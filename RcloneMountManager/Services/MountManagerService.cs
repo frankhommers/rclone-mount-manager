@@ -1,0 +1,733 @@
+using CliWrap;
+using CliWrap.Buffered;
+using CliWrap.EventStream;
+using RcloneMountManager.Models;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace RcloneMountManager.Services;
+
+public sealed class MountManagerService
+{
+    private readonly ConcurrentDictionary<string, RunningMount> _runningMounts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _rcloneMountCommandCache = new(StringComparer.OrdinalIgnoreCase);
+
+    public async Task StartAsync(MountProfile profile, Action<string> log, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        var mountPoint = ResolveMountPoint(profile.MountPoint);
+
+        if (string.IsNullOrWhiteSpace(profile.Source) &&
+            !(profile.Type is MountType.Rclone && profile.QuickConnectMode is not QuickConnectMode.None))
+        {
+            throw new InvalidOperationException("Source is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(mountPoint))
+        {
+            throw new InvalidOperationException("Mount point is required.");
+        }
+
+        try
+        {
+            Directory.CreateDirectory(mountPoint);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var suggestion = Path.Combine(home, "Mounts", "my-mount");
+            throw new InvalidOperationException(
+                $"No write access to mount path '{profile.MountPoint}'. Choose a folder inside your home directory, for example '{suggestion}'.",
+                ex);
+        }
+
+        if (!string.Equals(profile.MountPoint, mountPoint, StringComparison.Ordinal))
+        {
+            log($"Resolved mount path '{profile.MountPoint}' -> '{mountPoint}'.");
+        }
+
+        if (profile.Type is MountType.Rclone)
+        {
+            await StartRcloneAsync(profile, mountPoint, log, cancellationToken);
+            return;
+        }
+
+        await StartNfsAsync(profile, mountPoint, log, cancellationToken);
+    }
+
+    public async Task StopAsync(MountProfile profile, Action<string> log, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        var mountPoint = ResolveMountPoint(profile.MountPoint);
+
+        if (profile.Type is MountType.Rclone && _runningMounts.TryRemove(mountPoint, out var runningMount))
+        {
+            runningMount.Cancellation.Cancel();
+
+            try
+            {
+                await runningMount.Execution;
+            }
+            catch (OperationCanceledException)
+            {
+                log("rclone process cancelled.");
+            }
+        }
+
+        await UnmountAsync(mountPoint, log, cancellationToken);
+    }
+
+    public async Task<bool> IsMountedAsync(string mountPoint, CancellationToken cancellationToken)
+    {
+        mountPoint = ResolveMountPoint(mountPoint);
+
+        var result = await Cli.Wrap("mount")
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        if (result.ExitCode != 0)
+        {
+            return false;
+        }
+
+        var target = $" on {mountPoint}";
+        return result.StandardOutput.Contains(target, StringComparison.Ordinal);
+    }
+
+    public bool IsRunning(string mountPoint) => _runningMounts.ContainsKey(ResolveMountPoint(mountPoint));
+
+    public async Task TestConnectionAsync(MountProfile profile, Action<string> log, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        if (profile.Type is MountType.Nfs)
+        {
+            throw new InvalidOperationException("Connectivity test currently supports rclone profiles only.");
+        }
+
+        var binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
+
+        List<string> arguments;
+        if (profile.QuickConnectMode is QuickConnectMode.None)
+        {
+            var target = BuildConnectivityTarget(profile.Source);
+            arguments = new List<string> { "lsd", target, "--max-depth", "1" };
+        }
+        else
+        {
+            var source = ResolveRcloneSource(profile);
+            arguments = new List<string> { "lsd", source, "--max-depth", "1" };
+            await AddQuickConnectArgumentsAsync(profile, arguments, cancellationToken);
+        }
+
+        var result = await Cli.Wrap(binary)
+            .WithArguments(arguments)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(result.StandardOutput))
+        {
+            log(result.StandardOutput.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.StandardError))
+        {
+            log($"ERR: {result.StandardError.Trim()}");
+        }
+
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Connectivity test failed with exit code {result.ExitCode}.");
+        }
+
+        log("Connectivity test succeeded.");
+    }
+
+    public string GenerateScript(MountProfile profile)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine("#!/usr/bin/env bash");
+        builder.AppendLine("set -euo pipefail");
+        builder.AppendLine();
+        builder.AppendLine($"MOUNT_POINT=\"{EscapeForBash(ResolveMountPointForScript(profile.MountPoint))}\"");
+        builder.AppendLine();
+        builder.AppendLine("mkdir -p \"$MOUNT_POINT\"");
+
+        if (profile.Type is MountType.Rclone)
+        {
+            var binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
+            var mountCommand = GetRcloneMountCommandForScript(binary);
+            var source = ResolveRcloneSource(profile);
+
+            builder.Append("\"");
+            builder.Append(EscapeForBash(binary));
+            builder.Append("\" ");
+            builder.Append(mountCommand);
+            builder.Append(' ');
+            builder.Append(EscapeArgument(source));
+            builder.Append(" \"$MOUNT_POINT\"");
+            AppendQuickConnectScriptArgs(profile, builder);
+
+            var options = ParseArguments(profile.ExtraOptions);
+            foreach (var option in options)
+            {
+                builder.Append(' ');
+                builder.Append(EscapeArgument(option));
+            }
+
+            builder.AppendLine();
+        }
+        else
+        {
+            builder.Append("mount -t nfs ");
+            if (!string.IsNullOrWhiteSpace(profile.ExtraOptions))
+            {
+                builder.Append("-o ");
+                builder.Append(EscapeArgument(profile.ExtraOptions));
+                builder.Append(' ');
+            }
+
+            builder.Append(EscapeArgument(profile.Source));
+            builder.Append(" \"$MOUNT_POINT\"");
+            builder.AppendLine();
+        }
+
+        return builder.ToString();
+    }
+
+    private async Task StartRcloneAsync(MountProfile profile, string mountPoint, Action<string> log, CancellationToken cancellationToken)
+    {
+        if (_runningMounts.ContainsKey(mountPoint))
+        {
+            throw new InvalidOperationException("rclone mount is already running for this mount point.");
+        }
+
+        var source = ResolveRcloneSource(profile);
+        var binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
+        var mountCommand = await ResolveRcloneMountCommandAsync(binary, log, cancellationToken);
+        var arguments = new List<string> { mountCommand, source, mountPoint };
+        await AddQuickConnectArgumentsAsync(profile, arguments, cancellationToken);
+
+        arguments.AddRange(ParseArguments(profile.ExtraOptions));
+
+        var command = Cli.Wrap(binary)
+            .WithArguments(arguments)
+            .WithValidation(CommandResultValidation.None);
+
+        var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var runTask = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var cmdEvent in command.ListenAsync(linkedCancellation.Token))
+                {
+                    switch (cmdEvent)
+                    {
+                        case StartedCommandEvent started:
+                            log($"rclone {mountCommand} started (PID {started.ProcessId}).");
+                            break;
+                        case StandardOutputCommandEvent stdout when !string.IsNullOrWhiteSpace(stdout.Text):
+                            log(stdout.Text);
+                            break;
+                        case StandardErrorCommandEvent stderr when !string.IsNullOrWhiteSpace(stderr.Text):
+                            log($"ERR: {stderr.Text}");
+                            break;
+                        case ExitedCommandEvent exited:
+                            log($"rclone {mountCommand} exited with code {exited.ExitCode}.");
+                            break;
+                    }
+                }
+            }
+            finally
+            {
+                _runningMounts.TryRemove(mountPoint, out _);
+            }
+        }, CancellationToken.None);
+
+        if (!_runningMounts.TryAdd(mountPoint, new RunningMount(linkedCancellation, runTask)))
+        {
+            linkedCancellation.Cancel();
+            throw new InvalidOperationException("Could not track running mount process.");
+        }
+
+        await Task.Delay(250, cancellationToken);
+    }
+
+    private async Task StartNfsAsync(MountProfile profile, string mountPoint, Action<string> log, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(profile.ExtraOptions) && profile.ExtraOptions.Contains("--", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("NFS options look like rclone flags (contain '--'). Use NFS options such as 'nfsvers=4,resvport' or switch type to Rclone.");
+        }
+
+        var arguments = new List<string> { "-t", "nfs" };
+
+        if (!string.IsNullOrWhiteSpace(profile.ExtraOptions))
+        {
+            arguments.Add("-o");
+            arguments.Add(profile.ExtraOptions);
+        }
+
+        arguments.Add(profile.Source);
+        arguments.Add(mountPoint);
+
+        var result = await Cli.Wrap("mount")
+            .WithArguments(arguments)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(result.StandardOutput))
+        {
+            log(result.StandardOutput.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.StandardError))
+        {
+            log($"ERR: {result.StandardError.Trim()}");
+        }
+
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"NFS mount failed with exit code {result.ExitCode}.");
+        }
+    }
+
+    private async Task UnmountAsync(string mountPoint, Action<string> log, CancellationToken cancellationToken)
+    {
+        if (!await IsMountedAsync(mountPoint, cancellationToken))
+        {
+            log("Mount point is not mounted.");
+            return;
+        }
+
+        var unmountCandidates = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
+            ? new[]
+            {
+                (Binary: "fusermount", Args: new[] { "-u", mountPoint }),
+                (Binary: "umount", Args: new[] { mountPoint }),
+            }
+            : new[]
+            {
+                (Binary: "umount", Args: new[] { mountPoint }),
+            };
+
+        foreach (var candidate in unmountCandidates)
+        {
+            var result = await Cli.Wrap(candidate.Binary)
+                .WithArguments(candidate.Args)
+                .WithValidation(CommandResultValidation.None)
+                .ExecuteBufferedAsync(cancellationToken);
+
+            if (result.ExitCode == 0)
+            {
+                log($"Unmounted {mountPoint} via {candidate.Binary}.");
+                return;
+            }
+        }
+
+        throw new InvalidOperationException($"Could not unmount {mountPoint}. Try unmounting manually.");
+    }
+
+    private static string ResolveMountPoint(string mountPoint)
+    {
+        if (string.IsNullOrWhiteSpace(mountPoint))
+        {
+            return mountPoint;
+        }
+
+        var trimmed = mountPoint.Trim();
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        if (trimmed == "~")
+        {
+            return home;
+        }
+
+        if (trimmed.StartsWith("~/", StringComparison.Ordinal))
+        {
+            return Path.Combine(home, trimmed[2..]);
+        }
+
+        return trimmed;
+    }
+
+    private static string ResolveMountPointForScript(string mountPoint)
+    {
+        if (string.IsNullOrWhiteSpace(mountPoint))
+        {
+            return mountPoint;
+        }
+
+        var trimmed = mountPoint.Trim();
+        if (trimmed == "~")
+        {
+            return "$HOME";
+        }
+
+        if (trimmed.StartsWith("~/", StringComparison.Ordinal))
+        {
+            return "$HOME/" + trimmed[2..];
+        }
+
+        return trimmed;
+    }
+
+    private static string BuildConnectivityTarget(string source)
+    {
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            throw new InvalidOperationException("Source is required for connectivity test.");
+        }
+
+        var trimmed = source.Trim();
+        var colonIndex = trimmed.IndexOf(':');
+        if (colonIndex <= 0)
+        {
+            return trimmed;
+        }
+
+        return trimmed[..(colonIndex + 1)];
+    }
+
+    private static IReadOnlyList<string> ParseArguments(string input)
+    {
+        var args = new List<string>();
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return args;
+        }
+
+        var current = new StringBuilder();
+        var inQuotes = false;
+
+        foreach (var ch in input)
+        {
+            if (ch == '"')
+            {
+                inQuotes = !inQuotes;
+                continue;
+            }
+
+            if (!inQuotes && char.IsWhiteSpace(ch))
+            {
+                if (current.Length > 0)
+                {
+                    args.Add(current.ToString());
+                    current.Clear();
+                }
+
+                continue;
+            }
+
+            current.Append(ch);
+        }
+
+        if (current.Length > 0)
+        {
+            args.Add(current.ToString());
+        }
+
+        return args;
+    }
+
+    private static string EscapeForBash(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+    private static string EscapeArgument(string value)
+    {
+        var escaped = value.Replace("'", "'\"'\"'");
+        return $"'{escaped}'";
+    }
+
+    private static string ResolveRcloneSource(MountProfile profile)
+    {
+        if (profile.QuickConnectMode is not QuickConnectMode.None)
+        {
+            var subPath = string.IsNullOrWhiteSpace(profile.Source) ? "/" : profile.Source.Trim();
+            if (!subPath.StartsWith("/", StringComparison.Ordinal))
+            {
+                subPath = "/" + subPath;
+            }
+
+            var backend = profile.QuickConnectMode switch
+            {
+                QuickConnectMode.WebDav => "webdav",
+                QuickConnectMode.Sftp => "sftp",
+                QuickConnectMode.Ftp => "ftp",
+                QuickConnectMode.Ftps => "ftp",
+                _ => "",
+            };
+
+            return $":{backend}:{subPath}";
+        }
+
+        return profile.Source;
+    }
+
+    private static void AppendQuickConnectScriptArgs(MountProfile profile, StringBuilder builder)
+    {
+        switch (profile.QuickConnectMode)
+        {
+            case QuickConnectMode.None:
+                return;
+            case QuickConnectMode.WebDav:
+                EnsureNotEmpty(profile.QuickConnectEndpoint, "WebDAV URL is required.");
+                builder.Append(" --webdav-url ");
+                builder.Append(EscapeArgument(profile.QuickConnectEndpoint));
+                builder.Append(" --webdav-vendor ");
+                builder.Append(EscapeArgument("other"));
+                if (!string.IsNullOrWhiteSpace(profile.QuickConnectUsername))
+                {
+                    builder.Append(" --webdav-user ");
+                    builder.Append(EscapeArgument(profile.QuickConnectUsername));
+                }
+
+                builder.Append(" --webdav-pass ");
+                builder.Append(BuildScriptPasswordValue(profile, "WEBDAV_PASSWORD"));
+                return;
+            case QuickConnectMode.Sftp:
+                EnsureNotEmpty(profile.QuickConnectEndpoint, "SFTP host is required.");
+                builder.Append(" --sftp-host ");
+                builder.Append(EscapeArgument(profile.QuickConnectEndpoint));
+                AppendOptionalPort(builder, "sftp", profile.QuickConnectPort);
+                if (!string.IsNullOrWhiteSpace(profile.QuickConnectUsername))
+                {
+                    builder.Append(" --sftp-user ");
+                    builder.Append(EscapeArgument(profile.QuickConnectUsername));
+                }
+
+                builder.Append(" --sftp-pass ");
+                builder.Append(BuildScriptPasswordValue(profile, "SFTP_PASSWORD"));
+                return;
+            case QuickConnectMode.Ftp:
+            case QuickConnectMode.Ftps:
+                EnsureNotEmpty(profile.QuickConnectEndpoint, "FTP host is required.");
+                builder.Append(" --ftp-host ");
+                builder.Append(EscapeArgument(profile.QuickConnectEndpoint));
+                AppendOptionalPort(builder, "ftp", profile.QuickConnectPort);
+                if (!string.IsNullOrWhiteSpace(profile.QuickConnectUsername))
+                {
+                    builder.Append(" --ftp-user ");
+                    builder.Append(EscapeArgument(profile.QuickConnectUsername));
+                }
+
+                if (profile.QuickConnectMode is QuickConnectMode.Ftps)
+                {
+                    builder.Append(" --ftp-tls");
+                }
+
+                builder.Append(" --ftp-pass ");
+                builder.Append(BuildScriptPasswordValue(profile, "FTP_PASSWORD"));
+                return;
+        }
+    }
+
+    private static string BuildScriptPasswordValue(MountProfile profile, string envVar)
+    {
+        if (profile.AllowInsecurePasswordsInScript)
+        {
+            return EscapeArgument(profile.QuickConnectPassword);
+        }
+
+        return $"\"${{{envVar}:?set {envVar}}}\"";
+    }
+
+    private async Task AddQuickConnectArgumentsAsync(MountProfile profile, List<string> arguments, CancellationToken cancellationToken)
+    {
+        switch (profile.QuickConnectMode)
+        {
+            case QuickConnectMode.None:
+                return;
+            case QuickConnectMode.WebDav:
+                EnsureNotEmpty(profile.QuickConnectEndpoint, "WebDAV URL is required.");
+                arguments.Add("--webdav-url");
+                arguments.Add(profile.QuickConnectEndpoint);
+                arguments.Add("--webdav-vendor");
+                arguments.Add("other");
+                if (!string.IsNullOrWhiteSpace(profile.QuickConnectUsername))
+                {
+                    arguments.Add("--webdav-user");
+                    arguments.Add(profile.QuickConnectUsername);
+                }
+
+                await AddObscuredPasswordArgumentAsync(profile, arguments, "--webdav-pass", profile.QuickConnectPassword, cancellationToken);
+                return;
+            case QuickConnectMode.Sftp:
+                EnsureNotEmpty(profile.QuickConnectEndpoint, "SFTP host is required.");
+                arguments.Add("--sftp-host");
+                arguments.Add(profile.QuickConnectEndpoint);
+                AddOptionalPort(arguments, "--sftp-port", profile.QuickConnectPort);
+                if (!string.IsNullOrWhiteSpace(profile.QuickConnectUsername))
+                {
+                    arguments.Add("--sftp-user");
+                    arguments.Add(profile.QuickConnectUsername);
+                }
+
+                await AddObscuredPasswordArgumentAsync(profile, arguments, "--sftp-pass", profile.QuickConnectPassword, cancellationToken);
+                return;
+            case QuickConnectMode.Ftp:
+            case QuickConnectMode.Ftps:
+                EnsureNotEmpty(profile.QuickConnectEndpoint, "FTP host is required.");
+                arguments.Add("--ftp-host");
+                arguments.Add(profile.QuickConnectEndpoint);
+                AddOptionalPort(arguments, "--ftp-port", profile.QuickConnectPort);
+                if (!string.IsNullOrWhiteSpace(profile.QuickConnectUsername))
+                {
+                    arguments.Add("--ftp-user");
+                    arguments.Add(profile.QuickConnectUsername);
+                }
+
+                if (profile.QuickConnectMode is QuickConnectMode.Ftps)
+                {
+                    arguments.Add("--ftp-tls");
+                }
+
+                await AddObscuredPasswordArgumentAsync(profile, arguments, "--ftp-pass", profile.QuickConnectPassword, cancellationToken);
+                return;
+        }
+    }
+
+    private async Task AddObscuredPasswordArgumentAsync(MountProfile profile, List<string> arguments, string argumentName, string rawPassword, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(rawPassword))
+        {
+            return;
+        }
+
+        var obscureResult = await Cli.Wrap(string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath)
+            .WithArguments(["obscure", rawPassword])
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        if (obscureResult.ExitCode != 0 || string.IsNullOrWhiteSpace(obscureResult.StandardOutput))
+        {
+            throw new InvalidOperationException("Could not process password via 'rclone obscure'.");
+        }
+
+        arguments.Add(argumentName);
+        arguments.Add(obscureResult.StandardOutput.Trim());
+    }
+
+    private static void EnsureNotEmpty(string value, string message)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    private static void AddOptionalPort(List<string> arguments, string argName, string port)
+    {
+        if (!string.IsNullOrWhiteSpace(port))
+        {
+            arguments.Add(argName);
+            arguments.Add(port.Trim());
+        }
+    }
+
+    private static void AppendOptionalPort(StringBuilder builder, string protocol, string port)
+    {
+        if (!string.IsNullOrWhiteSpace(port))
+        {
+            builder.Append($" --{protocol}-port ");
+            builder.Append(EscapeArgument(port.Trim()));
+        }
+    }
+
+    private async Task<string> ResolveRcloneMountCommandAsync(string binary, Action<string> log, CancellationToken cancellationToken)
+    {
+        if (_rcloneMountCommandCache.TryGetValue(binary, out var cached))
+        {
+            return cached;
+        }
+
+        var hasMount = await HasRcloneSubcommandAsync(binary, "mount", cancellationToken);
+        var hasNfsMount = await HasRcloneSubcommandAsync(binary, "nfsmount", cancellationToken);
+
+        if (!hasMount && !hasNfsMount)
+        {
+            throw new InvalidOperationException("Could not find 'mount' or 'nfsmount' in this rclone build.");
+        }
+
+        var selected = hasMount ? "mount" : "nfsmount";
+
+        if (OperatingSystem.IsMacOS())
+        {
+            var tags = await GetRcloneGoTagsAsync(binary, cancellationToken);
+            var hasCmount = tags.Contains("cmount", StringComparison.OrdinalIgnoreCase);
+
+            selected = hasCmount && hasMount
+                ? "mount"
+                : hasNfsMount
+                    ? "nfsmount"
+                    : "mount";
+
+            var tagText = string.IsNullOrWhiteSpace(tags) ? "none" : tags;
+            log($"Detected rclone tags '{tagText}', using '{selected}'.");
+        }
+        else
+        {
+            log($"Using rclone command '{selected}'.");
+        }
+
+        _rcloneMountCommandCache[binary] = selected;
+        return selected;
+    }
+
+    private string GetRcloneMountCommandForScript(string binary)
+    {
+        if (_rcloneMountCommandCache.TryGetValue(binary, out var detected))
+        {
+            return detected;
+        }
+
+        return OperatingSystem.IsMacOS() ? "nfsmount" : "mount";
+    }
+
+    private static async Task<bool> HasRcloneSubcommandAsync(string binary, string subcommand, CancellationToken cancellationToken)
+    {
+        var result = await Cli.Wrap(binary)
+            .WithArguments(["help", subcommand])
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        return result.ExitCode == 0;
+    }
+
+    private static async Task<string> GetRcloneGoTagsAsync(string binary, CancellationToken cancellationToken)
+    {
+        var result = await Cli.Wrap(binary)
+            .WithArguments(["version"])
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        if (result.ExitCode != 0 || string.IsNullOrWhiteSpace(result.StandardOutput))
+        {
+            return string.Empty;
+        }
+
+        var lines = result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var line in lines)
+        {
+            var marker = "go/tags:";
+            var index = line.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+            {
+                continue;
+            }
+
+            return line[(index + marker.Length)..].Trim();
+        }
+
+        return string.Empty;
+    }
+
+    private sealed record RunningMount(CancellationTokenSource Cancellation, Task Execution);
+}
