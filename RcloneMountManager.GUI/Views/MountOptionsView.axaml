@@ -248,12 +248,18 @@
                    FontStyle="Italic"/>
 
         <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding !IsLoading}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <StackPanel Spacing="4"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:MountOptionGroupViewModel">
                     <Expander IsExpanded="{Binding IsExpanded}"
-                              Margin="0,0,0,4">
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Stretch">
                         <Expander.Header>
-                            <Grid ColumnDefinitions="*,Auto">
+                            <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
                                 <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
                                 <Border Grid.Column="1"
                                         Background="{DynamicResource SystemAccentColorDark1}"
@@ -269,7 +275,13 @@
                             </Grid>
                         </Expander.Header>
                         <ItemsControl ItemsSource="{Binding VisibleOptions}" Margin="0,4,0,0"
+                                      HorizontalAlignment="Stretch"
                                       ItemTemplate="{DynamicResource OptionTemplateSelector}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="1"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
                         </ItemsControl>
                     </Expander>
                 </DataTemplate>
