@@ -60,7 +60,7 @@
                                HorizontalAlignment="Stretch">
                          <ComboBox.ItemTemplate>
                              <DataTemplate>
-                                 <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding}"/>
+                                 <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="500" ToolTip.Tip="{Binding}"/>
                              </DataTemplate>
                          </ComboBox.ItemTemplate>
                      </ComboBox>
@@ -168,8 +168,9 @@
                         <ComboBox Grid.Column="1"
                                   ItemsSource="{Binding SizeSuffixUnits}"
                                   SelectedItem="{Binding SizeSuffixUnit}"
-                                  MinWidth="80"
-                                  Margin="4,0,0,0"/>
+                                  MinWidth="90"
+                                  Margin="4,0,0,0"
+                                  HorizontalAlignment="Right"/>
                     </Grid>
                     <Button Grid.Row="0" Grid.Column="2"
                             Command="{Binding ResetToDefaultCommand}"
