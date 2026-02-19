@@ -57,7 +57,13 @@
                                Margin="8,0,0,0"
                                MinWidth="200"
                                MaxDropDownHeight="300"
-                               HorizontalAlignment="Stretch"/>
+                               HorizontalAlignment="Stretch">
+                         <ComboBox.ItemTemplate>
+                             <DataTemplate>
+                                 <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding}"/>
+                             </DataTemplate>
+                         </ComboBox.ItemTemplate>
+                     </ComboBox>
                     <Button Grid.Row="0" Grid.Column="2"
                             Command="{Binding ResetToDefaultCommand}"
                             Padding="6,4" Margin="4,0,0,0"
