@@ -15,6 +15,102 @@ public class MountOptionInputViewModelTests
     }
 
     [Fact]
+    public void StringList_InitWithCommaSeparatedValue_PopulatesItems()
+    {
+        var option = new RcloneOption { Name = "exclude", Type = "CommaSepList" };
+        var vm = new MountOptionInputViewModel(option, "*.tmp,*.bak,*.log");
+
+        Assert.Equal(3, vm.StringListItems.Count);
+        Assert.Equal("*.tmp", vm.StringListItems[0].Text);
+        Assert.Equal("*.bak", vm.StringListItems[1].Text);
+        Assert.Equal("*.log", vm.StringListItems[2].Text);
+    }
+
+    [Fact]
+    public void StringList_ModifyItem_SyncsToValue()
+    {
+        var option = new RcloneOption { Name = "exclude", Type = "CommaSepList" };
+        var vm = new MountOptionInputViewModel(option, "*.tmp,*.bak");
+
+        vm.StringListItems[1].Text = "*.cache";
+
+        Assert.Equal("*.tmp,*.cache", vm.Value);
+    }
+
+    [Fact]
+    public void StringList_AddItem_AppearsInCollection()
+    {
+        var option = new RcloneOption { Name = "exclude", Type = "CommaSepList" };
+        var vm = new MountOptionInputViewModel(option);
+
+        vm.AddStringListItemCommand.Execute(null);
+
+        Assert.Single(vm.StringListItems);
+    }
+
+    [Fact]
+    public void StringList_RemoveItem_SyncsToValue()
+    {
+        var option = new RcloneOption { Name = "exclude", Type = "CommaSepList" };
+        var vm = new MountOptionInputViewModel(option, "*.tmp,*.bak");
+
+        vm.StringListItems[0].RemoveCommand.Execute(null);
+
+        Assert.Single(vm.StringListItems);
+        Assert.Equal("*.bak", vm.Value);
+    }
+
+    [Fact]
+    public void StringList_SpaceSeparated_UsesSpaceSeparator()
+    {
+        var option = new RcloneOption { Name = "include", Type = "SpaceSepList" };
+        var vm = new MountOptionInputViewModel(option, "one two");
+
+        vm.AddStringListItemCommand.Execute(null);
+        vm.StringListItems[2].Text = "three";
+
+        Assert.Equal("one two three", vm.Value);
+    }
+
+    [Fact]
+    public void StringList_KeyValueHeaders_ParsedCorrectly()
+    {
+        var option = new RcloneOption { Name = "headers", Type = "CommaSepList" };
+        var vm = new MountOptionInputViewModel(option, "Accept: application/json,Cache-Control: no-cache");
+
+        Assert.True(vm.IsKeyValue);
+        Assert.Equal("Accept", vm.StringListItems[0].Key);
+        Assert.Equal("application/json", vm.StringListItems[0].ItemValue);
+        Assert.Equal("Cache-Control", vm.StringListItems[1].Key);
+        Assert.Equal("no-cache", vm.StringListItems[1].ItemValue);
+    }
+
+    [Fact]
+    public void StringList_KeyValueHeaders_SerializesCorrectly()
+    {
+        var option = new RcloneOption { Name = "headers", Type = "CommaSepList" };
+        var vm = new MountOptionInputViewModel(option);
+
+        vm.AddStringListItemCommand.Execute(null);
+        vm.StringListItems[0].Key = "Accept";
+        vm.StringListItems[0].ItemValue = "application/json";
+
+        Assert.Equal("Accept: application/json", vm.Value);
+    }
+
+    [Fact]
+    public void StringList_Reset_ClearsItems()
+    {
+        var option = new RcloneOption { Name = "exclude", Type = "CommaSepList" };
+        var vm = new MountOptionInputViewModel(option, "*.tmp,*.bak");
+
+        vm.ResetToDefaultCommand.Execute(null);
+
+        Assert.Empty(vm.StringListItems);
+        Assert.Equal(string.Empty, vm.Value);
+    }
+
+    [Fact]
     public void Toggle_BoolValue_SyncsToValueString()
     {
         var option = new RcloneOption { Name = "debug_fuse", Type = "bool" };

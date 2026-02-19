@@ -3,7 +3,9 @@ using CommunityToolkit.Mvvm.Input;
 using RcloneMountManager.Core.Helpers;
 using RcloneMountManager.Core.Models;
 using System;
+using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace RcloneMountManager.Core.ViewModels;
 
@@ -20,6 +22,9 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     public OptionControlType ControlType => Option.GetControlType();
     public IReadOnlyList<string>? EnumValues => Option.GetEnumValues();
     public static IReadOnlyList<string> SizeSuffixUnits => SizeSuffixHelper.Units;
+    public ObservableCollection<StringListItemViewModel> StringListItems { get; } = [];
+    public bool IsKeyValue => Option.IsKeyValue;
+    public string ListSeparator => Option.ListSeparator;
 
     public abstract string Label { get; }
 
@@ -75,6 +80,9 @@ public abstract partial class TypedOptionViewModel : ObservableObject
                     break;
                 case OptionControlType.ComboBox:
                     SelectedEnumValue = string.IsNullOrEmpty(currentValue) ? null : currentValue;
+                    break;
+                case OptionControlType.StringList:
+                    InitializeStringListFromValue(currentValue);
                     break;
             }
         }
@@ -177,6 +185,9 @@ public abstract partial class TypedOptionViewModel : ObservableObject
                 case OptionControlType.ComboBox:
                     SelectedEnumValue = string.IsNullOrEmpty(value) ? null : value;
                     break;
+                case OptionControlType.StringList:
+                    InitializeStringListFromValue(value);
+                    break;
             }
         }
         finally
@@ -186,6 +197,54 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     }
 
     protected virtual void OnValueChangedExtra(string value) { }
+
+    [RelayCommand]
+    public void AddStringListItem()
+    {
+        StringListItems.Add(CreateStringListItem());
+    }
+
+    private StringListItemViewModel CreateStringListItem()
+    {
+        return new StringListItemViewModel(
+            IsKeyValue,
+            item =>
+            {
+                StringListItems.Remove(item);
+                SyncStringListToValue();
+            },
+            SyncStringListToValue);
+    }
+
+    private void SyncStringListToValue()
+    {
+        if (_syncing) return;
+
+        var newValue = string.Join(
+            ListSeparator,
+            StringListItems
+                .Select(item => item.Serialize())
+                .Where(serialized => !string.IsNullOrWhiteSpace(serialized)));
+
+        SyncToString(newValue);
+    }
+
+    private void InitializeStringListFromValue(string? currentValue)
+    {
+        StringListItems.Clear();
+        if (string.IsNullOrWhiteSpace(currentValue)) return;
+
+        var values = currentValue.Split(
+            ListSeparator,
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var value in values)
+        {
+            var item = CreateStringListItem();
+            item.Deserialize(value);
+            StringListItems.Add(item);
+        }
+    }
 
     [RelayCommand]
     protected virtual void ResetToDefault()
