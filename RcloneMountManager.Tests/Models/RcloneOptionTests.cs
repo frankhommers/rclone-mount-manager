@@ -15,7 +15,7 @@ public class RcloneOptionTests
     [InlineData("SizeSuffix", OptionControlType.SizeSuffix)]
     [InlineData("CacheMode", OptionControlType.ComboBox)]
     [InlineData("memory|disk|symlink", OptionControlType.ComboBox)]
-    [InlineData("stringArray", OptionControlType.Text)]
+    [InlineData("stringArray", OptionControlType.StringList)]
     public void GetControlType_ReturnsCorrectType(string rcloneType, OptionControlType expected)
     {
         var option = new RcloneOption { Type = rcloneType };

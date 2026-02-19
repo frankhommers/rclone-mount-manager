@@ -13,6 +13,8 @@ public sealed class RcloneBackendOption : IRcloneOptionDefinition
     public bool IsPassword { get; set; }
     public bool Advanced { get; set; }
     public IReadOnlyList<string>? Examples { get; set; }
+    public string ListSeparator => Type == "SpaceSepList" ? " " : ",";
+    public bool IsKeyValue => string.Equals(Name, "headers", StringComparison.OrdinalIgnoreCase);
 
     public OptionControlType GetControlType()
     {
@@ -23,6 +25,7 @@ public sealed class RcloneBackendOption : IRcloneOptionDefinition
             "int" or "int64" or "uint32" or "float64" => OptionControlType.Numeric,
             "Duration" => OptionControlType.Duration,
             "SizeSuffix" => OptionControlType.SizeSuffix,
+            "CommaSepList" or "SpaceSepList" or "stringArray" => OptionControlType.StringList,
             _ => OptionControlType.Text,
         };
 

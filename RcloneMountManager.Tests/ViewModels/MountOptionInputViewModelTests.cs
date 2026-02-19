@@ -6,6 +6,15 @@ namespace RcloneMountManager.Tests.ViewModels;
 public class MountOptionInputViewModelTests
 {
     [Fact]
+    public void StringList_ControlType_DetectedForStringArray()
+    {
+        var option = new RcloneOption { Name = "exclude", Type = "stringArray" };
+        var vm = new MountOptionInputViewModel(option);
+
+        Assert.Equal(OptionControlType.StringList, vm.ControlType);
+    }
+
+    [Fact]
     public void Toggle_BoolValue_SyncsToValueString()
     {
         var option = new RcloneOption { Name = "debug_fuse", Type = "bool" };

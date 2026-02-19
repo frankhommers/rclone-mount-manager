@@ -13,6 +13,8 @@ public sealed class RcloneOption : IRcloneOptionDefinition
     public bool Required { get; set; }
     public bool IsPassword { get; set; }
     public string? Groups { get; set; }
+    public string ListSeparator => Type == "SpaceSepList" ? " " : ",";
+    public bool IsKeyValue => string.Equals(Name, "headers", System.StringComparison.OrdinalIgnoreCase);
 
     public IReadOnlyList<string>? GetEnumValues()
     {
@@ -38,7 +40,7 @@ public sealed class RcloneOption : IRcloneOptionDefinition
             "SizeSuffix" => OptionControlType.SizeSuffix,
             "FileMode" => OptionControlType.Text,
             "string" => OptionControlType.Text,
-            "stringArray" or "SpaceSepList" => OptionControlType.Text,
+            "stringArray" or "SpaceSepList" or "CommaSepList" => OptionControlType.StringList,
             "BwTimetable" or "DumpFlags" or "Bits" or "Time" => OptionControlType.Text,
             _ => OptionControlType.Text,
         };
@@ -52,5 +54,6 @@ public enum OptionControlType
     Numeric,
     Duration,
     SizeSuffix,
+    StringList,
     ComboBox,
 }

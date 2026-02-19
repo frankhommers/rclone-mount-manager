@@ -11,6 +11,8 @@ public interface IRcloneOptionDefinition
     bool Advanced { get; }
     bool Required { get; }
     bool IsPassword { get; }
+    string ListSeparator { get; }
+    bool IsKeyValue { get; }
     OptionControlType GetControlType();
     IReadOnlyList<string>? GetEnumValues();
 }
