@@ -151,10 +151,6 @@
                                 <TextBox Grid.Column="1" Text="{Binding NewRemoteName}" Watermark="example: my-webdav" HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
                             </Grid>
 
-                            <CheckBox Content="Show advanced backend options"
-                                      IsChecked="{Binding ShowAdvancedBackendOptions}"
-                                      IsVisible="{Binding HasAdvancedBackendOptions}"/>
-
                             <ItemsControl ItemsSource="{Binding BackendOptionInputs}"
                                           IsVisible="{Binding HasBackendOptions}"
                                           ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
@@ -162,6 +158,23 @@
                             <TextBlock Text="No configurable options for this backend type."
                                        FontSize="11" Opacity="0.6"
                                        IsVisible="{Binding !HasBackendOptions}"/>
+
+                            <CheckBox Content="Show advanced backend options"
+                                      IsChecked="{Binding ShowAdvancedBackendOptions}"
+                                      IsVisible="{Binding HasAdvancedBackendOptions}"
+                                      Margin="0,8,0,0"/>
+
+                            <Border IsVisible="{Binding HasAdvancedBackendOptionInputs}"
+                                    BorderBrush="{DynamicResource SystemBaseLowColor}"
+                                    BorderThickness="0,1,0,0"
+                                    Padding="0,8,0,0"
+                                    Margin="0,4,0,0">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Advanced options" FontSize="12" FontWeight="SemiBold" Opacity="0.7" Margin="0,0,0,4"/>
+                                    <ItemsControl ItemsSource="{Binding AdvancedBackendOptionInputs}"
+                                                  ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
+                                </StackPanel>
+                            </Border>
 
                             <Button Content="Create remote and use in selected profile"
                                     Command="{Binding CreateRemoteCommand}"
@@ -179,7 +192,13 @@
 
                             <Grid ColumnDefinitions="200,*">
                                 <TextBlock Text="Mount type" VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="1" ItemsSource="{Binding MountTypes}" SelectedItem="{Binding SelectedProfile.Type}" HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding MountTypes}" SelectedItem="{Binding SelectedProfile.Type}" HorizontalAlignment="Stretch" Margin="8,0,0,0">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                             </Grid>
 
                             <Grid ColumnDefinitions="200,*">

@@ -11,6 +11,7 @@
                                          TrueBrush="{DynamicResource SystemAccentColorDark1}"
                                          FalseBrush="Transparent"/>
         <converters:BoolToFontWeightConverter x:Key="ModifiedFontWeightConverter"/>
+        <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
 
         <DataTemplate x:Key="Toggle" x:CompileBindings="False">
             <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
@@ -123,7 +124,7 @@
                                 MinuteIncrement="1"
                                 Margin="8,0,0,0"
                                 MinWidth="200"
-                                HorizontalAlignment="Stretch"/>
+                                HorizontalAlignment="Left"/>
                     <Button Grid.Row="0" Grid.Column="2"
                             Command="{Binding ResetToDefaultCommand}"
                             Padding="6,4" Margin="4,0,0,0"

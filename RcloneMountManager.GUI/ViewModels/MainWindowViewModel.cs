@@ -67,6 +67,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<string> Logs { get; } = new();
     public ObservableCollection<RcloneBackendInfo> AvailableBackends { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> BackendOptionInputs { get; } = new();
+    public ObservableCollection<RcloneBackendOptionInput> AdvancedBackendOptionInputs { get; } = new();
 
     public MainWindowViewModel()
     {
@@ -169,6 +170,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public string SaveChangesButtonText => HasPendingChanges ? "Save changes *" : "Save changes";
 
     public bool HasBackendOptions => BackendOptionInputs.Count > 0;
+    public bool HasAdvancedBackendOptionInputs => AdvancedBackendOptionInputs.Count > 0;
 
     public string SelectedBackendDescription => SelectedBackend?.Details ?? string.Empty;
 
@@ -624,10 +626,12 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(SelectedBackendDescription));
         BackendOptionInputs.Clear();
+        AdvancedBackendOptionInputs.Clear();
         if (value is null)
         {
             HasAdvancedBackendOptions = false;
             OnPropertyChanged(nameof(HasBackendOptions));
+            OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));
             NotifyCommandStateChanged();
             return;
         }
@@ -638,6 +642,7 @@ public partial class MainWindowViewModel : ViewModelBase
         PopulateBackendOptionInputs(value);
 
         OnPropertyChanged(nameof(HasBackendOptions));
+        OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));
         NotifyCommandStateChanged();
     }
 
@@ -650,19 +655,33 @@ public partial class MainWindowViewModel : ViewModelBase
 
         PopulateBackendOptionInputs(SelectedBackend);
         OnPropertyChanged(nameof(HasBackendOptions));
+        OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));
     }
 
     private void PopulateBackendOptionInputs(RcloneBackendInfo backend)
     {
         BackendOptionInputs.Clear();
+        AdvancedBackendOptionInputs.Clear();
 
         foreach (var option in backend.Options
-                     .Where(o => o.Required || !o.Advanced || ShowAdvancedBackendOptions)
+                     .Where(o => o.Required || !o.Advanced)
                      .OrderByDescending(o => o.Required)
                      .ThenBy(o => o.Name, StringComparer.OrdinalIgnoreCase))
         {
             BackendOptionInputs.Add(new RcloneBackendOptionInput(option));
         }
+
+        if (ShowAdvancedBackendOptions)
+        {
+            foreach (var option in backend.Options
+                         .Where(o => o.Advanced && !o.Required)
+                         .OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                AdvancedBackendOptionInputs.Add(new RcloneBackendOptionInput(option));
+            }
+        }
+
+        OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));
     }
 
     partial void OnNewRemoteNameChanged(string value)

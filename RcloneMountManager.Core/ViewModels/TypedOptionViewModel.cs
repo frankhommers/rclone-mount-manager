@@ -53,28 +53,28 @@ public abstract partial class TypedOptionViewModel : ObservableObject
         _syncing = true;
         try
         {
-            _value = currentValue ?? string.Empty;
+            Value = currentValue ?? string.Empty;
             switch (ControlType)
             {
                 case OptionControlType.Toggle:
-                    _boolValue = string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
+                    BoolValue = string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
                     break;
                 case OptionControlType.Numeric:
-                    _numericValue = decimal.TryParse(currentValue, out var num) ? num : null;
+                    NumericValue = decimal.TryParse(currentValue, out var num) ? num : null;
                     break;
                 case OptionControlType.Duration:
-                    _durationValue = string.IsNullOrEmpty(currentValue) ? null : DurationHelper.Parse(currentValue);
+                    DurationValue = string.IsNullOrEmpty(currentValue) ? null : DurationHelper.Parse(currentValue);
                     break;
                 case OptionControlType.SizeSuffix:
                     if (!string.IsNullOrEmpty(currentValue))
                     {
                         var (sv, su) = SizeSuffixHelper.Parse(currentValue);
-                        _sizeSuffixNumericValue = sv;
-                        _sizeSuffixUnit = su;
+                        SizeSuffixNumericValue = sv;
+                        SizeSuffixUnit = su;
                     }
                     break;
                 case OptionControlType.ComboBox:
-                    _selectedEnumValue = string.IsNullOrEmpty(currentValue) ? null : currentValue;
+                    SelectedEnumValue = string.IsNullOrEmpty(currentValue) ? null : currentValue;
                     break;
             }
         }
