@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
+using System.Collections.Generic;
 
 namespace RcloneMountManager.Core.Models;
 
@@ -22,6 +23,9 @@ public partial class MountProfile : ObservableObject
 
     [ObservableProperty]
     private string _extraOptions = "--vfs-cache-mode full --dir-cache-time 10m";
+
+    [ObservableProperty]
+    private Dictionary<string, string> _mountOptions = new();
 
     [ObservableProperty]
     private string _rcloneBinaryPath = "rclone";
