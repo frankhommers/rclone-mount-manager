@@ -14,10 +14,17 @@ public static class OptionTemplateSelectorFactory
         var selector = new OptionControlTemplateSelector();
         foreach (var key in Keys)
         {
-            if (host.TryFindResource(key, themeVariant, out var resource) && resource is IDataTemplate)
+            // Try the host's own tree first, then fall back to Application resources.
+            // UserControl constructors run before the control is in the visual tree,
+            // so host.TryFindResource won't reach Application-level resources.
+            if (host.TryFindResource(key, themeVariant, out var resource) && resource is IDataTemplate template)
             {
-                var template = (IDataTemplate)resource;
                 selector.Templates[key] = template;
+            }
+            else if (Application.Current?.TryFindResource(key, themeVariant, out var appResource) == true
+                     && appResource is IDataTemplate appTemplate)
+            {
+                selector.Templates[key] = appTemplate;
             }
         }
 
