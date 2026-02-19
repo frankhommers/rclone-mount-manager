@@ -13,7 +13,7 @@ public partial class MountProfile : ObservableObject
     private string _name = "New profile";
 
     [ObservableProperty]
-    private MountType _type = MountType.Rclone;
+    private MountType _type = MountType.RcloneAuto;
 
     [ObservableProperty]
     private string _source = "remote:bucket";

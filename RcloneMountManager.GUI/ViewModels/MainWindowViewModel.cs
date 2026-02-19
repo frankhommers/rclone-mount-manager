@@ -119,28 +119,28 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public string SourceLabel => SelectedProfile?.Type switch
     {
-        MountType.Nfs => "NFS export",
+        MountType.MacOsNfs => "NFS export",
         _ => "Source",
     };
 
-    public string SourceHint => SelectedProfile?.Type is MountType.Nfs
+    public string SourceHint => SelectedProfile?.Type is MountType.MacOsNfs
         ? "Example: 192.168.1.10:/volume1/media"
         : "Example: remote:media";
 
     public string MountPointHint => $"Example: {DefaultMountPoint("media")}";
 
-    public string OptionsHint => SelectedProfile?.Type is MountType.Nfs
+    public string OptionsHint => SelectedProfile?.Type is MountType.MacOsNfs
         ? "Example: nfsvers=4,resvport"
         : "Example: --vfs-cache-mode full --dir-cache-time 15m";
 
-    public string SourceFormatHelp => SelectedProfile?.Type is MountType.Nfs
+    public string SourceFormatHelp => SelectedProfile?.Type is MountType.MacOsNfs
         ? "NFS uses host + export path directly."
         : "For rclone use remote:path (create remote first or use the backend builder).";
 
-    public bool CanUseQuickConnect => SelectedProfile?.Type is MountType.Rclone;
+    public bool CanUseQuickConnect => SelectedProfile?.Type is MountType.RcloneAuto;
 
     public bool ShowQuickConnectSettings =>
-        SelectedProfile?.Type is MountType.Rclone && SelectedProfile.QuickConnectMode is not QuickConnectMode.None;
+        SelectedProfile?.Type is MountType.RcloneAuto && SelectedProfile.QuickConnectMode is not QuickConnectMode.None;
 
     public bool ShowQuickConnectPort =>
         SelectedProfile?.QuickConnectMode is QuickConnectMode.Sftp or QuickConnectMode.Ftp or QuickConnectMode.Ftps;
@@ -179,7 +179,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var profile = new MountProfile
         {
             Name = $"Profile {Profiles.Count + 1}",
-            Type = MountType.Rclone,
+            Type = MountType.RcloneAuto,
             Source = "remote:bucket",
             MountPoint = DefaultMountPoint("new-mount"),
             ExtraOptions = "--vfs-cache-mode full",
@@ -245,7 +245,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 BackendOptionInputs,
                 cancellationToken);
 
-            activeProfile.Type = MountType.Rclone;
+            activeProfile.Type = MountType.RcloneAuto;
             activeProfile.QuickConnectMode = QuickConnectMode.None;
             activeProfile.Source = $"{NewRemoteName.Trim()}:/";
 
@@ -258,7 +258,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void UseRcloneExample()
     {
-        SelectedProfile.Type = MountType.Rclone;
+        SelectedProfile.Type = MountType.RcloneAuto;
         SelectedProfile.QuickConnectMode = QuickConnectMode.None;
         SelectedProfile.Source = "remote:media";
         SelectedProfile.MountPoint = DefaultMountPoint("media");
@@ -273,7 +273,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void UseWebDavExample()
     {
-        SelectedProfile.Type = MountType.Rclone;
+        SelectedProfile.Type = MountType.RcloneAuto;
         SelectedProfile.QuickConnectMode = QuickConnectMode.WebDav;
         SelectedProfile.Source = "/";
         SelectedProfile.MountPoint = DefaultMountPoint("webdav");
@@ -291,7 +291,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void UseSftpExample()
     {
-        SelectedProfile.Type = MountType.Rclone;
+        SelectedProfile.Type = MountType.RcloneAuto;
         SelectedProfile.QuickConnectMode = QuickConnectMode.Sftp;
         SelectedProfile.Source = "/";
         SelectedProfile.MountPoint = DefaultMountPoint("sftp");
@@ -309,7 +309,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void UseFtpExample()
     {
-        SelectedProfile.Type = MountType.Rclone;
+        SelectedProfile.Type = MountType.RcloneAuto;
         SelectedProfile.QuickConnectMode = QuickConnectMode.Ftp;
         SelectedProfile.Source = "/";
         SelectedProfile.MountPoint = DefaultMountPoint("ftp");
@@ -327,7 +327,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void UseFtpsExample()
     {
-        SelectedProfile.Type = MountType.Rclone;
+        SelectedProfile.Type = MountType.RcloneAuto;
         SelectedProfile.QuickConnectMode = QuickConnectMode.Ftps;
         SelectedProfile.Source = "/";
         SelectedProfile.MountPoint = DefaultMountPoint("ftps");
@@ -345,7 +345,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void UseNfsExample()
     {
-        SelectedProfile.Type = MountType.Nfs;
+        SelectedProfile.Type = MountType.MacOsNfs;
         SelectedProfile.QuickConnectMode = QuickConnectMode.None;
         SelectedProfile.Source = "192.168.1.10:/volume1/media";
         SelectedProfile.MountPoint = DefaultMountPoint("media");
@@ -618,7 +618,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool CanTestConnection() =>
         !IsBusy &&
         SelectedProfile is not null &&
-        SelectedProfile.Type is MountType.Rclone &&
+        SelectedProfile.Type is MountType.RcloneAuto &&
         !string.IsNullOrWhiteSpace(SelectedProfile.Source);
 
     private bool CanSaveScript() => !IsBusy && !string.IsNullOrWhiteSpace(GeneratedScript);
@@ -723,15 +723,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void OnObservedProfileChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(MountProfile.Type) && _observedProfile is not null && _observedProfile.Type is not MountType.Rclone)
+        if (e.PropertyName is nameof(MountProfile.Type) && _observedProfile is not null && _observedProfile.Type is MountType.MacOsNfs)
         {
             _observedProfile.QuickConnectMode = QuickConnectMode.None;
         }
 
         if (e.PropertyName is nameof(MountProfile.QuickConnectMode) && _observedProfile is not null &&
-            _observedProfile.QuickConnectMode is not QuickConnectMode.None && _observedProfile.Type is not MountType.Rclone)
+            _observedProfile.QuickConnectMode is not QuickConnectMode.None && _observedProfile.Type is MountType.MacOsNfs)
         {
-            _observedProfile.Type = MountType.Rclone;
+            _observedProfile.Type = MountType.RcloneAuto;
         }
 
         if (e.PropertyName is nameof(MountProfile.Source)
@@ -923,7 +923,7 @@ public partial class MainWindowViewModel : ViewModelBase
         return new MountProfile
         {
             Name = "Media remote",
-            Type = MountType.Rclone,
+            Type = MountType.RcloneAuto,
             Source = "remote:media",
             MountPoint = DefaultMountPoint("media"),
             ExtraOptions = "--vfs-cache-mode full --dir-cache-time 15m",
@@ -980,7 +980,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         public string Id { get; set; } = Guid.NewGuid().ToString("N");
         public string Name { get; set; } = "Profile";
-        public MountType Type { get; set; } = MountType.Rclone;
+        public MountType Type { get; set; } = MountType.RcloneAuto;
         public string Source { get; set; } = string.Empty;
         public string MountPoint { get; set; } = string.Empty;
         public string ExtraOptions { get; set; } = string.Empty;

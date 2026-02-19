@@ -25,7 +25,7 @@ public sealed class MountManagerService
         var mountPoint = ResolveMountPoint(profile.MountPoint);
 
         if (string.IsNullOrWhiteSpace(profile.Source) &&
-            !(profile.Type is MountType.Rclone && profile.QuickConnectMode is not QuickConnectMode.None))
+            !(IsRcloneMountType(profile.Type) && profile.QuickConnectMode is not QuickConnectMode.None))
         {
             throw new InvalidOperationException("Source is required.");
         }
@@ -53,7 +53,7 @@ public sealed class MountManagerService
             log($"Resolved mount path '{profile.MountPoint}' -> '{mountPoint}'.");
         }
 
-        if (profile.Type is MountType.Rclone)
+        if (IsRcloneMountType(profile.Type))
         {
             await StartRcloneAsync(profile, mountPoint, log, cancellationToken);
             return;
@@ -68,7 +68,7 @@ public sealed class MountManagerService
 
         var mountPoint = ResolveMountPoint(profile.MountPoint);
 
-        if (profile.Type is MountType.Rclone && _runningMounts.TryRemove(mountPoint, out var runningMount))
+        if (IsRcloneMountType(profile.Type) && _runningMounts.TryRemove(mountPoint, out var runningMount))
         {
             runningMount.Cancellation.Cancel();
 
@@ -108,7 +108,7 @@ public sealed class MountManagerService
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        if (profile.Type is MountType.Nfs)
+        if (profile.Type is MountType.MacOsNfs)
         {
             throw new InvalidOperationException("Connectivity test currently supports rclone profiles only.");
         }
@@ -161,10 +161,10 @@ public sealed class MountManagerService
         builder.AppendLine();
         builder.AppendLine("mkdir -p \"$MOUNT_POINT\"");
 
-        if (profile.Type is MountType.Rclone)
+        if (IsRcloneMountType(profile.Type))
         {
             var binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
-            var mountCommand = GetRcloneMountCommandForScript(binary);
+            var mountCommand = GetRcloneMountCommandForScript(binary, profile.Type);
             var source = ResolveRcloneSource(profile);
 
             builder.Append("\"");
@@ -233,7 +233,7 @@ public sealed class MountManagerService
 
         var source = ResolveRcloneSource(profile);
         var binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
-        var mountCommand = await ResolveRcloneMountCommandAsync(binary, log, cancellationToken);
+        var mountCommand = await ResolveRcloneMountCommandAsync(binary, profile.Type, log, cancellationToken);
         var arguments = new List<string> { mountCommand, source, mountPoint };
         await AddQuickConnectArgumentsAsync(profile, arguments, cancellationToken);
 
@@ -680,8 +680,23 @@ public sealed class MountManagerService
         }
     }
 
-    private async Task<string> ResolveRcloneMountCommandAsync(string binary, Action<string> log, CancellationToken cancellationToken)
+    private static bool IsRcloneMountType(MountType mountType) =>
+        mountType is MountType.RcloneAuto or MountType.RcloneFuse or MountType.RcloneNfs;
+
+    private async Task<string> ResolveRcloneMountCommandAsync(string binary, MountType mountType, Action<string> log, CancellationToken cancellationToken)
     {
+        if (mountType is MountType.RcloneFuse)
+        {
+            log("User forced FUSE mount.");
+            return "mount";
+        }
+
+        if (mountType is MountType.RcloneNfs)
+        {
+            log("User forced NFS mount via rclone.");
+            return "nfsmount";
+        }
+
         if (_rcloneMountCommandCache.TryGetValue(binary, out var cached))
         {
             return cached;
@@ -720,14 +735,19 @@ public sealed class MountManagerService
         return selected;
     }
 
-    private string GetRcloneMountCommandForScript(string binary)
+    private string GetRcloneMountCommandForScript(string binary, MountType mountType)
     {
         if (_rcloneMountCommandCache.TryGetValue(binary, out var detected))
         {
             return detected;
         }
 
-        return OperatingSystem.IsMacOS() ? "nfsmount" : "mount";
+        return mountType switch
+        {
+            MountType.RcloneFuse => "mount",
+            MountType.RcloneNfs => "nfsmount",
+            _ => OperatingSystem.IsMacOS() ? "nfsmount" : "mount",
+        };
     }
 
     private static async Task<bool> HasRcloneSubcommandAsync(string binary, string subcommand, CancellationToken cancellationToken)
