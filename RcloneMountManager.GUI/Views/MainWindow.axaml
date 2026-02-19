@@ -159,22 +159,18 @@
                                        FontSize="11" Opacity="0.6"
                                        IsVisible="{Binding !HasBackendOptions}"/>
 
-                            <CheckBox Content="Show advanced backend options"
-                                      IsChecked="{Binding ShowAdvancedBackendOptions}"
-                                      IsVisible="{Binding HasAdvancedBackendOptions}"
-                                      Margin="0,8,0,0"/>
-
-                            <Border IsVisible="{Binding HasAdvancedBackendOptionInputs}"
-                                    BorderBrush="{DynamicResource SystemBaseLowColor}"
-                                    BorderThickness="0,1,0,0"
-                                    Padding="0,8,0,0"
-                                    Margin="0,4,0,0">
-                                <StackPanel Spacing="2">
-                                    <TextBlock Text="Advanced options" FontSize="12" FontWeight="SemiBold" Opacity="0.7" Margin="0,0,0,4"/>
-                                    <ItemsControl ItemsSource="{Binding AdvancedBackendOptionInputs}"
-                                                  ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
-                                </StackPanel>
-                            </Border>
+                            <Expander IsVisible="{Binding HasAdvancedBackendOptions}"
+                                      IsExpanded="{Binding ShowAdvancedBackendOptions}"
+                                      HorizontalAlignment="Stretch"
+                                      HorizontalContentAlignment="Stretch"
+                                      Margin="0,4,0,0">
+                                <Expander.Header>
+                                    <TextBlock Text="Advanced options" FontWeight="SemiBold"/>
+                                </Expander.Header>
+                                <ItemsControl ItemsSource="{Binding AdvancedBackendOptionInputs}"
+                                              Margin="0,4,0,0"
+                                              ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
+                            </Expander>
 
                             <Button Content="Create remote and use in selected profile"
                                     Command="{Binding CreateRemoteCommand}"
