@@ -23,6 +23,7 @@ public class OptionControlTemplateSelector : IDataTemplate
             Core.Models.OptionControlType.Numeric => "Numeric",
             Core.Models.OptionControlType.Duration => "Duration",
             Core.Models.OptionControlType.SizeSuffix => "SizeSuffix",
+            Core.Models.OptionControlType.StringList => "StringList",
             _ => "Text",
         };
 
