@@ -183,6 +183,27 @@ public sealed class MountManagerService
                 builder.Append(EscapeArgument(option));
             }
 
+            foreach (var kvp in profile.MountOptions)
+            {
+                var flag = "--" + kvp.Key.Replace('_', '-');
+                if (string.Equals(kvp.Value, "true", StringComparison.OrdinalIgnoreCase))
+                {
+                    builder.Append(' ');
+                    builder.Append(EscapeArgument(flag));
+                }
+                else if (string.Equals(kvp.Value, "false", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Skip false booleans
+                }
+                else if (!string.IsNullOrEmpty(kvp.Value))
+                {
+                    builder.Append(' ');
+                    builder.Append(EscapeArgument(flag));
+                    builder.Append(' ');
+                    builder.Append(EscapeArgument(kvp.Value));
+                }
+            }
+
             builder.AppendLine();
         }
         else
@@ -217,6 +238,24 @@ public sealed class MountManagerService
         await AddQuickConnectArgumentsAsync(profile, arguments, cancellationToken);
 
         arguments.AddRange(ParseArguments(profile.ExtraOptions));
+
+        foreach (var kvp in profile.MountOptions)
+        {
+            var flag = "--" + kvp.Key.Replace('_', '-');
+            if (string.Equals(kvp.Value, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                arguments.Add(flag);
+            }
+            else if (string.Equals(kvp.Value, "false", StringComparison.OrdinalIgnoreCase))
+            {
+                // Skip false booleans (they are the default)
+            }
+            else if (!string.IsNullOrEmpty(kvp.Value))
+            {
+                arguments.Add(flag);
+                arguments.Add(kvp.Value);
+            }
+        }
 
         var command = Cli.Wrap(binary)
             .WithArguments(arguments)

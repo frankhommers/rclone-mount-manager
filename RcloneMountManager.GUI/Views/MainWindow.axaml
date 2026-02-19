@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RcloneMountManager.ViewModels"
+        xmlns:views="using:RcloneMountManager.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="760"
@@ -203,6 +204,11 @@
                                         <TextBox Grid.Column="1" Text="{Binding SelectedProfile.MountPoint}" Watermark="{Binding MountPointHint}" Margin="8,0,0,0"/>
                                     </Grid>
                                 </StackPanel>
+                            </Border>
+
+                            <!-- Mount Parameters (typed options) -->
+                            <Border BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                <views:MountOptionsView DataContext="{Binding MountOptionsVm}"/>
                             </Border>
 
                             <WrapPanel Margin="0,0,0,8">

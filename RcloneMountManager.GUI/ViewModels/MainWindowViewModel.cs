@@ -24,6 +24,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly MountManagerService _mountManagerService = new();
     private readonly LaunchAgentService _launchAgentService = new();
     private readonly RcloneBackendService _rcloneBackendService = new();
+    public MountOptionsViewModel MountOptionsVm { get; } = new();
     private readonly string _profilesFilePath;
     private readonly Dictionary<string, List<string>> _profileLogs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _profileScripts = new(StringComparer.OrdinalIgnoreCase);
@@ -99,6 +100,19 @@ public partial class MainWindowViewModel : ViewModelBase
             catch (Exception ex)
             {
                 AppendLog($"ERR: Could not load backend list: {ex.Message}");
+            }
+        });
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var binary = SelectedProfile?.RcloneBinaryPath ?? "rclone";
+                await MountOptionsVm.LoadOptionsAsync(binary, SelectedProfile?.MountOptions ?? new Dictionary<string, string>(), CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"ERR: Could not load mount options: {ex.Message}");
             }
         });
     }
@@ -702,6 +716,8 @@ public partial class MainWindowViewModel : ViewModelBase
             GeneratedScript = string.Empty;
         }
 
+        MountOptionsVm.UpdateFromProfile(value.MountOptions);
+
         OnPropertyChanged(nameof(StartupButtonText));
     }
 
@@ -814,6 +830,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     Source = saved.Source,
                     MountPoint = saved.MountPoint,
                     ExtraOptions = saved.ExtraOptions,
+                    MountOptions = saved.MountOptions ?? new Dictionary<string, string>(),
                     RcloneBinaryPath = saved.RcloneBinaryPath,
                     QuickConnectMode = QuickConnectMode.None,
                     QuickConnectEndpoint = string.Empty,
@@ -849,6 +866,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 Directory.CreateDirectory(directory);
             }
 
+            // Sync typed options from ViewModel back to current profile
+            if (SelectedProfile is not null)
+            {
+                SelectedProfile.MountOptions = MountOptionsVm.GetNonDefaultValues();
+            }
+
             var payload = Profiles
                 .Select(profile => new PersistedProfile
                 {
@@ -858,6 +881,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     Source = profile.Source,
                     MountPoint = profile.MountPoint,
                     ExtraOptions = profile.ExtraOptions,
+                    MountOptions = profile.MountOptions,
                     RcloneBinaryPath = profile.RcloneBinaryPath,
                     QuickConnectMode = profile.QuickConnectMode,
                     QuickConnectEndpoint = profile.QuickConnectEndpoint,
@@ -960,6 +984,7 @@ public partial class MainWindowViewModel : ViewModelBase
         public string Source { get; set; } = string.Empty;
         public string MountPoint { get; set; } = string.Empty;
         public string ExtraOptions { get; set; } = string.Empty;
+        public Dictionary<string, string> MountOptions { get; set; } = new();
         public string RcloneBinaryPath { get; set; } = "rclone";
         public QuickConnectMode QuickConnectMode { get; set; } = QuickConnectMode.None;
         public string QuickConnectEndpoint { get; set; } = string.Empty;
