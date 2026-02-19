@@ -13,13 +13,10 @@
         <converters:BoolToFontWeightConverter x:Key="ModifiedFontWeightConverter"/>
 
         <DataTemplate x:Key="Toggle" x:CompileBindings="False">
-            <Border Padding="8,6" Margin="0,0,0,1"
-                    BorderThickness="3,0,0,0"
-                    CornerRadius="4"
-                    BorderBrush="{Binding HasNonDefaultValue, Converter={StaticResource AccentBorderConverter}}">
-                <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
+                               TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
                                FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
@@ -41,18 +38,14 @@
                                Margin="0,2,0,4"
                                MaxLines="2" TextTrimming="CharacterEllipsis"
                                ToolTip.Tip="{Binding Help}"/>
-                </Grid>
-            </Border>
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="ComboBox" x:CompileBindings="False">
-            <Border Padding="8,6" Margin="0,0,0,1"
-                    BorderThickness="3,0,0,0"
-                    CornerRadius="4"
-                    BorderBrush="{Binding HasNonDefaultValue, Converter={StaticResource AccentBorderConverter}}">
-                <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
+                               TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
                                FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
@@ -78,18 +71,14 @@
                                Margin="0,2,0,4"
                                MaxLines="2" TextTrimming="CharacterEllipsis"
                                ToolTip.Tip="{Binding Help}"/>
-                </Grid>
-            </Border>
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="Numeric" x:CompileBindings="False">
-            <Border Padding="8,6" Margin="0,0,0,1"
-                    BorderThickness="3,0,0,0"
-                    CornerRadius="4"
-                    BorderBrush="{Binding HasNonDefaultValue, Converter={StaticResource AccentBorderConverter}}">
-                <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
+                               TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
                                FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
@@ -116,18 +105,14 @@
                                Margin="0,2,0,4"
                                MaxLines="2" TextTrimming="CharacterEllipsis"
                                ToolTip.Tip="{Binding Help}"/>
-                </Grid>
-            </Border>
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="Duration" x:CompileBindings="False">
-            <Border Padding="8,6" Margin="0,0,0,1"
-                    BorderThickness="3,0,0,0"
-                    CornerRadius="4"
-                    BorderBrush="{Binding HasNonDefaultValue, Converter={StaticResource AccentBorderConverter}}">
-                <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
+                               TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
                                FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
@@ -153,18 +138,14 @@
                                Margin="0,2,0,4"
                                MaxLines="2" TextTrimming="CharacterEllipsis"
                                ToolTip.Tip="{Binding Help}"/>
-                </Grid>
-            </Border>
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="SizeSuffix" x:CompileBindings="False">
-            <Border Padding="8,6" Margin="0,0,0,1"
-                    BorderThickness="3,0,0,0"
-                    CornerRadius="4"
-                    BorderBrush="{Binding HasNonDefaultValue, Converter={StaticResource AccentBorderConverter}}">
-                <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
+                               TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
                                FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
@@ -197,18 +178,14 @@
                                Margin="0,2,0,4"
                                MaxLines="2" TextTrimming="CharacterEllipsis"
                                ToolTip.Tip="{Binding Help}"/>
-                </Grid>
-            </Border>
+            </Grid>
         </DataTemplate>
 
         <DataTemplate x:Key="Text" x:CompileBindings="False">
-            <Border Padding="8,6" Margin="0,0,0,1"
-                    BorderThickness="3,0,0,0"
-                    CornerRadius="4"
-                    BorderBrush="{Binding HasNonDefaultValue, Converter={StaticResource AccentBorderConverter}}">
-                <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
+                               TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
                                FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
@@ -231,8 +208,7 @@
                                Margin="0,2,0,4"
                                MaxLines="2" TextTrimming="CharacterEllipsis"
                                ToolTip.Tip="{Binding Help}"/>
-                </Grid>
-            </Border>
+            </Grid>
         </DataTemplate>
     </Application.Resources>
 
