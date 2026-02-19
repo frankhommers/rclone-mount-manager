@@ -27,6 +27,7 @@
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:MountOptionGroupViewModel">
                     <Expander IsExpanded="{Binding IsExpanded}"
+                              IsVisible="{Binding HasVisibleOptions}"
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Stretch">
                         <Expander.Header>

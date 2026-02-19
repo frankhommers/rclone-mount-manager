@@ -127,6 +127,7 @@ public partial class MountOptionGroupViewModel : ObservableObject
     public IEnumerable<MountOptionInputViewModel> VisibleOptions =>
         ShowAdvanced ? AllOptions : AllOptions.Where(o => !o.IsAdvanced);
 
+    public bool HasVisibleOptions => VisibleOptions.Any();
     public int ModifiedCount => VisibleOptions.Count(o => o.HasNonDefaultValue);
     public bool HasModifiedOptions => ModifiedCount > 0;
 
@@ -135,6 +136,7 @@ public partial class MountOptionGroupViewModel : ObservableObject
     partial void OnShowAdvancedChanged(bool value)
     {
         OnPropertyChanged(nameof(VisibleOptions));
+        OnPropertyChanged(nameof(HasVisibleOptions));
         OnPropertyChanged(nameof(ModifiedCount));
         OnPropertyChanged(nameof(HasModifiedOptions));
         OnPropertyChanged(nameof(Header));
