@@ -16,7 +16,7 @@ public partial class MountOptionsViewModel : ObservableObject
     private IReadOnlyList<RcloneOptionGroup>? _allGroups;
 
     [ObservableProperty]
-    private bool _showAdvancedOptions;
+    private bool _showAdvancedOptions = true;
 
     [ObservableProperty]
     private bool _isLoading;

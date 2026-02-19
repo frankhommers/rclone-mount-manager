@@ -8,10 +8,7 @@
              x:DataType="vm:MountOptionsViewModel">
 
     <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-            <TextBlock Text="Mount Parameters" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
-            <CheckBox Grid.Column="1" Content="Show advanced options" IsChecked="{Binding ShowAdvancedOptions}"/>
-        </Grid>
+        <TextBlock Text="Mount Parameters" FontWeight="SemiBold" FontSize="14"/>
 
         <TextBlock Text="Loading rclone options..."
                    IsVisible="{Binding IsLoading}"
