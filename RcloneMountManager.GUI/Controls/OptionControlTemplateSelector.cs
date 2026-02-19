@@ -1,8 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Metadata;
-using RcloneMountManager.Core.Models;
-using RcloneMountManager.ViewModels;
+using RcloneMountManager.Core.ViewModels;
 using System.Collections.Generic;
 
 namespace RcloneMountManager.Controls;
@@ -14,30 +13,23 @@ public class OptionControlTemplateSelector : IDataTemplate
 
     public Control? Build(object? param)
     {
-        var key = param switch
-        {
-            MountOptionInputViewModel vm => GetKey(vm.ControlType),
-            RcloneBackendOptionInput bi => GetKey(bi.ControlType),
-            _ => null,
-        };
+        if (param is not TypedOptionViewModel vm)
+            return null;
 
-        if (key is null) return null;
+        var key = vm.ControlType switch
+        {
+            Core.Models.OptionControlType.Toggle => "Toggle",
+            Core.Models.OptionControlType.ComboBox => "ComboBox",
+            Core.Models.OptionControlType.Numeric => "Numeric",
+            Core.Models.OptionControlType.Duration => "Duration",
+            Core.Models.OptionControlType.SizeSuffix => "SizeSuffix",
+            _ => "Text",
+        };
 
         return Templates.TryGetValue(key, out var template)
             ? template.Build(param)
             : null;
     }
 
-    public bool Match(object? data) =>
-        data is MountOptionInputViewModel or RcloneBackendOptionInput;
-
-    private static string GetKey(OptionControlType controlType) => controlType switch
-    {
-        OptionControlType.Toggle => "Toggle",
-        OptionControlType.ComboBox => "ComboBox",
-        OptionControlType.Numeric => "Numeric",
-        OptionControlType.Duration => "Duration",
-        OptionControlType.SizeSuffix => "SizeSuffix",
-        _ => "Text",
-    };
+    public bool Match(object? data) => data is TypedOptionViewModel;
 }

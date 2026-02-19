@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace RcloneMountManager.Core.Models;
 
-public sealed class RcloneBackendOption
+public sealed class RcloneBackendOption : IRcloneOptionDefinition
 {
     public string Name { get; set; } = string.Empty;
     public string Help { get; set; } = string.Empty;
@@ -17,7 +17,7 @@ public sealed class RcloneBackendOption
     public OptionControlType GetControlType()
     {
         if (IsPassword) return OptionControlType.Text;
-        if (Examples is { Count: > 0 }) return OptionControlType.ComboBox;
+        if (GetEnumValues() is not null) return OptionControlType.ComboBox;
 
         return Type switch
         {
@@ -28,4 +28,6 @@ public sealed class RcloneBackendOption
             _ => OptionControlType.Text,
         };
     }
+
+    public IReadOnlyList<string>? GetEnumValues() => Examples is { Count: > 0 } ? Examples : null;
 }

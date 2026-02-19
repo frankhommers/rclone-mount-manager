@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace RcloneMountManager.Core.Models;
 
-public sealed class RcloneOption
+public sealed class RcloneOption : IRcloneOptionDefinition
 {
     public string Name { get; set; } = string.Empty;
     public string Help { get; set; } = string.Empty;
