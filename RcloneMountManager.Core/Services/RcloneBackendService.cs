@@ -54,6 +54,7 @@ public sealed class RcloneBackendService
                         Examples = o.Examples?.Select(e => e.Value).Where(v => !string.IsNullOrEmpty(v)).ToList(),
                     })
                     .Where(o => !string.IsNullOrWhiteSpace(o.Name))
+                    .DistinctBy(o => o.Name)
                     .ToList(),
             })
             .OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
