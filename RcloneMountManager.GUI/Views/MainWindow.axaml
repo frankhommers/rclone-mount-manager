@@ -124,23 +124,20 @@
 
                     <ScrollViewer Grid.Row="1">
                         <StackPanel Margin="20,14">
-                            <Expander HorizontalAlignment="Stretch"
-                                      HorizontalContentAlignment="Stretch"
-                                      Margin="0,0,0,10">
-                                <Expander.Header>
+                            <Border BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                <StackPanel Spacing="8">
                                     <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
-                                        <TextBlock Text="Backend Configuration" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Backend Configuration" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         <Button Grid.Column="1" Content="Reload types"
                                                 Command="{Binding RefreshBackendsCommand}"
                                                 Padding="8,2" FontSize="11"/>
                                     </Grid>
-                                </Expander.Header>
-                                <StackPanel Spacing="8" Margin="0,8,0,0">
+
                                     <TextBlock Text="Build any rclone remote type directly from this app." FontSize="11" Opacity="0.75"/>
 
                                     <Grid ColumnDefinitions="220,*">
                                         <TextBlock Text="Backend type" VerticalAlignment="Center"/>
-                                        <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableBackends}" SelectedItem="{Binding SelectedBackend}" Margin="8,0,0,0" MaxWidth="480">
+                                        <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableBackends}" SelectedItem="{Binding SelectedBackend}" Margin="8,0,0,0">
                                             <ComboBox.ItemTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
@@ -155,16 +152,23 @@
                                         <TextBox Grid.Column="1" Text="{Binding NewRemoteName}" Watermark="example: my-webdav" Margin="8,0,0,0"/>
                                     </Grid>
 
-                                    <CheckBox Content="Show advanced backend options" IsChecked="{Binding ShowAdvancedBackendOptions}"/>
+                                    <CheckBox Content="Show advanced backend options"
+                                              IsChecked="{Binding ShowAdvancedBackendOptions}"
+                                              IsVisible="{Binding HasAdvancedBackendOptions}"/>
 
                                     <ItemsControl ItemsSource="{Binding BackendOptionInputs}"
                                                   IsVisible="{Binding HasBackendOptions}"
                                                   ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
 
+                                    <TextBlock Text="No configurable options for this backend type."
+                                               FontSize="11"
+                                               Opacity="0.7"
+                                               IsVisible="{Binding !HasBackendOptions}"/>
+
                                     <Button Content="Create remote and use in selected profile"
                                             Command="{Binding CreateRemoteCommand}"/>
                                 </StackPanel>
-                            </Expander>
+                            </Border>
 
                             <Grid ColumnDefinitions="220,*" Margin="0,0,0,10">
                                 <TextBlock Text="Profile name" VerticalAlignment="Center"/>
@@ -209,8 +213,7 @@
                                         Margin="0,0,8,8"/>
                             </WrapPanel>
 
-                            <CheckBox Content="Show advanced settings" IsChecked="{Binding ShowAdvanced}" Margin="0,0,0,8"/>
-                            <Expander IsExpanded="{Binding ShowAdvanced}" Header="Advanced" Margin="0,0,0,10">
+                            <Expander Header="Advanced" Margin="0,0,0,10">
                                 <StackPanel Spacing="8" Margin="0,8,0,0">
                                     <Grid ColumnDefinitions="220,*">
                                         <TextBlock Text="Extra options" VerticalAlignment="Center"/>

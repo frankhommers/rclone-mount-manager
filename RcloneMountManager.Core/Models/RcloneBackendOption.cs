@@ -17,9 +17,7 @@ public sealed class RcloneBackendOption : IRcloneOptionDefinition
     public OptionControlType GetControlType()
     {
         if (IsPassword) return OptionControlType.Text;
-        if (GetEnumValues() is not null) return OptionControlType.ComboBox;
-
-        return Type switch
+        var typeControl = Type switch
         {
             "bool" => OptionControlType.Toggle,
             "int" or "int64" or "uint32" or "float64" => OptionControlType.Numeric,
@@ -27,7 +25,15 @@ public sealed class RcloneBackendOption : IRcloneOptionDefinition
             "SizeSuffix" => OptionControlType.SizeSuffix,
             _ => OptionControlType.Text,
         };
+
+        if (typeControl is not OptionControlType.Text) return typeControl;
+        if (GetEnumValues() is not null) return OptionControlType.ComboBox;
+        return OptionControlType.Text;
     }
 
-    public IReadOnlyList<string>? GetEnumValues() => Examples is { Count: > 0 } ? Examples : null;
+    public IReadOnlyList<string>? GetEnumValues()
+    {
+        if (Type == "bool") return null;
+        return Examples is { Count: > 0 } ? Examples : null;
+    }
 }

@@ -56,13 +56,14 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
-                    <ComboBox Grid.Row="0" Grid.Column="1"
-                              ItemsSource="{Binding EnumValues}"
-                              SelectedItem="{Binding SelectedEnumValue}"
-                              PlaceholderText="{Binding DefaultStr}"
-                              Margin="8,0,0,0"
-                              MinWidth="200"
-                              HorizontalAlignment="Stretch"/>
+                     <ComboBox Grid.Row="0" Grid.Column="1"
+                               ItemsSource="{Binding EnumValues}"
+                               SelectedItem="{Binding SelectedEnumValue}"
+                               PlaceholderText="{Binding DefaultStr}"
+                               Margin="8,0,0,0"
+                               MinWidth="200"
+                               MaxDropDownHeight="300"
+                               HorizontalAlignment="Stretch"/>
                     <Button Grid.Row="0" Grid.Column="2"
                             Command="{Binding ResetToDefaultCommand}"
                             Padding="6,4" Margin="4,0,0,0"
@@ -174,11 +175,12 @@
                                        Minimum="0"
                                        Increment="1"
                                        ShowButtonSpinner="True"
-                                       MinWidth="120"/>
+                                       MinWidth="120"
+                                       HorizontalAlignment="Stretch"/>
                         <ComboBox Grid.Column="1"
                                   ItemsSource="{Binding SizeSuffixUnits}"
                                   SelectedItem="{Binding SizeSuffixUnit}"
-                                  Width="80"
+                                  MinWidth="80"
                                   Margin="4,0,0,0"/>
                     </Grid>
                     <Button Grid.Row="0" Grid.Column="2"
@@ -211,9 +213,10 @@
                                FontSize="12"
                                FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                     <TextBox Grid.Row="0" Grid.Column="1"
-                             Text="{Binding Value}"
-                             Watermark="{Binding DefaultStr}"
-                             Margin="8,0,0,0"/>
+                              Text="{Binding Value}"
+                              Watermark="{Binding DefaultStr}"
+                              Margin="8,0,0,0"
+                              HorizontalAlignment="Stretch"/>
                     <Button Grid.Row="0" Grid.Column="2"
                             Command="{Binding ResetToDefaultCommand}"
                             Padding="6,4" Margin="4,0,0,0"

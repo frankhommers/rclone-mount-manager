@@ -12,7 +12,6 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,9 +43,6 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _statusText = "Ready";
 
     [ObservableProperty]
-    private bool _showAdvanced;
-
-    [ObservableProperty]
     private string _selectedThemeMode = "Follow system";
 
     [ObservableProperty]
@@ -57,6 +53,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _showAdvancedBackendOptions;
+
+    [ObservableProperty]
+    private bool _hasAdvancedBackendOptions;
 
     [ObservableProperty]
     private bool _hasPendingChanges;
@@ -266,7 +265,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile.ExtraOptions = "--vfs-cache-mode full --dir-cache-time 15m";
         SelectedProfile.RcloneBinaryPath = "rclone";
         ResetQuickConnectFields();
-        ShowAdvanced = false;
         StatusText = "Preset loaded: rclone remote.";
         NotifyLabelsChanged();
     }
@@ -284,7 +282,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile.QuickConnectPort = string.Empty;
         SelectedProfile.QuickConnectUsername = string.Empty;
         SelectedProfile.QuickConnectPassword = string.Empty;
-        ShowAdvanced = false;
         StatusText = "Preset loaded: WebDAV Quick Connect.";
         NotifyLabelsChanged();
     }
@@ -302,7 +299,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile.QuickConnectPort = "22";
         SelectedProfile.QuickConnectUsername = string.Empty;
         SelectedProfile.QuickConnectPassword = string.Empty;
-        ShowAdvanced = false;
         StatusText = "Preset loaded: SFTP Quick Connect.";
         NotifyLabelsChanged();
     }
@@ -320,7 +316,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile.QuickConnectPort = "21";
         SelectedProfile.QuickConnectUsername = string.Empty;
         SelectedProfile.QuickConnectPassword = string.Empty;
-        ShowAdvanced = false;
         StatusText = "Preset loaded: FTP Quick Connect.";
         NotifyLabelsChanged();
     }
@@ -338,7 +333,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile.QuickConnectPort = "21";
         SelectedProfile.QuickConnectUsername = string.Empty;
         SelectedProfile.QuickConnectPassword = string.Empty;
-        ShowAdvanced = false;
         StatusText = "Preset loaded: FTPS Quick Connect.";
         NotifyLabelsChanged();
     }
@@ -352,7 +346,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile.MountPoint = DefaultMountPoint("media");
         SelectedProfile.ExtraOptions = "nfsvers=4,resvport";
         ResetQuickConnectFields();
-        ShowAdvanced = false;
         StatusText = "Preset loaded: NFS.";
         NotifyLabelsChanged();
     }
@@ -588,11 +581,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SaveChangesCommand.NotifyCanExecuteChanged();
     }
 
-    partial void OnShowAdvancedChanged(bool value)
-    {
-        NotifyCommandStateChanged();
-    }
-
     partial void OnSelectedThemeModeChanged(string value)
     {
         if (Application.Current is null)
@@ -638,23 +626,16 @@ public partial class MainWindowViewModel : ViewModelBase
         BackendOptionInputs.Clear();
         if (value is null)
         {
+            HasAdvancedBackendOptions = false;
             OnPropertyChanged(nameof(HasBackendOptions));
             NotifyCommandStateChanged();
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(NewRemoteName))
-        {
-            NewRemoteName = $"{value.Name}-remote";
-        }
+        NewRemoteName = $"{value.Name}-remote";
+        HasAdvancedBackendOptions = value.Options.Any(o => o.Advanced && !o.Required);
 
-        foreach (var option in value.Options
-                     .Where(o => o.Required || !o.Advanced || ShowAdvancedBackendOptions)
-                     .OrderByDescending(o => o.Required)
-                     .ThenBy(o => o.Name, StringComparer.OrdinalIgnoreCase))
-        {
-            BackendOptionInputs.Add(new RcloneBackendOptionInput(option));
-        }
+        PopulateBackendOptionInputs(value);
 
         OnPropertyChanged(nameof(HasBackendOptions));
         NotifyCommandStateChanged();
@@ -662,7 +643,26 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnShowAdvancedBackendOptionsChanged(bool value)
     {
-        OnSelectedBackendChanged(SelectedBackend);
+        if (SelectedBackend is null)
+        {
+            return;
+        }
+
+        PopulateBackendOptionInputs(SelectedBackend);
+        OnPropertyChanged(nameof(HasBackendOptions));
+    }
+
+    private void PopulateBackendOptionInputs(RcloneBackendInfo backend)
+    {
+        BackendOptionInputs.Clear();
+
+        foreach (var option in backend.Options
+                     .Where(o => o.Required || !o.Advanced || ShowAdvancedBackendOptions)
+                     .OrderByDescending(o => o.Required)
+                     .ThenBy(o => o.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            BackendOptionInputs.Add(new RcloneBackendOptionInput(option));
+        }
     }
 
     partial void OnNewRemoteNameChanged(string value)
@@ -964,19 +964,6 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile.QuickConnectPort = string.Empty;
         SelectedProfile.QuickConnectUsername = string.Empty;
         SelectedProfile.QuickConnectPassword = string.Empty;
-    }
-
-    private static string BuildSafeFileName(string fileName)
-    {
-        var invalidChars = Path.GetInvalidFileNameChars().ToHashSet();
-        var builder = new StringBuilder(fileName.Length);
-
-        foreach (var ch in fileName)
-        {
-            builder.Append(invalidChars.Contains(ch) ? '-' : ch);
-        }
-
-        return builder.Length == 0 ? "mount-script" : builder.ToString();
     }
 
     private static string DefaultMountPoint(string name)
