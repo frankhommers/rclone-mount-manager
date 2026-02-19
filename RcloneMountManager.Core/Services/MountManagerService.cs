@@ -1,7 +1,7 @@
 using CliWrap;
 using CliWrap.Buffered;
 using CliWrap.EventStream;
-using RcloneMountManager.Models;
+using RcloneMountManager.Core.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -11,7 +11,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace RcloneMountManager.Services;
+namespace RcloneMountManager.Core.Services;
 
 public sealed class MountManagerService
 {

@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace RcloneMountManager.Models;
+namespace RcloneMountManager.Core.Models;
 
 public partial class RcloneBackendOptionInput : ObservableObject
 {

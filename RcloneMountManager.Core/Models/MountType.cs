@@ -1,4 +1,4 @@
-namespace RcloneMountManager.Models;
+namespace RcloneMountManager.Core.Models;
 
 public enum MountType
 {

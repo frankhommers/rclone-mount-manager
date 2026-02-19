@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 
-namespace RcloneMountManager.Models;
+namespace RcloneMountManager.Core.Models;
 
 public partial class MountProfile : ObservableObject
 {

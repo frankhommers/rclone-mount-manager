@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="RcloneMountManager.Core/RcloneMountManager.Core.csproj"/>
+  <Project Path="RcloneMountManager.GUI/RcloneMountManager.GUI.csproj"/>
+  <Project Path="RcloneMountManager.Tests/RcloneMountManager.Tests.csproj"/>
+</Solution>

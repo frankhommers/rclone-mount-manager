@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace RcloneMountManager.Models;
+namespace RcloneMountManager.Core.Models;
 
 public sealed class RcloneBackendInfo
 {

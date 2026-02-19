@@ -1,6 +1,6 @@
 using CliWrap;
 using CliWrap.Buffered;
-using RcloneMountManager.Models;
+using RcloneMountManager.Core.Models;
 using System;
 using System.IO;
 using System.Linq;
@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace RcloneMountManager.Services;
+namespace RcloneMountManager.Core.Services;
 
 public sealed class LaunchAgentService
 {
