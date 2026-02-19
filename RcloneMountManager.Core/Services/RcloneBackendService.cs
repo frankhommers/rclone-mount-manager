@@ -46,9 +46,12 @@ public sealed class RcloneBackendService
                     {
                         Name = o.Name,
                         Help = o.Help,
+                        Type = o.Type,
+                        DefaultStr = o.DefaultStr,
                         Required = o.Required,
                         IsPassword = o.IsPassword,
                         Advanced = o.Advanced,
+                        Examples = o.Examples?.Select(e => e.Value).Where(v => !string.IsNullOrEmpty(v)).ToList(),
                     })
                     .Where(o => !string.IsNullOrWhiteSpace(o.Name))
                     .ToList(),
@@ -114,8 +117,17 @@ public sealed class RcloneBackendService
     {
         public string Name { get; set; } = string.Empty;
         public string Help { get; set; } = string.Empty;
+        public string Type { get; set; } = "string";
+        public string DefaultStr { get; set; } = string.Empty;
+        public List<ExampleDto>? Examples { get; set; }
         public bool Required { get; set; }
         public bool IsPassword { get; set; }
         public bool Advanced { get; set; }
+    }
+
+    private sealed class ExampleDto
+    {
+        public string Value { get; set; } = string.Empty;
+        public string Help { get; set; } = string.Empty;
     }
 }

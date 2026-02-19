@@ -653,13 +653,7 @@ public partial class MainWindowViewModel : ViewModelBase
                      .OrderByDescending(o => o.Required)
                      .ThenBy(o => o.Name, StringComparer.OrdinalIgnoreCase))
         {
-            BackendOptionInputs.Add(new RcloneBackendOptionInput
-            {
-                Name = option.Name,
-                Help = option.Help,
-                Required = option.Required,
-                IsPassword = option.IsPassword,
-            });
+            BackendOptionInputs.Add(new RcloneBackendOptionInput(option));
         }
 
         OnPropertyChanged(nameof(HasBackendOptions));

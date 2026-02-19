@@ -158,23 +158,8 @@
                                     <CheckBox Content="Show advanced backend options" IsChecked="{Binding ShowAdvancedBackendOptions}"/>
 
                                     <ItemsControl ItemsSource="{Binding BackendOptionInputs}"
-                                                  IsVisible="{Binding HasBackendOptions}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <Border BorderThickness="0,0,0,1" Padding="0,6" Opacity="0.95">
-                                                    <StackPanel Spacing="4">
-                                                        <Grid ColumnDefinitions="220,*">
-                                                            <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
-                                                            <TextBox Grid.Column="1"
-                                                                     Text="{Binding Value}"
-                                                                     Margin="8,0,0,0"/>
-                                                        </Grid>
-                                                        <TextBlock Text="{Binding Help}" TextWrapping="Wrap" FontSize="11" Opacity="0.7"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                                  IsVisible="{Binding HasBackendOptions}"
+                                                  ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
 
                                     <Button Content="Create remote and use in selected profile"
                                             Command="{Binding CreateRemoteCommand}"/>

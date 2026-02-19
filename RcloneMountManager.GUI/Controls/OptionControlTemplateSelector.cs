@@ -14,23 +14,30 @@ public class OptionControlTemplateSelector : IDataTemplate
 
     public Control? Build(object? param)
     {
-        if (param is not MountOptionInputViewModel vm)
-            return null;
-
-        var key = vm.ControlType switch
+        var key = param switch
         {
-            OptionControlType.Toggle => "Toggle",
-            OptionControlType.ComboBox => "ComboBox",
-            OptionControlType.Numeric => "Numeric",
-            OptionControlType.Duration => "Duration",
-            OptionControlType.SizeSuffix => "SizeSuffix",
-            _ => "Text",
+            MountOptionInputViewModel vm => GetKey(vm.ControlType),
+            RcloneBackendOptionInput bi => GetKey(bi.ControlType),
+            _ => null,
         };
+
+        if (key is null) return null;
 
         return Templates.TryGetValue(key, out var template)
             ? template.Build(param)
             : null;
     }
 
-    public bool Match(object? data) => data is MountOptionInputViewModel;
+    public bool Match(object? data) =>
+        data is MountOptionInputViewModel or RcloneBackendOptionInput;
+
+    private static string GetKey(OptionControlType controlType) => controlType switch
+    {
+        OptionControlType.Toggle => "Toggle",
+        OptionControlType.ComboBox => "ComboBox",
+        OptionControlType.Numeric => "Numeric",
+        OptionControlType.Duration => "Duration",
+        OptionControlType.SizeSuffix => "SizeSuffix",
+        _ => "Text",
+    };
 }
