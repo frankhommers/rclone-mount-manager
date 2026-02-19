@@ -183,6 +183,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Source = "remote:bucket",
             MountPoint = DefaultMountPoint("new-mount"),
             ExtraOptions = "--vfs-cache-mode full",
+            MountOptions = GetDefaultMountOptions(MountType.RcloneAuto),
             QuickConnectMode = QuickConnectMode.None,
         };
 
@@ -927,7 +928,21 @@ public partial class MainWindowViewModel : ViewModelBase
             Source = "remote:media",
             MountPoint = DefaultMountPoint("media"),
             ExtraOptions = "--vfs-cache-mode full --dir-cache-time 15m",
+            MountOptions = GetDefaultMountOptions(MountType.RcloneAuto),
             QuickConnectMode = QuickConnectMode.None,
+        };
+    }
+
+    private static Dictionary<string, string> GetDefaultMountOptions(MountType type)
+    {
+        return type switch
+        {
+            MountType.MacOsNfs => new Dictionary<string, string>(),
+            _ => new Dictionary<string, string>
+            {
+                ["vfs_cache_mode"] = "full",
+                ["dir_cache_time"] = "10m",
+            },
         };
     }
 

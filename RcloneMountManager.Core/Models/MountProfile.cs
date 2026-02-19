@@ -22,7 +22,7 @@ public partial class MountProfile : ObservableObject
     private string _mountPoint = "~/Mounts/rclone";
 
     [ObservableProperty]
-    private string _extraOptions = "--vfs-cache-mode full --dir-cache-time 10m";
+    private string _extraOptions = string.Empty;
 
     [ObservableProperty]
     private Dictionary<string, string> _mountOptions = new();

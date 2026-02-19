@@ -186,11 +186,6 @@
                                 <ComboBox Grid.Column="1" ItemsSource="{Binding MountTypes}" SelectedItem="{Binding SelectedProfile.Type}" Margin="8,0,0,0"/>
                             </Grid>
 
-                            <WrapPanel Margin="0,0,0,10">
-                                <Button Content="Use Rclone preset" Command="{Binding UseRcloneExampleCommand}" Margin="0,0,8,8"/>
-                                <Button Content="Use NFS preset" Command="{Binding UseNfsExampleCommand}" Margin="0,0,8,8"/>
-                            </WrapPanel>
-
                             <Border BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,10">
                                 <StackPanel Spacing="8">
                                     <Grid ColumnDefinitions="220,*">

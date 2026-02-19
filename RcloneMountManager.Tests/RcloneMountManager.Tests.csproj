@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RcloneMountManager.Core\RcloneMountManager.Core.csproj" />
+    <ProjectReference Include="..\RcloneMountManager.GUI\RcloneMountManager.GUI.csproj" />
   </ItemGroup>
 </Project>
