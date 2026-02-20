@@ -84,15 +84,18 @@ public abstract partial class TypedOptionViewModel : ObservableObject
                     BoolValue = string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
                     break;
                 case OptionControlType.Numeric:
-                    NumericValue = decimal.TryParse(currentValue, out var num) ? num : null;
+                    var numStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
+                    NumericValue = decimal.TryParse(numStr, out var num) ? num : null;
                     break;
                 case OptionControlType.Duration:
-                    DurationValue = string.IsNullOrEmpty(currentValue) ? null : DurationHelper.Parse(currentValue);
+                    var durStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
+                    DurationValue = string.IsNullOrEmpty(durStr) ? null : DurationHelper.Parse(durStr);
                     break;
                 case OptionControlType.SizeSuffix:
-                    if (!string.IsNullOrEmpty(currentValue))
+                    var sizeStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
+                    if (!string.IsNullOrEmpty(sizeStr))
                     {
-                        var (sv, su) = SizeSuffixHelper.Parse(currentValue);
+                        var (sv, su) = SizeSuffixHelper.Parse(sizeStr);
                         SizeSuffixNumericValue = sv;
                         SizeSuffixUnit = su;
                     }
