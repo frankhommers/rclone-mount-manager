@@ -51,7 +51,26 @@ public abstract partial class TypedOptionViewModel : ObservableObject
 
     public virtual bool HasNonDefaultValue =>
         !string.IsNullOrEmpty(Value) &&
-        !string.Equals(Value, DefaultStr, StringComparison.OrdinalIgnoreCase);
+        !string.Equals(Value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// DefaultStr normalized through the same parse→format roundtrip as Value,
+    /// so "5m0s" matches "5m" and "128Mi" matches "128Mi".
+    /// </summary>
+    private string NormalizedDefaultStr
+    {
+        get
+        {
+            var raw = DefaultStr;
+            if (string.IsNullOrEmpty(raw)) return raw;
+            return ControlType switch
+            {
+                OptionControlType.Duration => DurationHelper.Format(DurationHelper.Parse(raw)),
+                OptionControlType.SizeSuffix => SizeSuffixHelper.Format(SizeSuffixHelper.Parse(raw).Value, SizeSuffixHelper.Parse(raw).Unit),
+                _ => raw,
+            };
+        }
+    }
 
     protected void InitializeTypedValues(string? currentValue)
     {
