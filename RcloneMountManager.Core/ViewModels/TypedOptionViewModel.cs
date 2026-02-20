@@ -113,6 +113,17 @@ public abstract partial class TypedOptionViewModel : ObservableObject
         finally
         {
             _syncing = false;
+
+            // Force property change notifications for all typed values so
+            // bindings that missed the initial set (same value as field default) get updated.
+            OnPropertyChanged(nameof(Value));
+            OnPropertyChanged(nameof(BoolValue));
+            OnPropertyChanged(nameof(NumericValue));
+            OnPropertyChanged(nameof(DurationValue));
+            OnPropertyChanged(nameof(SizeSuffixNumericValue));
+            OnPropertyChanged(nameof(SizeSuffixUnit));
+            OnPropertyChanged(nameof(SelectedEnumValue));
+            OnPropertyChanged(nameof(HasNonDefaultValue));
         }
     }
 
