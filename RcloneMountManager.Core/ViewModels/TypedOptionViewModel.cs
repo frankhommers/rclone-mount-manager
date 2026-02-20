@@ -142,6 +142,11 @@ public abstract partial class TypedOptionViewModel : ObservableObject
 
     partial void OnSizeSuffixUnitChanged(string value)
     {
+        if (string.IsNullOrEmpty(value))
+        {
+            SizeSuffixUnit = "B";
+            return;
+        }
         if (_syncing) return;
         SyncSizeSuffix();
     }
