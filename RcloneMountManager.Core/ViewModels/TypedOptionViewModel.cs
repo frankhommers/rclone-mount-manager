@@ -57,7 +57,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     /// DefaultStr normalized through the same parse→format roundtrip as Value,
     /// so "5m0s" matches "5m" and "128Mi" matches "128Mi".
     /// </summary>
-    private string NormalizedDefaultStr
+    protected string NormalizedDefaultStr
     {
         get
         {

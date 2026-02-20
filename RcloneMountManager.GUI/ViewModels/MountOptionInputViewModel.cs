@@ -35,13 +35,18 @@ public partial class MountOptionInputViewModel : TypedOptionViewModel
 
     public override bool HasNonDefaultValue =>
         IsSet && !string.IsNullOrEmpty(Value) &&
-        !string.Equals(Value, DefaultStr, StringComparison.OrdinalIgnoreCase);
+        !string.Equals(Value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase);
+
+    partial void OnIsSetChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasNonDefaultValue));
+    }
 
     protected override void SyncToString(string newValue)
     {
         base.SyncToString(newValue);
         if (!string.IsNullOrEmpty(newValue) &&
-            !string.Equals(newValue, DefaultStr, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(newValue, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase))
         {
             IsSet = true;
         }
@@ -50,7 +55,7 @@ public partial class MountOptionInputViewModel : TypedOptionViewModel
     protected override void OnValueChangedExtra(string value)
     {
         if (!string.IsNullOrEmpty(value) &&
-            !string.Equals(value, DefaultStr, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase))
         {
             IsSet = true;
         }
