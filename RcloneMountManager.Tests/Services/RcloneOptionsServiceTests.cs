@@ -1,4 +1,5 @@
 using RcloneMountManager.Core.Services;
+using System.Linq;
 
 namespace RcloneMountManager.Tests.Services;
 
@@ -54,6 +55,66 @@ public class RcloneOptionsServiceTests
       ]
     }
     """;
+
+    private const string SampleJsonWithRc = """
+    {
+      "mount": [
+        { "Name": "debug_fuse", "Help": "Debug", "Type": "bool", "DefaultStr": "false" }
+      ],
+      "rc": [
+        { "Name": "rc", "Help": "Enable RC", "Type": "bool", "DefaultStr": "false", "Advanced": false },
+        { "Name": "rc_addr", "Help": "RC address", "Type": "stringArray", "DefaultStr": "localhost:5572", "Advanced": false },
+        { "Name": "rc_user", "Help": "RC user", "Type": "string", "DefaultStr": "", "Advanced": false },
+        { "Name": "rc_pass", "Help": "RC pass", "Type": "string", "DefaultStr": "", "Advanced": false, "IsPassword": true },
+        { "Name": "rc_no_auth", "Help": "No auth", "Type": "bool", "DefaultStr": "false", "Advanced": false },
+        { "Name": "rc_cert", "Help": "TLS cert", "Type": "string", "DefaultStr": "", "Advanced": false },
+        { "Name": "rc_web_gui", "Help": "Web GUI", "Type": "bool", "DefaultStr": "false", "Advanced": false },
+        { "Name": "metrics_addr", "Help": "Metrics addr", "Type": "stringArray", "DefaultStr": "", "Advanced": false }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void ParseOptionsJson_IncludesRcGroup()
+    {
+        var groups = RcloneOptionsService.ParseOptionsJson(SampleJsonWithRc);
+        var rc = groups.FirstOrDefault(g => g.Name == "rc");
+        Assert.NotNull(rc);
+        Assert.Equal("Remote Control", rc.DisplayName);
+    }
+
+    [Fact]
+    public void ParseOptionsJson_RcGroup_ExcludesMetricsOptions()
+    {
+        var groups = RcloneOptionsService.ParseOptionsJson(SampleJsonWithRc);
+        var rc = groups.First(g => g.Name == "rc");
+        Assert.DoesNotContain(rc.Options, o => o.Name.StartsWith("metrics_"));
+    }
+
+    [Fact]
+    public void ParseOptionsJson_RcGroup_BasicOptionsNotAdvanced()
+    {
+        var groups = RcloneOptionsService.ParseOptionsJson(SampleJsonWithRc);
+        var rc = groups.First(g => g.Name == "rc");
+        var basicNames = new[] { "rc", "rc_addr", "rc_user", "rc_pass", "rc_no_auth" };
+        foreach (var name in basicNames)
+        {
+            var opt = rc.Options.FirstOrDefault(o => o.Name == name);
+            Assert.NotNull(opt);
+            Assert.False(opt.Advanced, $"{name} should be basic");
+        }
+    }
+
+    [Fact]
+    public void ParseOptionsJson_RcGroup_NonBasicOptionsAreAdvanced()
+    {
+        var groups = RcloneOptionsService.ParseOptionsJson(SampleJsonWithRc);
+        var rc = groups.First(g => g.Name == "rc");
+        var cert = rc.Options.First(o => o.Name == "rc_cert");
+        Assert.True(cert.Advanced);
+        var webGui = rc.Options.First(o => o.Name == "rc_web_gui");
+        Assert.True(webGui.Advanced);
+    }
 
     [Fact]
     public void ParseOptionsJson_ReturnsCorrectGroups()

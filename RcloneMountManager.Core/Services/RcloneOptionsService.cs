@@ -18,7 +18,13 @@ public sealed class RcloneOptionsService
         ("nfs", "NFS"),
         ("filter", "Filters"),
         ("main", "General"),
+        ("rc", "Remote Control"),
     ];
+
+    private static readonly HashSet<string> RcBasicOptions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "rc", "rc_addr", "rc_user", "rc_pass", "rc_no_auth",
+    };
 
     public async Task<IReadOnlyList<RcloneOptionGroup>> GetMountOptionsAsync(
         string rcloneBinaryPath,
@@ -70,6 +76,16 @@ public sealed class RcloneOptionsService
 
                 if (!string.IsNullOrWhiteSpace(option.Name))
                     options.Add(option);
+            }
+
+            if (key == "rc")
+            {
+                options.RemoveAll(o => o.Name.StartsWith("metrics_", StringComparison.OrdinalIgnoreCase));
+                foreach (var opt in options)
+                {
+                    if (!RcBasicOptions.Contains(opt.Name))
+                        opt.Advanced = true;
+                }
             }
 
             groups.Add(new RcloneOptionGroup
