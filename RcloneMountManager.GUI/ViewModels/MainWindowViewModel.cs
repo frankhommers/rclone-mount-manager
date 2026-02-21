@@ -108,7 +108,7 @@ public partial class MainWindowViewModel : ViewModelBase
             try
             {
                 var binary = SelectedProfile?.RcloneBinaryPath ?? "rclone";
-                await MountOptionsVm.LoadOptionsAsync(binary, SelectedProfile?.MountOptions ?? new Dictionary<string, string>(), CancellationToken.None);
+                await MountOptionsVm.LoadOptionsAsync(binary, SelectedProfile?.MountOptions ?? new Dictionary<string, string>(), CancellationToken.None, SelectedProfile?.PinnedMountOptions);
             }
             catch (Exception ex)
             {
@@ -734,7 +734,7 @@ public partial class MainWindowViewModel : ViewModelBase
             GeneratedScript = string.Empty;
         }
 
-        MountOptionsVm.UpdateFromProfile(value.MountOptions);
+        MountOptionsVm.UpdateFromProfile(value.MountOptions, value.PinnedMountOptions);
 
         OnPropertyChanged(nameof(StartupButtonText));
     }
@@ -849,6 +849,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     MountPoint = saved.MountPoint,
                     ExtraOptions = saved.ExtraOptions,
                     MountOptions = saved.MountOptions ?? new Dictionary<string, string>(),
+                    PinnedMountOptions = saved.PinnedMountOptions ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                     RcloneBinaryPath = saved.RcloneBinaryPath,
                     QuickConnectMode = QuickConnectMode.None,
                     QuickConnectEndpoint = string.Empty,
@@ -884,11 +885,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 Directory.CreateDirectory(directory);
             }
 
-            // Sync typed options from ViewModel back to current profile
-            if (SelectedProfile is not null)
-            {
-                SelectedProfile.MountOptions = MountOptionsVm.GetNonDefaultValues();
-            }
+            SyncMountOptionsToProfile();
 
             var payload = Profiles
                 .Select(profile => new PersistedProfile
@@ -900,6 +897,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     MountPoint = profile.MountPoint,
                     ExtraOptions = profile.ExtraOptions,
                     MountOptions = profile.MountOptions,
+                    PinnedMountOptions = profile.PinnedMountOptions,
                     RcloneBinaryPath = profile.RcloneBinaryPath,
                     QuickConnectMode = profile.QuickConnectMode,
                     QuickConnectEndpoint = profile.QuickConnectEndpoint,
@@ -986,6 +984,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (SelectedProfile is not null)
         {
             SelectedProfile.MountOptions = MountOptionsVm.GetNonDefaultValues();
+            SelectedProfile.PinnedMountOptions = MountOptionsVm.GetPinnedOptionNames();
         }
     }
 
@@ -1012,6 +1011,7 @@ public partial class MainWindowViewModel : ViewModelBase
         public string MountPoint { get; set; } = string.Empty;
         public string ExtraOptions { get; set; } = string.Empty;
         public Dictionary<string, string> MountOptions { get; set; } = new();
+        public HashSet<string> PinnedMountOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string RcloneBinaryPath { get; set; } = "rclone";
         public QuickConnectMode QuickConnectMode { get; set; } = QuickConnectMode.None;
         public string QuickConnectEndpoint { get; set; } = string.Empty;

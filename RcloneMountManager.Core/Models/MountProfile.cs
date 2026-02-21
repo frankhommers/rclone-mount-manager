@@ -28,6 +28,9 @@ public partial class MountProfile : ObservableObject
     private Dictionary<string, string> _mountOptions = new();
 
     [ObservableProperty]
+    private HashSet<string> _pinnedMountOptions = new(StringComparer.OrdinalIgnoreCase);
+
+    [ObservableProperty]
     private string _rcloneBinaryPath = "rclone";
 
     [ObservableProperty]

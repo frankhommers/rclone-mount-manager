@@ -23,13 +23,13 @@ public partial class MountOptionsViewModel : ObservableObject
 
     public ObservableCollection<MountOptionGroupViewModel> Groups { get; } = new();
 
-    public async Task LoadOptionsAsync(string rcloneBinaryPath, Dictionary<string, string> currentValues, CancellationToken cancellationToken)
+    public async Task LoadOptionsAsync(string rcloneBinaryPath, Dictionary<string, string> currentValues, CancellationToken cancellationToken, HashSet<string>? pinnedNames = null)
     {
         IsLoading = true;
         try
         {
             _allGroups = await _optionsService.GetMountOptionsAsync(rcloneBinaryPath, cancellationToken);
-            RebuildGroups(currentValues);
+            RebuildGroups(currentValues, pinnedNames);
         }
         finally
         {
@@ -37,10 +37,10 @@ public partial class MountOptionsViewModel : ObservableObject
         }
     }
 
-    public void UpdateFromProfile(Dictionary<string, string> currentValues)
+    public void UpdateFromProfile(Dictionary<string, string> currentValues, HashSet<string>? pinnedNames = null)
     {
         if (_allGroups is null) return;
-        RebuildGroups(currentValues);
+        RebuildGroups(currentValues, pinnedNames);
     }
 
     public Dictionary<string, string> GetNonDefaultValues()
@@ -82,6 +82,23 @@ public partial class MountOptionsViewModel : ObservableObject
         return args;
     }
 
+    public HashSet<string> GetPinnedOptionNames()
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in Groups)
+        {
+            foreach (var option in group.AllOptions)
+            {
+                if (option.IsPinned)
+                {
+                    result.Add(option.Name);
+                }
+            }
+        }
+
+        return result;
+    }
+
     partial void OnShowAdvancedOptionsChanged(bool value)
     {
         foreach (var group in Groups)
@@ -90,7 +107,7 @@ public partial class MountOptionsViewModel : ObservableObject
         }
     }
 
-    private void RebuildGroups(Dictionary<string, string> currentValues)
+    private void RebuildGroups(Dictionary<string, string> currentValues, HashSet<string>? pinnedNames = null)
     {
         Groups.Clear();
         if (_allGroups is null) return;
@@ -98,7 +115,20 @@ public partial class MountOptionsViewModel : ObservableObject
         foreach (var group in _allGroups)
         {
             var optionVms = group.Options
-                .Select(o => new MountOptionInputViewModel(o, currentValues.GetValueOrDefault(o.Name)))
+                .Select(o =>
+                {
+                    var vm = new MountOptionInputViewModel(o, currentValues.GetValueOrDefault(o.Name));
+                    if (pinnedNames is not null && pinnedNames.Contains(o.Name))
+                    {
+                        vm.IsPinned = true;
+                        if (!string.IsNullOrEmpty(currentValues.GetValueOrDefault(o.Name)))
+                        {
+                            vm.IsSet = true;
+                        }
+                    }
+
+                    return vm;
+                })
                 .ToList();
 
             Groups.Add(new MountOptionGroupViewModel
