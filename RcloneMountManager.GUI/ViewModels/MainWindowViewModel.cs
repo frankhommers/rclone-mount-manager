@@ -101,9 +101,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<string> ThemeModes { get; } = new() { "Follow system", "Dark", "Light" };
     public ObservableCollection<DiagnosticsProfileFilterOption> DiagnosticsProfileFilters { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
+    public ObservableCollection<DiagnosticsTimelineRow> DiagnosticsRows { get; } = new();
     public ObservableCollection<RcloneBackendInfo> AvailableBackends { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> BackendOptionInputs { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> AdvancedBackendOptionInputs { get; } = new();
+    public bool HasDiagnosticsRows => DiagnosticsRows.Count > 0;
+    public string DiagnosticsEmptyStateText => "No diagnostics for current filter.";
 
     public MainWindowViewModel(
         string? profilesFilePath = null,
@@ -147,6 +150,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             "profiles.json");
 
         Profiles.CollectionChanged += OnProfilesCollectionChanged;
+        DiagnosticsRows.CollectionChanged += OnDiagnosticsRowsCollectionChanged;
         LoadProfiles();
 
         if (Profiles.Count == 0)
@@ -916,12 +920,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return ProfileLogSeverity.Information;
     }
 
-    private static string ToDisplayLog(ProfileLogEvent entry)
+    private static DiagnosticsTimelineRow ToDiagnosticsRow(ProfileLogEvent entry)
     {
+        var timestamp = entry.Timestamp.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
         var category = entry.Category.ToString().ToLowerInvariant();
         var stage = entry.Stage.ToString().ToLowerInvariant();
         var severity = entry.Severity.ToString().ToLowerInvariant();
-        return $"[{entry.Timestamp.LocalDateTime:HH:mm:ss}] [profile:{entry.ProfileId}] [{category}/{stage}] [{severity}] {entry.Message}";
+        var stageText = $"{category}/{stage}";
+        return new DiagnosticsTimelineRow(entry.ProfileId, timestamp, severity, stageText, entry.Message);
     }
 
     partial void OnSelectedDiagnosticsProfileIdChanged(string? value)
@@ -995,18 +1001,25 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             .ThenBy(entry => entry.Category)
             .ThenBy(entry => entry.Stage)
             .ThenBy(entry => entry.Message, StringComparer.Ordinal)
-            .Select(ToDisplayLog)
+            .Select(ToDiagnosticsRow)
             .ToList();
 
+        DiagnosticsRows.Clear();
         Logs.Clear();
         foreach (var row in rows)
         {
-            Logs.Add(row);
+            DiagnosticsRows.Add(row);
+            Logs.Add(row.DisplayText);
         }
     }
 
     private static bool IsStartupTimelineEvent(ProfileLogEvent entry)
         => entry.Category is ProfileLogCategory.Startup;
+
+    private void OnDiagnosticsRowsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(HasDiagnosticsRows));
+    }
 
     private void RecordStartupPreflightReport(string profileId, StartupPreflightReport report)
     {
@@ -1514,6 +1527,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     public sealed record DiagnosticsProfileFilterOption(string ProfileId, string DisplayName);
+
+    public sealed record DiagnosticsTimelineRow(
+        string ProfileId,
+        string TimestampText,
+        string SeverityText,
+        string StageText,
+        string MessageText)
+    {
+        public string DisplayText => $"[{TimestampText}] [profile:{ProfileId}] [{StageText}] [{SeverityText}] {MessageText}";
+    }
 
     private sealed class PersistedProfile
     {
