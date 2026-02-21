@@ -296,8 +296,36 @@
                                      MinHeight="140"
                                      MaxHeight="220"/>
 
-                            <!-- Activity Log -->
-                            <TextBlock Text="Activity" FontWeight="SemiBold" FontSize="14"/>
+                            <!-- Diagnostics Timeline -->
+                            <TextBlock Text="Diagnostics timeline" FontWeight="SemiBold" FontSize="14"/>
+                            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="6">
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="Profile scope"
+                                           VerticalAlignment="Center"/>
+                                <ComboBox Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2"
+                                          Margin="8,0,0,0"
+                                          ItemsSource="{Binding DiagnosticsProfileFilters}"
+                                          SelectedValue="{Binding SelectedDiagnosticsProfileId}"
+                                          SelectedValueBinding="{Binding ProfileId}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="Timeline scope"
+                                           VerticalAlignment="Center"/>
+                                <CheckBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                          Margin="8,0,0,0"
+                                          Content="Startup path only"
+                                          IsChecked="{Binding StartupTimelineOnly}"/>
+                            </Grid>
+                            <TextBlock Text="Use profile and startup filters to isolate startup failures quickly."
+                                       FontSize="11"
+                                       Opacity="0.6"
+                                       Margin="0,-2,0,0"/>
                             <ListBox ItemsSource="{Binding Logs}"
                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
@@ -305,7 +333,7 @@
                                      MaxHeight="220">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding .}" FontFamily="Cascadia Mono, Consolas, Menlo"/>
+                                        <TextBlock Text="{Binding .}" FontFamily="Cascadia Mono, Consolas, Menlo" TextWrapping="Wrap"/>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
