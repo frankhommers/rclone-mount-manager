@@ -219,10 +219,43 @@
                                 <TextBox Grid.Column="1" Text="{Binding SelectedProfile.RcloneBinaryPath}" Watermark="Default: rclone" HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
                             </Grid>
 
-                            <CheckBox Content="UNSECURE: include plaintext passwords in generated script"
-                                      IsChecked="{Binding SelectedProfile.AllowInsecurePasswordsInScript}"/>
+                             <CheckBox Content="UNSECURE: include plaintext passwords in generated script"
+                                       IsChecked="{Binding SelectedProfile.AllowInsecurePasswordsInScript}"/>
 
-                             <Separator Margin="0,4"/>
+                             <Border BorderThickness="1"
+                                     BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                     CornerRadius="10"
+                                     Padding="10"
+                                     Margin="0,-2,0,0">
+                                 <StackPanel Spacing="6">
+                                     <TextBlock Text="Reliability"
+                                                FontWeight="SemiBold"/>
+                                     <Grid ColumnDefinitions="200,*,Auto"
+                                           ColumnSpacing="8">
+                                         <TextBlock Text="Policy preset"
+                                                    VerticalAlignment="Center"/>
+                                         <ComboBox Grid.Column="1"
+                                                   ItemsSource="{Binding ReliabilityPresets}"
+                                                   SelectedValue="{Binding SelectedReliabilityPresetId}"
+                                                   SelectedValueBinding="{Binding Id}">
+                                             <ComboBox.ItemTemplate>
+                                                 <DataTemplate>
+                                                     <TextBlock Text="{Binding DisplayName}"/>
+                                                 </DataTemplate>
+                                             </ComboBox.ItemTemplate>
+                                         </ComboBox>
+                                         <Button Grid.Column="2"
+                                                 Content="Apply"
+                                                 Command="{Binding ApplyReliabilityPresetCommand}"/>
+                                     </Grid>
+                                     <TextBlock Text="Applies managed reliability flags safely for this profile without editing raw options."
+                                                FontSize="11"
+                                                Opacity="0.6"
+                                                TextWrapping="Wrap"/>
+                                 </StackPanel>
+                             </Border>
+
+                              <Separator Margin="0,4"/>
 
                              <Border BorderThickness="1"
                                      BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
