@@ -485,6 +485,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private async Task ToggleStartupAsync()
     {
         SyncMountOptionsToProfile();
+        string? completionStatus = null;
         await RunBusyActionAsync(async cancellationToken =>
         {
             if (!IsStartupSupported)
@@ -496,19 +497,42 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 await _startupDisableRunner(SelectedProfile, AppendLog, cancellationToken);
                 SelectedProfile.StartAtLogin = false;
-                StatusText = "Start at login disabled.";
+                SaveProfiles();
+                HasPendingChanges = false;
+                completionStatus = "Start at login disabled and saved.";
+                AppendLog("Persisted startup preference after disable.");
             }
             else
             {
+                var report = await _startupPreflightRunner(SelectedProfile, cancellationToken);
+                RecordStartupPreflightReport(report);
+                AppendStartupPreflightChecksToLog(report);
+
+                if (!report.CriticalChecksPassed)
+                {
+                    completionStatus = "Start at login blocked: startup preflight failed.";
+                    AppendLog("Startup enable blocked by critical preflight failures.");
+                    return;
+                }
+
                 var script = _mountManagerService.GenerateScript(SelectedProfile);
                 await _startupEnableRunner(SelectedProfile, script, AppendLog, cancellationToken);
                 SelectedProfile.StartAtLogin = true;
-                StatusText = "Start at login enabled.";
+                SaveProfiles();
+                HasPendingChanges = false;
+                completionStatus = "Start at login enabled and saved.";
+                AppendLog("Persisted startup preference after enable.");
             }
 
             OnPropertyChanged(nameof(StartupButtonText));
+            OnPropertyChanged(nameof(SaveChangesButtonText));
             NotifyCommandStateChanged();
         });
+
+        if (!string.IsNullOrWhiteSpace(completionStatus) && !IsBusy)
+        {
+            StatusText = completionStatus;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanRunStartupPreflight))]
