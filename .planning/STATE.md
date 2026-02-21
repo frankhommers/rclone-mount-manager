@@ -9,10 +9,10 @@
 ## Current Position
 
 - **Current Phase:** 4 - Per-Profile Reliability Policy Presets
-- **Current Plan:** 1 of 3 completed in phase 4 (`04-01-PLAN.md`)
+- **Current Plan:** 2 of 3 completed in phase 4 (`04-02-PLAN.md`)
 - **Overall Status:** Phase 1, phase 2, and phase 3 complete; phase 4 is in progress
-- **Last activity:** 2026-02-21 - Completed `04-01-PLAN.md`
-- **Progress:** [████████░░] 10/12 plans complete (83%)
+- **Last activity:** 2026-02-21 - Completed `04-02-PLAN.md`
+- **Progress:** [█████████░] 11/12 plans complete (92%)
 
 ## Performance Metrics
 
@@ -21,7 +21,7 @@
 - **Mapped requirements:** 13
 - **Coverage:** 100%
 - **Completed phases:** 3
-- **Completed plans:** 10/12 (phase 1 through phase 3 complete, phase 4 plan 1 complete)
+- **Completed plans:** 11/12 (phase 1 through phase 3 complete, phase 4 plans 1-2 complete)
 
 ## Accumulated Context
 
@@ -56,10 +56,12 @@
 - Model reliability presets as immutable records with stable `conservative`/`balanced`/`aggressive` IDs and typed override dictionaries.
 - Expose managed reliability preset scope centrally through `ManagedReliabilityKeys` for controlled non-clobber option patching.
 - Store selected reliability policy intent per profile via `SelectedReliabilityPresetId` with a `balanced` default.
+- Apply reliability presets through an explicit ViewModel command path (`ApplyReliabilityPreset`) instead of manual raw flag edits.
+- Preserve non-policy mount settings by patching only managed reliability keys (remove managed keys, then apply preset overrides).
+- Persist and reload `SelectedReliabilityPresetId` via `profiles.json` mapping with migration-safe fallback to `balanced`.
 
 ### TODOs
 
-- Execute `04-02-PLAN.md` to implement ViewModel preset apply/persist with managed-key patching.
 - Execute `04-03-PLAN.md` to wire preset picker/apply UI and regression tests.
 
 ### Blockers
@@ -68,12 +70,12 @@
 
 ## Session Continuity
 
-- **Last completed artifact:** `.planning/phases/04-per-profile-reliability-policy-presets/04-01-SUMMARY.md`
-- **Last updated files:** `RcloneMountManager.Core/Models/ReliabilityPolicyPreset.cs`, `RcloneMountManager.Core/Models/MountProfile.cs`, `.planning/phases/04-per-profile-reliability-policy-presets/04-01-SUMMARY.md`, `.planning/STATE.md`
-- **Last session:** 2026-02-21T22:13:52Z
-- **Stopped at:** Completed `04-01-PLAN.md`
+- **Last completed artifact:** `.planning/phases/04-per-profile-reliability-policy-presets/04-02-SUMMARY.md`
+- **Last updated files:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `.planning/phases/04-per-profile-reliability-policy-presets/04-02-SUMMARY.md`, `.planning/STATE.md`
+- **Last session:** 2026-02-21T22:22:18Z
+- **Stopped at:** Completed `04-02-PLAN.md`
 - **Resume file:** None
-- **Next command:** `/gsd-execute-plan .planning/phases/04-per-profile-reliability-policy-presets/04-02-PLAN.md`
+- **Next command:** `/gsd-execute-plan .planning/phases/04-per-profile-reliability-policy-presets/04-03-PLAN.md`
 
 ---
 *Initialized: 2026-02-21*
