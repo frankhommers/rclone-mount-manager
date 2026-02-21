@@ -921,7 +921,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var category = entry.Category.ToString().ToLowerInvariant();
         var stage = entry.Stage.ToString().ToLowerInvariant();
         var severity = entry.Severity.ToString().ToLowerInvariant();
-        return $"[{entry.Timestamp.LocalDateTime:HH:mm:ss}] [{category}/{stage}] [{severity}] {entry.Message}";
+        return $"[{entry.Timestamp.LocalDateTime:HH:mm:ss}] [profile:{entry.ProfileId}] [{category}/{stage}] [{severity}] {entry.Message}";
     }
 
     partial void OnSelectedDiagnosticsProfileIdChanged(string? value)
