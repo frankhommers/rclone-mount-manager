@@ -137,6 +137,9 @@ public partial class MountOptionsViewModel : ObservableObject
                 DisplayName = group.DisplayName,
                 AllOptions = optionVms,
                 ShowAdvanced = ShowAdvancedOptions,
+                InfoText = group.Name == "rc"
+                    ? "Enable Remote Control to allow mount status monitoring and management."
+                    : null,
             });
         }
     }
@@ -147,6 +150,8 @@ public partial class MountOptionGroupViewModel : ObservableObject
     public string Name { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
     public List<MountOptionInputViewModel> AllOptions { get; init; } = [];
+    public string? InfoText { get; init; }
+    public bool HasInfoText => !string.IsNullOrEmpty(InfoText);
 
     [ObservableProperty]
     private bool _showAdvanced;

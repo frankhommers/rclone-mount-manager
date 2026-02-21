@@ -43,15 +43,24 @@
                                 </Border>
                             </Grid>
                         </Expander.Header>
-                        <ItemsControl ItemsSource="{Binding VisibleOptions}" Margin="0,4,0,0"
-                                      HorizontalAlignment="Stretch"
-                                      ItemTemplate="{DynamicResource OptionTemplateSelector}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <StackPanel Spacing="1"/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                        </ItemsControl>
+                        <StackPanel Spacing="4" Margin="0,4,0,0">
+                            <TextBlock Text="{Binding InfoText}"
+                                       IsVisible="{Binding HasInfoText}"
+                                       FontSize="12"
+                                       Opacity="0.7"
+                                       FontStyle="Italic"
+                                       TextWrapping="Wrap"
+                                       Margin="0,0,0,4"/>
+                            <ItemsControl ItemsSource="{Binding VisibleOptions}"
+                                          HorizontalAlignment="Stretch"
+                                          ItemTemplate="{DynamicResource OptionTemplateSelector}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Spacing="1"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                            </ItemsControl>
+                        </StackPanel>
                     </Expander>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
