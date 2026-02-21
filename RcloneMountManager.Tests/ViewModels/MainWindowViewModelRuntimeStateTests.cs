@@ -1,5 +1,6 @@
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.ViewModels;
+using System.Collections.Concurrent;
 
 namespace RcloneMountManager.Tests.ViewModels;
 
@@ -79,12 +80,128 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
         Assert.Contains($"Health: {health.ToString().ToLowerInvariant()}", viewModel.StatusText, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task InitializeRuntimeMonitoring_VerifiesOnlyStartAtLoginProfiles()
+    {
+        var verifiedProfileIds = new ConcurrentBag<string>();
+        var viewModel = CreateViewModel(
+            runtimeStateVerifier: (profile, _) =>
+            {
+                verifiedProfileIds.Add(profile.Id);
+                return Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy));
+            },
+            runtimeRefreshWaiter: (_, _) => Task.FromResult(false));
+
+        var startupProfile = viewModel.SelectedProfile;
+        startupProfile.StartAtLogin = true;
+
+        viewModel.AddProfileCommand.Execute(null);
+        var nonStartupProfile = viewModel.SelectedProfile;
+        nonStartupProfile.StartAtLogin = false;
+
+        viewModel.InitializeRuntimeMonitoring();
+
+        await WaitUntilAsync(() => startupProfile.RuntimeState.Health is MountHealthState.Healthy);
+
+        Assert.Contains(startupProfile.Id, verifiedProfileIds);
+        Assert.DoesNotContain(nonStartupProfile.Id, verifiedProfileIds);
+        viewModel.StopRuntimeMonitoring();
+    }
+
+    [Fact]
+    public async Task InitializeRuntimeMonitoring_MapsDegradedAndFailedStartupStates()
+    {
+        var startupStates = new Dictionary<string, ProfileRuntimeState>();
+        var viewModel = CreateViewModel(
+            runtimeStateVerifier: (profile, _) => Task.FromResult(startupStates[profile.Id]),
+            runtimeRefreshWaiter: (_, _) => Task.FromResult(false));
+
+        var degradedProfile = viewModel.SelectedProfile;
+        degradedProfile.StartAtLogin = true;
+        viewModel.AddProfileCommand.Execute(null);
+        var failedProfile = viewModel.SelectedProfile;
+        failedProfile.StartAtLogin = true;
+        viewModel.AddProfileCommand.Execute(null);
+        var skippedProfile = viewModel.SelectedProfile;
+        skippedProfile.StartAtLogin = false;
+
+        startupStates[degradedProfile.Id] = CreateState(MountLifecycleState.Mounted, MountHealthState.Degraded, "probe timeout");
+        startupStates[failedProfile.Id] = CreateState(MountLifecycleState.Failed, MountHealthState.Failed, "mount missing");
+        startupStates[skippedProfile.Id] = CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy);
+
+        viewModel.InitializeRuntimeMonitoring();
+
+        await WaitUntilAsync(() =>
+            degradedProfile.RuntimeState.Health is MountHealthState.Degraded &&
+            failedProfile.RuntimeState.Health is MountHealthState.Failed);
+
+        Assert.Equal(MountHealthState.Degraded, degradedProfile.RuntimeState.Health);
+        Assert.Equal(MountLifecycleState.Mounted, degradedProfile.RuntimeState.Lifecycle);
+        Assert.Equal(MountHealthState.Failed, failedProfile.RuntimeState.Health);
+        Assert.Equal(MountLifecycleState.Failed, failedProfile.RuntimeState.Lifecycle);
+        Assert.Equal(MountHealthState.Unknown, skippedProfile.RuntimeState.Health);
+        viewModel.StopRuntimeMonitoring();
+    }
+
+    [Fact]
+    public async Task InitializeRuntimeMonitoring_PeriodicRefreshUpdatesAllProfiles()
+    {
+        var ticks = new Queue<bool>(new[] { true, false });
+        var firstTickAt = DateTimeOffset.UtcNow;
+        var secondTickAt = firstTickAt.AddSeconds(10);
+
+        var profileStates = new Dictionary<string, Queue<ProfileRuntimeState>>();
+        var viewModel = CreateViewModel(
+            runtimeStateVerifier: (profile, _) => Task.FromResult(profileStates[profile.Id].Dequeue()),
+            runtimeRefreshWaiter: (_, _) => Task.FromResult(ticks.Count > 0 && ticks.Dequeue()));
+
+        var firstProfile = viewModel.SelectedProfile;
+        firstProfile.StartAtLogin = false;
+        viewModel.AddProfileCommand.Execute(null);
+        var secondProfile = viewModel.SelectedProfile;
+        secondProfile.StartAtLogin = false;
+
+        profileStates[firstProfile.Id] = new Queue<ProfileRuntimeState>(new[]
+        {
+            new ProfileRuntimeState(MountLifecycleState.Mounted, MountHealthState.Healthy, firstTickAt, null),
+        });
+        profileStates[secondProfile.Id] = new Queue<ProfileRuntimeState>(new[]
+        {
+            new ProfileRuntimeState(MountLifecycleState.Mounted, MountHealthState.Degraded, secondTickAt, "probe lag"),
+        });
+
+        viewModel.InitializeRuntimeMonitoring();
+
+        await WaitUntilAsync(() =>
+            firstProfile.RuntimeState.LastCheckedAt >= firstTickAt &&
+            secondProfile.RuntimeState.LastCheckedAt >= secondTickAt);
+
+        Assert.Equal(MountHealthState.Healthy, firstProfile.RuntimeState.Health);
+        Assert.Equal(MountHealthState.Degraded, secondProfile.RuntimeState.Health);
+        viewModel.StopRuntimeMonitoring();
+    }
+
     private MainWindowViewModel CreateViewModel(
         Func<MountProfile, Action<string>, CancellationToken, Task>? mountStartRunner = null,
         Func<MountProfile, Action<string>, CancellationToken, Task>? mountStopRunner = null,
         Func<MountProfile, CancellationToken, Task<bool>>? mountedProbe = null,
-        Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>>? runtimeStateVerifier = null)
+        Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>>? runtimeStateVerifier = null,
+        Func<TimeSpan, CancellationToken, Task<bool>>? runtimeRefreshWaiter = null)
     {
+        async Task<IReadOnlyList<ProfileRuntimeState>> RuntimeStateBatchVerifier(
+            IEnumerable<MountProfile> profiles,
+            CancellationToken cancellationToken)
+        {
+            var states = new List<ProfileRuntimeState>();
+            foreach (var profile in profiles)
+            {
+                states.Add(await (runtimeStateVerifier?.Invoke(profile, cancellationToken)
+                    ?? Task.FromResult(CreateState(MountLifecycleState.Idle, MountHealthState.Unknown))));
+            }
+
+            return states;
+        }
+
         return new MainWindowViewModel(
             profilesFilePath: CreateProfilesPath(),
             mountStartRunner: mountStartRunner,
@@ -92,6 +209,8 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
             mountedProbe: mountedProbe,
             runtimeStateVerifier: runtimeStateVerifier,
             startupEnabledProbe: _ => false,
+            runtimeRefreshWaiter: runtimeRefreshWaiter,
+            runtimeStateBatchVerifier: RuntimeStateBatchVerifier,
             loadStartupData: false);
     }
 

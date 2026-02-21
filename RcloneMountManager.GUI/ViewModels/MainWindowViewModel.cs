@@ -37,6 +37,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly Func<MountProfile, string, Action<string>, CancellationToken, Task> _startupEnableRunner;
     private readonly Func<MountProfile, Action<string>, CancellationToken, Task> _startupDisableRunner;
     private readonly Func<MountProfile, bool> _startupEnabledProbe;
+    private readonly Func<TimeSpan, CancellationToken, Task<bool>> _runtimeRefreshWaiter;
+    private readonly Func<IEnumerable<MountProfile>, CancellationToken, Task<IReadOnlyList<ProfileRuntimeState>>> _runtimeStateBatchVerifier;
     private readonly bool _isStartupSupported;
     public MountOptionsViewModel MountOptionsVm { get; } = new();
     private readonly string _profilesFilePath;
@@ -110,6 +112,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Func<MountProfile, string, Action<string>, CancellationToken, Task>? startupEnableRunner = null,
         Func<MountProfile, Action<string>, CancellationToken, Task>? startupDisableRunner = null,
         Func<MountProfile, bool>? startupEnabledProbe = null,
+        Func<TimeSpan, CancellationToken, Task<bool>>? runtimeRefreshWaiter = null,
+        Func<IEnumerable<MountProfile>, CancellationToken, Task<IReadOnlyList<ProfileRuntimeState>>>? runtimeStateBatchVerifier = null,
         bool loadStartupData = true)
     {
         _mountManagerService = mountManagerService ?? new MountManagerService();
@@ -125,6 +129,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _startupEnableRunner = startupEnableRunner ?? _launchAgentService.EnableAsync;
         _startupDisableRunner = startupDisableRunner ?? _launchAgentService.DisableAsync;
         _startupEnabledProbe = startupEnabledProbe ?? _launchAgentService.IsEnabled;
+        _runtimeRefreshWaiter = runtimeRefreshWaiter ?? DefaultRuntimeRefreshWaiterAsync;
+        _runtimeStateBatchVerifier = runtimeStateBatchVerifier ?? _mountHealthService.VerifyAllAsync;
         _isStartupSupported = _launchAgentService.IsSupported;
 
         _profilesFilePath = profilesFilePath ?? Path.Combine(
@@ -670,8 +676,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             await VerifyStartupProfilesAsync(cancellationToken);
 
-            using var timer = new PeriodicTimer(RuntimeRefreshCadence);
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            while (await _runtimeRefreshWaiter(RuntimeRefreshCadence, cancellationToken))
             {
                 await RefreshAllRuntimeStatesAsync(cancellationToken);
             }
@@ -697,9 +702,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var states = await _mountHealthService.VerifyAllAsync(startupProfiles, cancellationToken);
+        var states = await _runtimeStateBatchVerifier(startupProfiles, cancellationToken);
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        await RunOnUiThreadAsync(() =>
         {
             for (var index = 0; index < startupProfiles.Count; index++)
             {
@@ -719,14 +724,31 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        var states = await _mountHealthService.VerifyAllAsync(profilesSnapshot, cancellationToken);
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        var states = await _runtimeStateBatchVerifier(profilesSnapshot, cancellationToken);
+        await RunOnUiThreadAsync(() =>
         {
             for (var index = 0; index < profilesSnapshot.Count; index++)
             {
                 ApplyRuntimeState(profilesSnapshot[index], states[index]);
             }
         });
+    }
+
+    private static Task RunOnUiThreadAsync(Action action)
+    {
+        if (Application.Current is null || Dispatcher.UIThread.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return Dispatcher.UIThread.InvokeAsync(action).GetTask();
+    }
+
+    private static async Task<bool> DefaultRuntimeRefreshWaiterAsync(TimeSpan cadence, CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(cadence);
+        return await timer.WaitForNextTickAsync(cancellationToken);
     }
 
     private async Task RunBusyActionAsync(Func<CancellationToken, Task> action)
