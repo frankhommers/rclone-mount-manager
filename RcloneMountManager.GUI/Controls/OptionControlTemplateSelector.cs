@@ -28,9 +28,14 @@ public class OptionControlTemplateSelector : IDataTemplate
             _ => "Text",
         };
 
-        return Templates.TryGetValue(key, out var template)
-            ? template.Build(param)
-            : null;
+        if (Templates.TryGetValue(key, out var template))
+            return template.Build(param);
+
+        // Fallback: if specific template not found, try Text
+        if (Templates.TryGetValue("Text", out var fallback))
+            return fallback.Build(param);
+
+        return null;
     }
 
     public bool Match(object? data) => data is TypedOptionViewModel;

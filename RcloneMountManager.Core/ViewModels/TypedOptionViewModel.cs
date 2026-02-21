@@ -107,6 +107,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
                     }
                     break;
                 case OptionControlType.ComboBox:
+                case OptionControlType.EditableComboBox:
                     SelectedEnumValue = !string.IsNullOrEmpty(currentValue)
                         ? currentValue
                         : !string.IsNullOrEmpty(DefaultStr) ? DefaultStr : null;
@@ -237,6 +238,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
                     }
                     break;
                 case OptionControlType.ComboBox:
+                case OptionControlType.EditableComboBox:
                     SelectedEnumValue = string.IsNullOrEmpty(value) ? null : value;
                     break;
                 case OptionControlType.StringList:

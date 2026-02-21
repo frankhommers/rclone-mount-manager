@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
 using Avalonia.Styling;
+using Serilog;
 
 namespace RcloneMountManager.Controls;
 
@@ -25,6 +26,10 @@ public static class OptionTemplateSelectorFactory
                      && appResource is IDataTemplate appTemplate)
             {
                 selector.Templates[key] = appTemplate;
+            }
+            else
+            {
+                Log.Warning("Template '{Key}' not found in resources", key);
             }
         }
 
