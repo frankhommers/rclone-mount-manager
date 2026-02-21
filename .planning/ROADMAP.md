@@ -81,6 +81,13 @@ Plans:
 2. User can apply policy presets without manually editing raw rclone flags.
 3. User can revisit profile settings and confirm the selected preset remains applied.
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md - Add typed reliability preset catalog and per-profile preset identity model.
+- [ ] 04-02-PLAN.md - Implement ViewModel preset apply/persist path with managed-key non-clobber patching.
+- [ ] 04-03-PLAN.md - Wire preset picker/apply UI and add apply/persist/reload regression tests.
+
 ## Progress
 
 | Phase | Name | Requirements | Status |
