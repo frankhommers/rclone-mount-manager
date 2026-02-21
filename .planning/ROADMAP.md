@@ -41,6 +41,13 @@ Plans:
 2. User can see degraded or failed state when a startup mount does not meet health checks.
 3. User can observe live per-profile state transitions (idle, mounting, mounted, failed) during startup and normal operation.
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md - Add typed runtime lifecycle/health models and implement bounded `MountHealthService` with classification tests.
+- [ ] 02-02-PLAN.md - Wire lifecycle/health state transitions into `MainWindowViewModel` and surface runtime state in the main UI.
+- [ ] 02-03-PLAN.md - Add startup fan-out verification and periodic live-state refresh loop with deterministic ViewModel tests.
+
 ### Phase 3 - Startup Diagnostics and Log Isolation
 
 **Goal:** Users can diagnose startup mount failures quickly from in-app lifecycle evidence.
