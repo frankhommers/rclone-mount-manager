@@ -63,6 +63,9 @@ public partial class MountProfile : ObservableObject
     [ObservableProperty]
     private string _lastStatus = "Idle";
 
+    [ObservableProperty]
+    private ProfileRuntimeState _runtimeState = ProfileRuntimeState.Unknown;
+
     public string DisplayName => $"{Name} ({Type})";
 
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(DisplayName));
