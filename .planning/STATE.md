@@ -9,10 +9,10 @@
 ## Current Position
 
 - **Current Phase:** 2 - Boot Health Verification and Live State
-- **Current Plan:** 1 of 3 completed in phase 2
+- **Current Plan:** 2 of 3 completed in phase 2
 - **Overall Status:** Phase 1 complete and verified; phase 2 in progress
-- **Last activity:** 2026-02-21 - Completed 02-01-PLAN.md
-- **Progress:** [███████░░░] 4/6 plans complete (67%)
+- **Last activity:** 2026-02-21 - Completed 02-02-PLAN.md
+- **Progress:** [████████░░] 5/6 plans complete (83%)
 
 ## Performance Metrics
 
@@ -21,7 +21,7 @@
 - **Mapped requirements:** 13
 - **Coverage:** 100%
 - **Completed phases:** 1
-- **Completed plans:** 4/6 (phase 1 complete, phase 2 in progress)
+- **Completed plans:** 5/6 (phase 1 complete, phase 2 in progress)
 
 ## Accumulated Context
 
@@ -38,10 +38,13 @@
 - Enforce startup toggle order `preflight -> gate -> launch-agent apply -> persist` and only persist after successful apply.
 - Treat mounted-but-unusable and probe-timeout outcomes as `Degraded`, reserving `Failed` for mount absence or command-level failures.
 - Keep typed runtime state as the source of truth while synchronizing `IsMounted`, `IsRunning`, and `LastStatus` for compatibility.
+- Set mount action lifecycle transitions explicitly (`Mounting` before start, `Idle` after confirmed stop, `Failed` on command exceptions).
+- Surface lifecycle and health directly in the main UI for selected profile and profile list rows.
+- Keep status text derived from typed runtime state formatting, not boolean status concatenation.
 
 ### TODOs
 
-- Execute remaining phase 2 plans (`02-02`, `02-03`).
+- Execute remaining phase 2 plans (`02-03`).
 
 ### Blockers
 
@@ -49,12 +52,12 @@
 
 ## Session Continuity
 
-- **Last completed artifact:** `.planning/phases/02-boot-health-verification-and-live-state/02-01-SUMMARY.md`
-- **Last updated files:** `RcloneMountManager.Core/Models/MountLifecycleState.cs`, `RcloneMountManager.Core/Models/MountHealthState.cs`, `RcloneMountManager.Core/Models/ProfileRuntimeState.cs`, `RcloneMountManager.Core/Models/MountProfile.cs`, `RcloneMountManager.Core/Services/MountHealthService.cs`, `RcloneMountManager.Tests/Services/MountHealthServiceTests.cs`, `.planning/phases/02-boot-health-verification-and-live-state/02-01-SUMMARY.md`, `.planning/STATE.md`
-- **Last session:** 2026-02-21T20:15:11Z
-- **Stopped at:** Completed 02-01-PLAN.md
+- **Last completed artifact:** `.planning/phases/02-boot-health-verification-and-live-state/02-02-SUMMARY.md`
+- **Last updated files:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelRuntimeStateTests.cs`, `.planning/phases/02-boot-health-verification-and-live-state/02-02-SUMMARY.md`, `.planning/STATE.md`
+- **Last session:** 2026-02-21T20:20:33Z
+- **Stopped at:** Completed 02-02-PLAN.md
 - **Resume file:** None
-- **Next command:** `/gsd-execute-plan .planning/phases/02-boot-health-verification-and-live-state/02-02-PLAN.md`
+- **Next command:** `/gsd-execute-plan .planning/phases/02-boot-health-verification-and-live-state/02-03-PLAN.md`
 
 ---
 *Initialized: 2026-02-21*
