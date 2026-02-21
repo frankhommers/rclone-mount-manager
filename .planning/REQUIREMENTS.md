@@ -27,8 +27,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Observability
 
 - [x] **OBS-01**: User can see live per-profile mount status (idle, mounting, mounted, failed)
-- [ ] **OBS-02**: User can view timestamped logs for startup and mount lifecycle events
-- [ ] **OBS-03**: User can filter logs by profile to diagnose startup failures quickly
+- [x] **OBS-02**: User can view timestamped logs for startup and mount lifecycle events
+- [x] **OBS-03**: User can filter logs by profile to diagnose startup failures quickly
 
 ### Runtime Policy
 
@@ -71,8 +71,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HEAL-01 | Phase 2 | Complete |
 | HEAL-02 | Phase 2 | Complete |
 | OBS-01 | Phase 2 | Complete |
-| OBS-02 | Phase 3 | Pending |
-| OBS-03 | Phase 3 | Pending |
+| OBS-02 | Phase 3 | Complete |
+| OBS-03 | Phase 3 | Complete |
 | POL-01 | Phase 4 | Pending |
 | POL-02 | Phase 4 | Pending |
 
@@ -83,4 +83,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after phase 2 completion*
+*Last updated: 2026-02-21 after phase 3 completion*

@@ -64,9 +64,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md - Add typed per-profile diagnostics event pipeline with explicit async attribution and bounded retention.
-- [ ] 03-02-PLAN.md - Implement ViewModel profile/startup filters and deterministic timeline projection for diagnostics isolation.
-- [ ] 03-03-PLAN.md - Wire diagnostics filter controls and timestamped timeline rendering into the main window UI.
+- [x] 03-01-PLAN.md - Add typed per-profile diagnostics event pipeline with explicit async attribution and bounded retention.
+- [x] 03-02-PLAN.md - Implement ViewModel profile/startup filters and deterministic timeline projection for diagnostics isolation.
+- [x] 03-03-PLAN.md - Wire diagnostics filter controls and timestamped timeline rendering into the main window UI.
 
 ### Phase 4 - Per-Profile Reliability Policy Presets
 
@@ -87,7 +87,7 @@ Plans:
 |-------|------|--------------|--------|
 | 1 | Startup Enablement and Safety Gates | BOOT-01, BOOT-02, BOOT-03, SAFE-01, SAFE-02, SAFE-03 | Complete |
 | 2 | Boot Health Verification and Live State | HEAL-01, HEAL-02, OBS-01 | Complete |
-| 3 | Startup Diagnostics and Log Isolation | OBS-02, OBS-03 | Pending |
+| 3 | Startup Diagnostics and Log Isolation | OBS-02, OBS-03 | Complete |
 | 4 | Per-Profile Reliability Policy Presets | POL-01, POL-02 | Pending |
 
 ---
