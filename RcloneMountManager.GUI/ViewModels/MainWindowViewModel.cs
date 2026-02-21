@@ -22,13 +22,20 @@ namespace RcloneMountManager.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
 {
-    private readonly MountManagerService _mountManagerService = new();
-    private readonly LaunchAgentService _launchAgentService = new();
-    private readonly RcloneBackendService _rcloneBackendService = new();
+    private readonly MountManagerService _mountManagerService;
+    private readonly LaunchAgentService _launchAgentService;
+    private readonly RcloneBackendService _rcloneBackendService;
+    private readonly StartupPreflightService _startupPreflightService;
+    private readonly Func<MountProfile, CancellationToken, Task<StartupPreflightReport>> _startupPreflightRunner;
+    private readonly Func<MountProfile, string, Action<string>, CancellationToken, Task> _startupEnableRunner;
+    private readonly Func<MountProfile, Action<string>, CancellationToken, Task> _startupDisableRunner;
+    private readonly Func<MountProfile, bool> _startupEnabledProbe;
+    private readonly bool _isStartupSupported;
     public MountOptionsViewModel MountOptionsVm { get; } = new();
     private readonly string _profilesFilePath;
     private readonly Dictionary<string, List<string>> _profileLogs = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> _profileScripts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, StartupPreflightReport> _profileStartupPreflightReports = new(StringComparer.OrdinalIgnoreCase);
     private MountProfile? _observedProfile;
     private bool _isLoadingProfiles;
 
@@ -62,6 +69,12 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _hasPendingChanges;
 
+    [ObservableProperty]
+    private string _startupPreflightSummary = "Startup preflight has not been run.";
+
+    [ObservableProperty]
+    private string _startupPreflightReport = string.Empty;
+
     public ObservableCollection<MountProfile> Profiles { get; } = new();
     public ObservableCollection<MountType> MountTypes { get; } = new(Enum.GetValues<MountType>());
     public ObservableCollection<QuickConnectMode> QuickConnectModes { get; } = new(Enum.GetValues<QuickConnectMode>());
@@ -71,9 +84,29 @@ public partial class MainWindowViewModel : ViewModelBase
     public ObservableCollection<RcloneBackendOptionInput> BackendOptionInputs { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> AdvancedBackendOptionInputs { get; } = new();
 
-    public MainWindowViewModel()
+    public MainWindowViewModel(
+        string? profilesFilePath = null,
+        MountManagerService? mountManagerService = null,
+        LaunchAgentService? launchAgentService = null,
+        RcloneBackendService? rcloneBackendService = null,
+        StartupPreflightService? startupPreflightService = null,
+        Func<MountProfile, CancellationToken, Task<StartupPreflightReport>>? startupPreflightRunner = null,
+        Func<MountProfile, string, Action<string>, CancellationToken, Task>? startupEnableRunner = null,
+        Func<MountProfile, Action<string>, CancellationToken, Task>? startupDisableRunner = null,
+        Func<MountProfile, bool>? startupEnabledProbe = null,
+        bool loadStartupData = true)
     {
-        _profilesFilePath = Path.Combine(
+        _mountManagerService = mountManagerService ?? new MountManagerService();
+        _launchAgentService = launchAgentService ?? new LaunchAgentService();
+        _rcloneBackendService = rcloneBackendService ?? new RcloneBackendService();
+        _startupPreflightService = startupPreflightService ?? new StartupPreflightService();
+        _startupPreflightRunner = startupPreflightRunner ?? _startupPreflightService.RunAsync;
+        _startupEnableRunner = startupEnableRunner ?? _launchAgentService.EnableAsync;
+        _startupDisableRunner = startupDisableRunner ?? _launchAgentService.DisableAsync;
+        _startupEnabledProbe = startupEnabledProbe ?? _launchAgentService.IsEnabled;
+        _isStartupSupported = _launchAgentService.IsSupported;
+
+        _profilesFilePath = profilesFilePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "RcloneMountManager",
             "profiles.json");
@@ -92,6 +125,11 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedProfile = Profiles[0];
         HasPendingChanges = false;
         AppendLog($"Profiles file: {_profilesFilePath}");
+
+        if (!loadStartupData)
+        {
+            return;
+        }
 
         _ = Task.Run(async () =>
         {
@@ -165,7 +203,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public string QuickStartHelp =>
         "Quick start: choose a preset, change mount path, then click Start mount.";
 
-    public bool IsStartupSupported => _launchAgentService.IsSupported;
+    public bool IsStartupSupported => _isStartupSupported;
 
     public string StartupButtonText => SelectedProfile?.StartAtLogin is true ? "Disable start at login" : "Enable start at login";
 
@@ -456,20 +494,44 @@ public partial class MainWindowViewModel : ViewModelBase
 
             if (SelectedProfile.StartAtLogin)
             {
-                await _launchAgentService.DisableAsync(SelectedProfile, AppendLog, cancellationToken);
+                await _startupDisableRunner(SelectedProfile, AppendLog, cancellationToken);
                 SelectedProfile.StartAtLogin = false;
                 StatusText = "Start at login disabled.";
             }
             else
             {
                 var script = _mountManagerService.GenerateScript(SelectedProfile);
-                await _launchAgentService.EnableAsync(SelectedProfile, script, AppendLog, cancellationToken);
+                await _startupEnableRunner(SelectedProfile, script, AppendLog, cancellationToken);
                 SelectedProfile.StartAtLogin = true;
                 StatusText = "Start at login enabled.";
             }
 
             OnPropertyChanged(nameof(StartupButtonText));
+            NotifyCommandStateChanged();
         });
+    }
+
+    [RelayCommand(CanExecute = nameof(CanRunStartupPreflight))]
+    private async Task RunStartupPreflightAsync()
+    {
+        SyncMountOptionsToProfile();
+        string? completionStatus = null;
+
+        await RunBusyActionAsync(async cancellationToken =>
+        {
+            var report = await _startupPreflightRunner(SelectedProfile, cancellationToken);
+            RecordStartupPreflightReport(report);
+            AppendStartupPreflightChecksToLog(report);
+
+            completionStatus = report.CriticalChecksPassed
+                ? "Startup preflight passed."
+                : "Startup preflight completed with failures.";
+        });
+
+        if (!string.IsNullOrWhiteSpace(completionStatus) && !IsBusy)
+        {
+            StatusText = completionStatus;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanSaveChanges))]
@@ -497,8 +559,13 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
+            var statusBeforeAction = StatusText;
             await action(cancellationTokenSource.Token);
-            StatusText = "Operation completed.";
+
+            if (string.Equals(StatusText, statusBeforeAction, StringComparison.Ordinal))
+            {
+                StatusText = "Operation completed.";
+            }
         }
         catch (Exception ex)
         {
@@ -574,6 +641,21 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private void RecordStartupPreflightReport(StartupPreflightReport report)
+    {
+        _profileStartupPreflightReports[SelectedProfile.Id] = report;
+        StartupPreflightSummary = report.ToSummaryText();
+        StartupPreflightReport = report.ToUserFacingMessage();
+    }
+
+    private void AppendStartupPreflightChecksToLog(StartupPreflightReport report)
+    {
+        foreach (var check in report.Checks)
+        {
+            AppendLog($"Startup preflight {check.Severity.ToString().ToLowerInvariant()}: [{check.CheckKey}] {check.Message}");
+        }
+    }
+
     private void NotifyCommandStateChanged()
     {
         RemoveProfileCommand.NotifyCanExecuteChanged();
@@ -587,6 +669,7 @@ public partial class MainWindowViewModel : ViewModelBase
         RefreshBackendsCommand.NotifyCanExecuteChanged();
         CreateRemoteCommand.NotifyCanExecuteChanged();
         SaveChangesCommand.NotifyCanExecuteChanged();
+        RunStartupPreflightCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedThemeModeChanged(string value)
@@ -621,6 +704,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool CanSaveScript() => !IsBusy && !string.IsNullOrWhiteSpace(GeneratedScript);
 
     private bool CanToggleStartup() => !IsBusy && SelectedProfile is not null && IsStartupSupported;
+
+    private bool CanRunStartupPreflight() => !IsBusy && SelectedProfile is not null && IsStartupSupported;
 
     private bool CanSaveChanges() => !IsBusy && HasPendingChanges;
 
@@ -715,7 +800,18 @@ public partial class MainWindowViewModel : ViewModelBase
 
         if (IsStartupSupported)
         {
-            value.StartAtLogin = _launchAgentService.IsEnabled(value);
+            value.StartAtLogin = _startupEnabledProbe(value);
+        }
+
+        if (_profileStartupPreflightReports.TryGetValue(value.Id, out var preflightReport))
+        {
+            StartupPreflightSummary = preflightReport.ToSummaryText();
+            StartupPreflightReport = preflightReport.ToUserFacingMessage();
+        }
+        else
+        {
+            StartupPreflightSummary = "Startup preflight has not been run.";
+            StartupPreflightReport = string.Empty;
         }
 
         Logs.Clear();

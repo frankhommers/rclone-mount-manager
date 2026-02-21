@@ -231,11 +231,35 @@
                                 <Button Content="Stop mount" Command="{Binding StopMountCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Generate script" Command="{Binding GenerateScriptCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Save script" Command="{Binding SaveScriptCommand}" Margin="0,0,8,8"/>
+                                <Button Content="Run startup preflight"
+                                        Command="{Binding RunStartupPreflightCommand}"
+                                        IsVisible="{Binding IsStartupSupported}"
+                                        Margin="0,0,8,8"/>
                                 <Button Content="{Binding StartupButtonText}"
                                         Command="{Binding ToggleStartupCommand}"
                                         IsVisible="{Binding IsStartupSupported}"
                                         Margin="0,0,8,8"/>
                             </WrapPanel>
+
+                            <Border IsVisible="{Binding IsStartupSupported}"
+                                    BorderThickness="1"
+                                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                    CornerRadius="10"
+                                    Padding="10"
+                                    Margin="0,-2,0,0">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Startup preflight" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding StartupPreflightSummary}" FontSize="11"/>
+                                    <TextBox Text="{Binding StartupPreflightReport}"
+                                             IsReadOnly="True"
+                                             AcceptsReturn="True"
+                                             TextWrapping="Wrap"
+                                             MinHeight="72"
+                                             MaxHeight="160"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             FontFamily="Cascadia Mono, Consolas, Menlo"/>
+                                </StackPanel>
+                            </Border>
 
                             <Separator Margin="0,4"/>
 
