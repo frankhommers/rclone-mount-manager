@@ -61,6 +61,13 @@ Plans:
 2. User can filter logs by profile and isolate one profile's startup failure path quickly.
 3. User can follow a profile's event timeline to understand what failed and when.
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md - Add typed per-profile diagnostics event pipeline with explicit async attribution and bounded retention.
+- [ ] 03-02-PLAN.md - Implement ViewModel profile/startup filters and deterministic timeline projection for diagnostics isolation.
+- [ ] 03-03-PLAN.md - Wire diagnostics filter controls and timestamped timeline rendering into the main window UI.
+
 ### Phase 4 - Per-Profile Reliability Policy Presets
 
 **Goal:** Users can tune reliability behavior safely through presets instead of raw flag editing.
