@@ -4,6 +4,7 @@ using RcloneMountManager.Core.Models;
 using System;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,6 +16,9 @@ public sealed class LaunchAgentService
     private readonly string _appDataDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "RcloneMountManager");
+
+    [DllImport("libc")]
+    private static extern uint getuid();
 
     public bool IsSupported => OperatingSystem.IsMacOS();
 
@@ -32,7 +36,7 @@ public sealed class LaunchAgentService
             "Library",
             "LaunchAgents");
 
-        return Path.Combine(launchAgentsDirectory, $"com.rclonemountmanager.profile.{profile.Id}.plist");
+        return Path.Combine(launchAgentsDirectory, $"{BuildLabel(profile)}.plist");
     }
 
     public async Task EnableAsync(MountProfile profile, string scriptContent, Action<string> log, CancellationToken cancellationToken)
@@ -59,8 +63,7 @@ public sealed class LaunchAgentService
         var plistContent = BuildPlist(profile, scriptPath);
         await File.WriteAllTextAsync(plistPath, plistContent, cancellationToken);
 
-        await RunLaunchCtlAsync(["unload", "-w", plistPath], cancellationToken);
-        await RunLaunchCtlAsync(["load", "-w", plistPath], cancellationToken);
+        await RunLaunchCtlAsync(["bootstrap", BuildGuiDomain(), plistPath], cancellationToken);
 
         log($"Enabled start at login for '{profile.Name}'.");
         log($"LaunchAgent: {plistPath}");
@@ -76,7 +79,7 @@ public sealed class LaunchAgentService
         var plistPath = GetLaunchAgentPlistPath(profile);
         if (File.Exists(plistPath))
         {
-            await RunLaunchCtlAsync(["unload", "-w", plistPath], cancellationToken);
+            await RunLaunchCtlAsync(["bootout", BuildServiceTarget(profile)], cancellationToken);
             File.Delete(plistPath);
         }
 
@@ -90,7 +93,7 @@ public sealed class LaunchAgentService
 
     private static string BuildPlist(MountProfile profile, string scriptPath)
     {
-        var label = $"com.rclonemountmanager.profile.{profile.Id}";
+        var label = BuildLabel(profile);
         var escapedPath = EscapeXml(scriptPath);
         var escapedLabel = EscapeXml(label);
 
@@ -121,6 +124,21 @@ public sealed class LaunchAgentService
             .WithArguments(args)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(cancellationToken);
+    }
+
+    private static string BuildLabel(MountProfile profile)
+    {
+        return $"com.rclonemountmanager.profile.{profile.Id}";
+    }
+
+    private static string BuildGuiDomain()
+    {
+        return $"gui/{getuid()}";
+    }
+
+    private static string BuildServiceTarget(MountProfile profile)
+    {
+        return $"{BuildGuiDomain()}/{BuildLabel(profile)}";
     }
 
     private static string BuildSafeFileName(string fileName)
