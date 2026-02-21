@@ -4,15 +4,15 @@
 
 **Core Value:** Users can configure mounts once and trust they are mounted automatically and reliably on boot.
 
-**Current Focus:** Execute phase 4 reliability policy preset implementation plans.
+**Current Focus:** Phase 4 completed; reliability policy preset UX and regression coverage are in place.
 
 ## Current Position
 
-- **Current Phase:** 4 - Per-Profile Reliability Policy Presets
-- **Current Plan:** 2 of 3 completed in phase 4 (`04-02-PLAN.md`)
-- **Overall Status:** Phase 1, phase 2, and phase 3 complete; phase 4 is in progress
-- **Last activity:** 2026-02-21 - Completed `04-02-PLAN.md`
-- **Progress:** [█████████░] 11/12 plans complete (92%)
+- **Current Phase:** 4 of 4 - Per-Profile Reliability Policy Presets
+- **Current Plan:** 3 of 3 completed in phase 4 (`04-03-PLAN.md`)
+- **Overall Status:** Phase 1 through phase 4 complete
+- **Last activity:** 2026-02-21 - Completed `04-03-PLAN.md`
+- **Progress:** [██████████] 12/12 plans complete (100%)
 
 ## Performance Metrics
 
@@ -20,8 +20,8 @@
 - **v1 requirements:** 13
 - **Mapped requirements:** 13
 - **Coverage:** 100%
-- **Completed phases:** 3
-- **Completed plans:** 11/12 (phase 1 through phase 3 complete, phase 4 plans 1-2 complete)
+- **Completed phases:** 4
+- **Completed plans:** 12/12 (phase 1 through phase 4 complete)
 
 ## Accumulated Context
 
@@ -59,10 +59,13 @@
 - Apply reliability presets through an explicit ViewModel command path (`ApplyReliabilityPreset`) instead of manual raw flag edits.
 - Preserve non-policy mount settings by patching only managed reliability keys (remove managed keys, then apply preset overrides).
 - Persist and reload `SelectedReliabilityPresetId` via `profiles.json` mapping with migration-safe fallback to `balanced`.
+- Keep reliability policy controls in Profile Settings with profile-scoped selected-value binding to `SelectedReliabilityPresetId`.
+- Require explicit `ApplyReliabilityPresetCommand` action rather than implicit apply-on-selection changes.
+- Prime `MountOptionsViewModel` option catalog in tests when startup loading is disabled to keep non-clobber regressions deterministic.
 
 ### TODOs
 
-- Execute `04-03-PLAN.md` to wire preset picker/apply UI and regression tests.
+- None.
 
 ### Blockers
 
@@ -70,12 +73,12 @@
 
 ## Session Continuity
 
-- **Last completed artifact:** `.planning/phases/04-per-profile-reliability-policy-presets/04-02-SUMMARY.md`
-- **Last updated files:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `.planning/phases/04-per-profile-reliability-policy-presets/04-02-SUMMARY.md`, `.planning/STATE.md`
-- **Last session:** 2026-02-21T22:22:18Z
-- **Stopped at:** Completed `04-02-PLAN.md`
+- **Last completed artifact:** `.planning/phases/04-per-profile-reliability-policy-presets/04-03-SUMMARY.md`
+- **Last updated files:** `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelPolicyPresetTests.cs`, `.planning/phases/04-per-profile-reliability-policy-presets/04-03-SUMMARY.md`, `.planning/STATE.md`
+- **Last session:** 2026-02-21T22:27:41Z
+- **Stopped at:** Completed `04-03-PLAN.md`
 - **Resume file:** None
-- **Next command:** `/gsd-execute-plan .planning/phases/04-per-profile-reliability-policy-presets/04-03-PLAN.md`
+- **Next command:** None
 
 ---
 *Initialized: 2026-02-21*
