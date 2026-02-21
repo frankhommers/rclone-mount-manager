@@ -30,7 +30,7 @@ public sealed class RcloneBackendOption : IRcloneOptionDefinition
         };
 
         if (typeControl is not OptionControlType.Text) return typeControl;
-        if (GetEnumValues() is not null) return OptionControlType.ComboBox;
+        if (GetEnumValues() is not null) return OptionControlType.EditableComboBox;
         return OptionControlType.Text;
     }
 

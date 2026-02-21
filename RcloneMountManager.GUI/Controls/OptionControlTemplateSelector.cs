@@ -20,6 +20,7 @@ public class OptionControlTemplateSelector : IDataTemplate
         {
             Core.Models.OptionControlType.Toggle => "Toggle",
             Core.Models.OptionControlType.ComboBox => "ComboBox",
+            Core.Models.OptionControlType.EditableComboBox => "EditableComboBox",
             Core.Models.OptionControlType.Numeric => "Numeric",
             Core.Models.OptionControlType.Duration => "Duration",
             Core.Models.OptionControlType.SizeSuffix => "SizeSuffix",

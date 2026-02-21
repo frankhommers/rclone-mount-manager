@@ -7,7 +7,7 @@ namespace RcloneMountManager.Controls;
 
 public static class OptionTemplateSelectorFactory
 {
-    private static readonly string[] Keys = ["Toggle", "ComboBox", "Numeric", "Duration", "SizeSuffix", "StringList", "Text"];
+    private static readonly string[] Keys = ["Toggle", "ComboBox", "EditableComboBox", "Numeric", "Duration", "SizeSuffix", "StringList", "Text"];
 
     public static OptionControlTemplateSelector Create(Control host, ThemeVariant themeVariant)
     {

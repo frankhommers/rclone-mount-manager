@@ -56,4 +56,5 @@ public enum OptionControlType
     SizeSuffix,
     StringList,
     ComboBox,
+    EditableComboBox,
 }
