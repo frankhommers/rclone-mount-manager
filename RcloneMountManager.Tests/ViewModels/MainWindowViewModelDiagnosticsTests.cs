@@ -37,12 +37,17 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
         await viewModel.StartMountCommand.ExecuteAsync(null);
 
         viewModel.SelectedDiagnosticsProfileId = firstProfile.Id;
-        Assert.Contains(viewModel.Logs, entry => entry.Contains(firstProfile.Id, StringComparison.Ordinal));
-        Assert.DoesNotContain(viewModel.Logs, entry => entry.Contains(secondProfile.Id, StringComparison.Ordinal));
+        Assert.NotEmpty(viewModel.DiagnosticsRows);
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.Equal(firstProfile.Id, row.ProfileId));
+        Assert.All(viewModel.DiagnosticsRows, AssertTimestampPresent);
+
+        viewModel.SelectedProfile = secondProfile;
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.Equal(firstProfile.Id, row.ProfileId));
 
         viewModel.SelectedDiagnosticsProfileId = secondProfile.Id;
-        Assert.Contains(viewModel.Logs, entry => entry.Contains(secondProfile.Id, StringComparison.Ordinal));
-        Assert.DoesNotContain(viewModel.Logs, entry => entry.Contains(firstProfile.Id, StringComparison.Ordinal));
+        Assert.NotEmpty(viewModel.DiagnosticsRows);
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.Equal(secondProfile.Id, row.ProfileId));
+        Assert.All(viewModel.DiagnosticsRows, AssertTimestampPresent);
     }
 
     [Fact]
@@ -62,11 +67,12 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
         viewModel.StartupTimelineOnly = true;
 
         Assert.NotEmpty(viewModel.Logs);
-        Assert.Contains(viewModel.Logs, entry => entry.Contains("Startup monitor initialization started.", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(viewModel.Logs, entry => entry.Contains("Startup verification:", StringComparison.OrdinalIgnoreCase));
-        Assert.All(viewModel.Logs, entry => Assert.True(entry.Contains("[startup/", StringComparison.OrdinalIgnoreCase)));
-        Assert.DoesNotContain(viewModel.Logs, entry => entry.Contains("[manualstart/", StringComparison.OrdinalIgnoreCase));
-        Assert.DoesNotContain(viewModel.Logs, entry => entry.Contains("[runtimerefresh/", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(viewModel.DiagnosticsRows, row => row.MessageText.Contains("Startup monitor initialization started.", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(viewModel.DiagnosticsRows, row => row.MessageText.Contains("Startup verification:", StringComparison.OrdinalIgnoreCase));
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.StartsWith("startup/", row.StageText, StringComparison.OrdinalIgnoreCase));
+        Assert.All(viewModel.DiagnosticsRows, AssertTimestampPresent);
+        Assert.DoesNotContain(viewModel.DiagnosticsRows, row => row.StageText.StartsWith("manualstart/", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(viewModel.DiagnosticsRows, row => row.StageText.StartsWith("runtimerefresh/", StringComparison.OrdinalIgnoreCase));
 
         viewModel.StopRuntimeMonitoring();
     }
@@ -85,6 +91,12 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
         var profile = viewModel.SelectedProfile;
         viewModel.SelectedDiagnosticsProfileId = profile.Id;
         await viewModel.StartMountCommand.ExecuteAsync(null);
+
+        Assert.NotEmpty(viewModel.DiagnosticsRows);
+        Assert.All(viewModel.DiagnosticsRows, AssertTimestampPresent);
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.False(string.IsNullOrWhiteSpace(row.SeverityText)));
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.False(string.IsNullOrWhiteSpace(row.StageText)));
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.False(string.IsNullOrWhiteSpace(row.MessageText)));
 
         var startedIndex = FindLogIndex(viewModel.Logs, "Starting mount");
         var callbackIndex = FindLogIndex(viewModel.Logs, "runner callback");
@@ -129,10 +141,11 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
         var firstProfileAllEvents = viewModel.Logs.ToList();
 
         viewModel.StartupTimelineOnly = true;
-        Assert.All(viewModel.Logs, entry => Assert.True(entry.Contains("[startup/", StringComparison.OrdinalIgnoreCase)));
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.StartsWith("startup/", row.StageText, StringComparison.OrdinalIgnoreCase));
+        Assert.All(viewModel.DiagnosticsRows, AssertTimestampPresent);
 
         viewModel.SelectedDiagnosticsProfileId = secondProfile.Id;
-        Assert.All(viewModel.Logs, entry => Assert.True(entry.Contains(secondProfile.Id, StringComparison.Ordinal)));
+        Assert.All(viewModel.DiagnosticsRows, row => Assert.Equal(secondProfile.Id, row.ProfileId));
 
         viewModel.SelectedDiagnosticsProfileId = firstProfile.Id;
         viewModel.StartupTimelineOnly = false;
@@ -208,5 +221,17 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
         }
 
         throw new TimeoutException("Timed out waiting for diagnostics expectation.");
+    }
+
+    private static void AssertTimestampPresent(MainWindowViewModel.DiagnosticsTimelineRow row)
+    {
+        Assert.True(
+            DateTime.TryParseExact(
+                row.TimestampText,
+                "yyyy-MM-dd HH:mm:ss",
+                provider: null,
+                System.Globalization.DateTimeStyles.None,
+                out _),
+            $"Expected timestamp in yyyy-MM-dd HH:mm:ss format but got '{row.TimestampText}'.");
     }
 }
