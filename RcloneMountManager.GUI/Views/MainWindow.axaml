@@ -72,13 +72,19 @@
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <StackPanel Margin="4,4,4,6" Spacing="2">
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                        <TextBlock Text="{Binding Type}" FontSize="11" Opacity="0.75"/>
-                                        <TextBlock Text="{Binding MountPoint}" FontSize="11" Opacity="0.65" TextTrimming="CharacterEllipsis"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
+                                     <StackPanel Margin="4,4,4,6" Spacing="2">
+                                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                         <TextBlock Text="{Binding Type}" FontSize="11" Opacity="0.75"/>
+                                         <TextBlock Text="{Binding RuntimeState.Lifecycle, StringFormat='Lifecycle: {0}'}"
+                                                    FontSize="11"
+                                                    Opacity="0.75"/>
+                                         <TextBlock Text="{Binding RuntimeState.Health, StringFormat='Health: {0}'}"
+                                                    FontSize="11"
+                                                    Opacity="0.75"/>
+                                         <TextBlock Text="{Binding MountPoint}" FontSize="11" Opacity="0.65" TextTrimming="CharacterEllipsis"/>
+                                     </StackPanel>
+                                 </DataTemplate>
+                             </ListBox.ItemTemplate>
                         </ListBox>
 
                         <Border Grid.Row="2"
@@ -216,10 +222,26 @@
                             <CheckBox Content="UNSECURE: include plaintext passwords in generated script"
                                       IsChecked="{Binding SelectedProfile.AllowInsecurePasswordsInScript}"/>
 
-                            <Separator Margin="0,4"/>
+                             <Separator Margin="0,4"/>
 
-                            <!-- Mount Parameters -->
-                            <views:MountOptionsView DataContext="{Binding MountOptionsVm}"/>
+                             <Border BorderThickness="1"
+                                     BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                     CornerRadius="10"
+                                     Padding="10"
+                                     Margin="0,-2,0,0">
+                                 <StackPanel Spacing="6">
+                                     <TextBlock Text="Runtime state" FontWeight="SemiBold"/>
+                                     <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto">
+                                         <TextBlock Text="Lifecycle" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center"/>
+                                         <TextBlock Text="{Binding SelectedProfileLifecycleText}" Grid.Row="0" Grid.Column="1" FontWeight="SemiBold"/>
+                                         <TextBlock Text="Health" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center"/>
+                                         <TextBlock Text="{Binding SelectedProfileHealthText}" Grid.Row="1" Grid.Column="1" FontWeight="SemiBold"/>
+                                     </Grid>
+                                 </StackPanel>
+                             </Border>
+
+                             <!-- Mount Parameters -->
+                             <views:MountOptionsView DataContext="{Binding MountOptionsVm}"/>
 
                             <Separator Margin="0,4"/>
 
