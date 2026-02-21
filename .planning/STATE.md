@@ -4,15 +4,15 @@
 
 **Core Value:** Users can configure mounts once and trust they are mounted automatically and reliably on boot.
 
-**Current Focus:** Prepare phase 4 planning for per-profile reliability policy presets.
+**Current Focus:** Execute phase 4 reliability policy preset implementation plans.
 
 ## Current Position
 
 - **Current Phase:** 4 - Per-Profile Reliability Policy Presets
-- **Current Plan:** Pending planning/execution for phase 4
-- **Overall Status:** Phase 1, phase 2, and phase 3 complete and verified; phase 4 not started
-- **Last activity:** 2026-02-21 - Verified phase 3 goal (9/9)
-- **Progress:** [███████░░░] 3/4 phases complete (75%)
+- **Current Plan:** 1 of 3 completed in phase 4 (`04-01-PLAN.md`)
+- **Overall Status:** Phase 1, phase 2, and phase 3 complete; phase 4 is in progress
+- **Last activity:** 2026-02-21 - Completed `04-01-PLAN.md`
+- **Progress:** [████████░░] 10/12 plans complete (83%)
 
 ## Performance Metrics
 
@@ -21,7 +21,7 @@
 - **Mapped requirements:** 13
 - **Coverage:** 100%
 - **Completed phases:** 3
-- **Completed plans:** 9/9 (phase 1 through phase 3 complete)
+- **Completed plans:** 10/12 (phase 1 through phase 3 complete, phase 4 plan 1 complete)
 
 ## Accumulated Context
 
@@ -53,11 +53,14 @@
 - Keep diagnostics panel controls (profile scope + startup-only toggle) directly in the main window timeline area for fast startup-failure isolation.
 - Project diagnostics into typed UI rows (`DiagnosticsTimelineRow`) with explicit timestamp/severity/stage/message fields while retaining compatibility display strings.
 - Surface an explicit diagnostics empty state (`No diagnostics for current filter.`) instead of blank timeline output.
+- Model reliability presets as immutable records with stable `conservative`/`balanced`/`aggressive` IDs and typed override dictionaries.
+- Expose managed reliability preset scope centrally through `ManagedReliabilityKeys` for controlled non-clobber option patching.
+- Store selected reliability policy intent per profile via `SelectedReliabilityPresetId` with a `balanced` default.
 
 ### TODOs
 
-- Discuss and plan Phase 4 (`Per-Profile Reliability Policy Presets`).
-- Execute Phase 4 plans after planning is complete.
+- Execute `04-02-PLAN.md` to implement ViewModel preset apply/persist with managed-key patching.
+- Execute `04-03-PLAN.md` to wire preset picker/apply UI and regression tests.
 
 ### Blockers
 
@@ -65,12 +68,12 @@
 
 ## Session Continuity
 
-- **Last completed artifact:** `.planning/phases/03-startup-diagnostics-and-log-isolation/03-startup-diagnostics-and-log-isolation-VERIFICATION.md`
-- **Last updated files:** `.planning/phases/03-startup-diagnostics-and-log-isolation/03-03-SUMMARY.md`, `.planning/phases/03-startup-diagnostics-and-log-isolation/03-startup-diagnostics-and-log-isolation-VERIFICATION.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, `.planning/STATE.md`
-- **Last session:** 2026-02-21T21:59:01Z
-- **Stopped at:** Completed and verified phase 3
+- **Last completed artifact:** `.planning/phases/04-per-profile-reliability-policy-presets/04-01-SUMMARY.md`
+- **Last updated files:** `RcloneMountManager.Core/Models/ReliabilityPolicyPreset.cs`, `RcloneMountManager.Core/Models/MountProfile.cs`, `.planning/phases/04-per-profile-reliability-policy-presets/04-01-SUMMARY.md`, `.planning/STATE.md`
+- **Last session:** 2026-02-21T22:13:52Z
+- **Stopped at:** Completed `04-01-PLAN.md`
 - **Resume file:** None
-- **Next command:** `/gsd-discuss-phase 4`
+- **Next command:** `/gsd-execute-plan .planning/phases/04-per-profile-reliability-policy-presets/04-02-PLAN.md`
 
 ---
 *Initialized: 2026-02-21*
