@@ -13,12 +13,29 @@ namespace RcloneMountManager.Core.Services;
 
 public sealed class LaunchAgentService
 {
-    private readonly string _appDataDirectory = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RcloneMountManager");
+    private readonly string _appDataDirectory;
+    private readonly string _userProfileDirectory;
+    private readonly Func<string, string[], CancellationToken, Task<CommandExecutionResult>> _commandRunner;
+    private readonly Func<uint> _uidProvider;
 
     [DllImport("libc")]
     private static extern uint getuid();
+
+    public readonly record struct CommandExecutionResult(int ExitCode, string StandardOutput, string StandardError);
+
+    public LaunchAgentService(
+        string? appDataDirectory = null,
+        string? userProfileDirectory = null,
+        Func<string, string[], CancellationToken, Task<CommandExecutionResult>>? commandRunner = null,
+        Func<uint>? uidProvider = null)
+    {
+        _appDataDirectory = appDataDirectory ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "RcloneMountManager");
+        _userProfileDirectory = userProfileDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        _commandRunner = commandRunner ?? ExecuteCommandAsync;
+        _uidProvider = uidProvider ?? getuid;
+    }
 
     public bool IsSupported => OperatingSystem.IsMacOS();
 
@@ -32,7 +49,7 @@ public sealed class LaunchAgentService
     public string GetLaunchAgentPlistPath(MountProfile profile)
     {
         var launchAgentsDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            _userProfileDirectory,
             "Library",
             "LaunchAgents");
 
@@ -119,22 +136,19 @@ public sealed class LaunchAgentService
         return builder.ToString();
     }
 
-    private static async Task RunLaunchCtlAsync(string[] args, CancellationToken cancellationToken)
+    private async Task RunLaunchCtlAsync(string[] args, CancellationToken cancellationToken)
     {
         await RunCommandWithStrictValidationAsync("launchctl", args, cancellationToken);
     }
 
-    private static async Task RunPlutilLintAsync(string plistPath, CancellationToken cancellationToken)
+    private async Task RunPlutilLintAsync(string plistPath, CancellationToken cancellationToken)
     {
         await RunCommandWithStrictValidationAsync("plutil", ["-lint", plistPath], cancellationToken);
     }
 
-    private static async Task RunCommandWithStrictValidationAsync(string command, string[] args, CancellationToken cancellationToken)
+    private async Task RunCommandWithStrictValidationAsync(string command, string[] args, CancellationToken cancellationToken)
     {
-        var result = await Cli.Wrap(command)
-            .WithArguments(args)
-            .WithValidation(CommandResultValidation.None)
-            .ExecuteBufferedAsync(cancellationToken);
+        var result = await _commandRunner(command, args, cancellationToken);
 
         if (result.ExitCode != 0)
         {
@@ -155,14 +169,24 @@ public sealed class LaunchAgentService
         return $"com.rclonemountmanager.profile.{profile.Id}";
     }
 
-    private static string BuildGuiDomain()
+    private string BuildGuiDomain()
     {
-        return $"gui/{getuid()}";
+        return $"gui/{_uidProvider()}";
     }
 
-    private static string BuildServiceTarget(MountProfile profile)
+    private string BuildServiceTarget(MountProfile profile)
     {
         return $"{BuildGuiDomain()}/{BuildLabel(profile)}";
+    }
+
+    private static async Task<CommandExecutionResult> ExecuteCommandAsync(string command, string[] args, CancellationToken cancellationToken)
+    {
+        var result = await Cli.Wrap(command)
+            .WithArguments(args)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        return new CommandExecutionResult(result.ExitCode, result.StandardOutput, result.StandardError);
     }
 
     private static string BuildSafeFileName(string fileName)
