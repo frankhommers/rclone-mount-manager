@@ -50,7 +50,7 @@ public partial class MountOptionsViewModel : ObservableObject
         {
             foreach (var option in group.AllOptions)
             {
-                if (option.HasNonDefaultValue)
+                if (option.ShouldInclude)
                 {
                     result[option.Name] = option.Value;
                 }
@@ -128,10 +128,10 @@ public partial class MountOptionGroupViewModel : ObservableObject
         ShowAdvanced ? AllOptions : AllOptions.Where(o => !o.IsAdvanced);
 
     public bool HasVisibleOptions => VisibleOptions.Any();
-    public int ModifiedCount => VisibleOptions.Count(o => o.HasNonDefaultValue);
+    public int ModifiedCount => VisibleOptions.Count(o => o.ShouldInclude);
     public bool HasModifiedOptions => ModifiedCount > 0;
 
-    public string Header => $"{DisplayName} ({VisibleOptions.Count(o => o.HasNonDefaultValue)}/{VisibleOptions.Count()})";
+    public string Header => $"{DisplayName} ({VisibleOptions.Count(o => o.ShouldInclude)}/{VisibleOptions.Count()})";
 
     partial void OnShowAdvancedChanged(bool value)
     {
