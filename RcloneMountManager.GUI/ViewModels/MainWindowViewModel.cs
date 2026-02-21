@@ -12,6 +12,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -950,15 +952,31 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private static Dictionary<string, string> GetDefaultMountOptions(MountType type)
     {
+        var port = FindFreePort();
+        var rcDefaults = new Dictionary<string, string>
+        {
+            ["rc"] = "true",
+            ["rc_addr"] = $"localhost:{port}",
+        };
+
         return type switch
         {
-            MountType.MacOsNfs => new Dictionary<string, string>(),
-            _ => new Dictionary<string, string>
+            MountType.MacOsNfs => rcDefaults,
+            _ => new Dictionary<string, string>(rcDefaults)
             {
                 ["vfs_cache_mode"] = "full",
                 ["dir_cache_time"] = "10m",
             },
         };
+    }
+
+    private static int FindFreePort()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
     }
 
     private void NotifyLabelsChanged()
