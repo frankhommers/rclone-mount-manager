@@ -28,6 +28,8 @@ public partial class App : Application
             {
                 DataContext = viewModel,
             };
+
+            desktop.Exit += (_, _) => viewModel.Dispose();
             viewModel.InitializeRuntimeMonitoring();
         }
 

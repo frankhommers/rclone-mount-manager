@@ -21,8 +21,9 @@ using System.Threading.Tasks;
 
 namespace RcloneMountManager.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
+public partial class MainWindowViewModel : ViewModelBase, IDisposable
 {
+    private static readonly TimeSpan RuntimeRefreshCadence = TimeSpan.FromSeconds(3);
     private readonly MountManagerService _mountManagerService;
     private readonly LaunchAgentService _launchAgentService;
     private readonly RcloneBackendService _rcloneBackendService;
@@ -44,6 +45,10 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly Dictionary<string, StartupPreflightReport> _profileStartupPreflightReports = new(StringComparer.OrdinalIgnoreCase);
     private MountProfile? _observedProfile;
     private bool _isLoadingProfiles;
+    private readonly object _runtimeMonitoringGate = new();
+    private CancellationTokenSource? _runtimeMonitoringCts;
+    private Task? _runtimeMonitoringTask;
+    private bool _runtimeMonitoringActive;
 
     [ObservableProperty]
     private MountProfile _selectedProfile;
@@ -619,20 +624,65 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public void InitializeRuntimeMonitoring()
     {
-        _ = Task.Run(async () =>
+        lock (_runtimeMonitoringGate)
         {
-            try
+            if (_runtimeMonitoringActive)
             {
-                await VerifyStartupProfilesAsync(CancellationToken.None);
+                return;
             }
-            catch (OperationCanceledException)
+
+            _runtimeMonitoringCts = new CancellationTokenSource();
+            _runtimeMonitoringTask = Task.Run(() => RunRuntimeMonitoringLoopAsync(_runtimeMonitoringCts.Token));
+            _runtimeMonitoringActive = true;
+        }
+    }
+
+    public void StopRuntimeMonitoring()
+    {
+        CancellationTokenSource? cancellationSource;
+
+        lock (_runtimeMonitoringGate)
+        {
+            if (!_runtimeMonitoringActive)
             {
+                return;
             }
-            catch (Exception ex)
+
+            cancellationSource = _runtimeMonitoringCts;
+            _runtimeMonitoringCts = null;
+            _runtimeMonitoringTask = null;
+            _runtimeMonitoringActive = false;
+        }
+
+        cancellationSource?.Cancel();
+        cancellationSource?.Dispose();
+    }
+
+    public void Dispose()
+    {
+        StopRuntimeMonitoring();
+        GC.SuppressFinalize(this);
+    }
+
+    private async Task RunRuntimeMonitoringLoopAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await VerifyStartupProfilesAsync(cancellationToken);
+
+            using var timer = new PeriodicTimer(RuntimeRefreshCadence);
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                AppendLog($"ERR: Startup runtime verification failed: {ex.Message}");
+                await RefreshAllRuntimeStatesAsync(cancellationToken);
             }
-        });
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"ERR: Runtime monitoring loop failed: {ex.Message}");
+        }
     }
 
     private async Task VerifyStartupProfilesAsync(CancellationToken cancellationToken)
@@ -657,6 +707,24 @@ public partial class MainWindowViewModel : ViewModelBase
                 var state = states[index];
                 ApplyRuntimeState(profile, state);
                 AppendLog(profile.Id, $"Startup verification: lifecycle={FormatLifecycle(state.Lifecycle)}, health={FormatHealth(state.Health)}");
+            }
+        });
+    }
+
+    private async Task RefreshAllRuntimeStatesAsync(CancellationToken cancellationToken)
+    {
+        var profilesSnapshot = Profiles.ToList();
+        if (profilesSnapshot.Count == 0)
+        {
+            return;
+        }
+
+        var states = await _mountHealthService.VerifyAllAsync(profilesSnapshot, cancellationToken);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            for (var index = 0; index < profilesSnapshot.Count; index++)
+            {
+                ApplyRuntimeState(profilesSnapshot[index], states[index]);
             }
         });
     }
