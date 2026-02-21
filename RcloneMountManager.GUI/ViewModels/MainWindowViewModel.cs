@@ -26,7 +26,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly LaunchAgentService _launchAgentService;
     private readonly RcloneBackendService _rcloneBackendService;
     private readonly StartupPreflightService _startupPreflightService;
+    private readonly MountHealthService _mountHealthService;
     private readonly Func<MountProfile, CancellationToken, Task<StartupPreflightReport>> _startupPreflightRunner;
+    private readonly Func<MountProfile, Action<string>, CancellationToken, Task> _mountStartRunner;
+    private readonly Func<MountProfile, Action<string>, CancellationToken, Task> _mountStopRunner;
+    private readonly Func<MountProfile, CancellationToken, Task<bool>> _mountedProbe;
+    private readonly Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>> _runtimeStateVerifier;
     private readonly Func<MountProfile, string, Action<string>, CancellationToken, Task> _startupEnableRunner;
     private readonly Func<MountProfile, Action<string>, CancellationToken, Task> _startupDisableRunner;
     private readonly Func<MountProfile, bool> _startupEnabledProbe;
@@ -90,6 +95,11 @@ public partial class MainWindowViewModel : ViewModelBase
         LaunchAgentService? launchAgentService = null,
         RcloneBackendService? rcloneBackendService = null,
         StartupPreflightService? startupPreflightService = null,
+        MountHealthService? mountHealthService = null,
+        Func<MountProfile, Action<string>, CancellationToken, Task>? mountStartRunner = null,
+        Func<MountProfile, Action<string>, CancellationToken, Task>? mountStopRunner = null,
+        Func<MountProfile, CancellationToken, Task<bool>>? mountedProbe = null,
+        Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>>? runtimeStateVerifier = null,
         Func<MountProfile, CancellationToken, Task<StartupPreflightReport>>? startupPreflightRunner = null,
         Func<MountProfile, string, Action<string>, CancellationToken, Task>? startupEnableRunner = null,
         Func<MountProfile, Action<string>, CancellationToken, Task>? startupDisableRunner = null,
@@ -100,6 +110,11 @@ public partial class MainWindowViewModel : ViewModelBase
         _launchAgentService = launchAgentService ?? new LaunchAgentService();
         _rcloneBackendService = rcloneBackendService ?? new RcloneBackendService();
         _startupPreflightService = startupPreflightService ?? new StartupPreflightService();
+        _mountHealthService = mountHealthService ?? new MountHealthService();
+        _mountStartRunner = mountStartRunner ?? _mountManagerService.StartAsync;
+        _mountStopRunner = mountStopRunner ?? _mountManagerService.StopAsync;
+        _mountedProbe = mountedProbe ?? ((profile, cancellationToken) => _mountManagerService.IsMountedAsync(profile.MountPoint, cancellationToken));
+        _runtimeStateVerifier = runtimeStateVerifier ?? _mountHealthService.VerifyAsync;
         _startupPreflightRunner = startupPreflightRunner ?? _startupPreflightService.RunAsync;
         _startupEnableRunner = startupEnableRunner ?? _launchAgentService.EnableAsync;
         _startupDisableRunner = startupDisableRunner ?? _launchAgentService.DisableAsync;
@@ -208,6 +223,10 @@ public partial class MainWindowViewModel : ViewModelBase
     public string StartupButtonText => SelectedProfile?.StartAtLogin is true ? "Disable start at login" : "Enable start at login";
 
     public string SaveChangesButtonText => HasPendingChanges ? "Save changes *" : "Save changes";
+
+    public string SelectedProfileLifecycleText => FormatLifecycle(SelectedProfile?.RuntimeState.Lifecycle ?? MountLifecycleState.Idle);
+
+    public string SelectedProfileHealthText => FormatHealth(SelectedProfile?.RuntimeState.Health ?? MountHealthState.Unknown);
 
     public bool HasBackendOptions => BackendOptionInputs.Count > 0;
     public bool HasAdvancedBackendOptionInputs => AdvancedBackendOptionInputs.Count > 0;
@@ -415,9 +434,20 @@ public partial class MainWindowViewModel : ViewModelBase
         SyncMountOptionsToProfile();
         await RunBusyActionAsync(async cancellationToken =>
         {
-            AppendLog($"Starting mount '{SelectedProfile.Name}'...");
-            await _mountManagerService.StartAsync(SelectedProfile, AppendLog, cancellationToken);
-            await RefreshStatusInternalAsync(cancellationToken);
+            var profile = SelectedProfile;
+            AppendLog($"Starting mount '{profile.Name}'...");
+            ApplyRuntimeState(profile, new ProfileRuntimeState(MountLifecycleState.Mounting, MountHealthState.Unknown, DateTimeOffset.UtcNow, null));
+
+            try
+            {
+                await _mountStartRunner(profile, AppendLog, cancellationToken);
+                await RefreshRuntimeStateInternalAsync(profile, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                ApplyRuntimeState(profile, new ProfileRuntimeState(MountLifecycleState.Failed, MountHealthState.Failed, DateTimeOffset.UtcNow, ex.Message));
+                throw;
+            }
         });
     }
 
@@ -426,9 +456,26 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         await RunBusyActionAsync(async cancellationToken =>
         {
-            AppendLog($"Stopping mount '{SelectedProfile.Name}'...");
-            await _mountManagerService.StopAsync(SelectedProfile, AppendLog, cancellationToken);
-            await RefreshStatusInternalAsync(cancellationToken);
+            var profile = SelectedProfile;
+            AppendLog($"Stopping mount '{profile.Name}'...");
+
+            try
+            {
+                await _mountStopRunner(profile, AppendLog, cancellationToken);
+
+                if (!await _mountedProbe(profile, cancellationToken))
+                {
+                    ApplyRuntimeState(profile, new ProfileRuntimeState(MountLifecycleState.Idle, MountHealthState.Unknown, DateTimeOffset.UtcNow, null));
+                    return;
+                }
+
+                await RefreshRuntimeStateInternalAsync(profile, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                ApplyRuntimeState(profile, new ProfileRuntimeState(MountLifecycleState.Failed, MountHealthState.Failed, DateTimeOffset.UtcNow, ex.Message));
+                throw;
+            }
         });
     }
 
@@ -605,17 +652,42 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private async Task RefreshStatusInternalAsync(CancellationToken cancellationToken)
     {
-        var profile = SelectedProfile;
-        var mounted = await _mountManagerService.IsMountedAsync(profile.MountPoint, cancellationToken);
-        var running = _mountManagerService.IsRunning(profile.MountPoint);
+        await RefreshRuntimeStateInternalAsync(SelectedProfile, cancellationToken);
+    }
 
-        profile.IsMounted = mounted;
-        profile.IsRunning = running;
-        profile.LastStatus = $"Mounted: {mounted}, Running: {running}";
-
-        StatusText = profile.LastStatus;
+    private async Task RefreshRuntimeStateInternalAsync(MountProfile profile, CancellationToken cancellationToken)
+    {
+        var state = await _runtimeStateVerifier(profile, cancellationToken);
+        ApplyRuntimeState(profile, state);
         AppendLog($"Status for '{profile.Name}': {profile.LastStatus}");
     }
+
+    private void ApplyRuntimeState(MountProfile profile, ProfileRuntimeState state)
+    {
+        profile.RuntimeState = state;
+        profile.IsMounted = state.Lifecycle is MountLifecycleState.Mounted;
+        profile.IsRunning = state.Lifecycle is MountLifecycleState.Mounted or MountLifecycleState.Mounting;
+        profile.LastStatus = BuildStatusText(state);
+
+        if (ReferenceEquals(SelectedProfile, profile))
+        {
+            StatusText = profile.LastStatus;
+            OnPropertyChanged(nameof(SelectedProfileLifecycleText));
+            OnPropertyChanged(nameof(SelectedProfileHealthText));
+        }
+    }
+
+    private static string BuildStatusText(ProfileRuntimeState state)
+    {
+        var text = $"Lifecycle: {FormatLifecycle(state.Lifecycle)} | Health: {FormatHealth(state.Health)}";
+        return string.IsNullOrWhiteSpace(state.ErrorText)
+            ? text
+            : $"{text} | Detail: {state.ErrorText}";
+    }
+
+    private static string FormatLifecycle(MountLifecycleState lifecycle) => lifecycle.ToString().ToLowerInvariant();
+
+    private static string FormatHealth(MountHealthState health) => health.ToString().ToLowerInvariant();
 
     private void AppendLog(string line)
     {
@@ -821,6 +893,13 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             StatusText = value.LastStatus;
         }
+        else
+        {
+            StatusText = BuildStatusText(value.RuntimeState);
+        }
+
+        OnPropertyChanged(nameof(SelectedProfileLifecycleText));
+        OnPropertyChanged(nameof(SelectedProfileHealthText));
 
         if (IsStartupSupported)
         {
@@ -887,6 +966,17 @@ public partial class MainWindowViewModel : ViewModelBase
             NotifyCommandStateChanged();
             NotifyLabelsChanged();
             OnPropertyChanged(nameof(StartupButtonText));
+        }
+
+        if (e.PropertyName is nameof(MountProfile.RuntimeState) or nameof(MountProfile.LastStatus))
+        {
+            OnPropertyChanged(nameof(SelectedProfileLifecycleText));
+            OnPropertyChanged(nameof(SelectedProfileHealthText));
+
+            if (_observedProfile is not null && !string.IsNullOrWhiteSpace(_observedProfile.LastStatus))
+            {
+                StatusText = _observedProfile.LastStatus;
+            }
         }
     }
 
