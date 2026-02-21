@@ -4,15 +4,15 @@
 
 **Core Value:** Users can configure mounts once and trust they are mounted automatically and reliably on boot.
 
-**Current Focus:** Execute final phase 3 plan to harden diagnostics observability and complete startup timeline isolation delivery.
+**Current Focus:** Phase 3 execution complete; diagnostics observability and startup timeline isolation are delivered and verified.
 
 ## Current Position
 
 - **Current Phase:** 3 - Startup Diagnostics and Log Isolation
-- **Current Plan:** 2 of 3 complete in phase 3
-- **Overall Status:** Phase 1 and phase 2 complete and verified; phase 3 in progress
-- **Last activity:** 2026-02-21 - Completed 03-02-PLAN.md
-- **Progress:** [█████████░] 8/9 plans complete (89%)
+- **Current Plan:** 3 of 3 complete in phase 3
+- **Overall Status:** Phase 1, phase 2, and phase 3 complete and verified
+- **Last activity:** 2026-02-21 - Completed 03-03-PLAN.md
+- **Progress:** [██████████] 9/9 plans complete (100%)
 
 ## Performance Metrics
 
@@ -20,8 +20,8 @@
 - **v1 requirements:** 13
 - **Mapped requirements:** 13
 - **Coverage:** 100%
-- **Completed phases:** 2
-- **Completed plans:** 8/9 (phase 3 plan 2 complete)
+- **Completed phases:** 3
+- **Completed plans:** 9/9 (phase 3 complete)
 
 ## Accumulated Context
 
@@ -50,10 +50,13 @@
 - Keep diagnostics filtering explicit and independent from `SelectedProfile` by using dedicated filter state (`SelectedDiagnosticsProfileId`, `StartupTimelineOnly`).
 - Recompute visible diagnostics timeline from typed events on every filter/event/profile input change using stable ordering for deterministic analysis.
 - Define startup-only timeline scope by `ProfileLogCategory.Startup` to include startup verification/init events while excluding manual and runtime refresh noise.
+- Keep diagnostics panel controls (profile scope + startup-only toggle) directly in the main window timeline area for fast startup-failure isolation.
+- Project diagnostics into typed UI rows (`DiagnosticsTimelineRow`) with explicit timestamp/severity/stage/message fields while retaining compatibility display strings.
+- Surface an explicit diagnostics empty state (`No diagnostics for current filter.`) instead of blank timeline output.
 
 ### TODOs
 
-- Execute `03-03-PLAN.md` (phase 3 completion and hardening).
+- None.
 
 ### Blockers
 
@@ -61,12 +64,12 @@
 
 ## Session Continuity
 
-- **Last completed artifact:** `.planning/phases/03-startup-diagnostics-and-log-isolation/03-02-SUMMARY.md`
-- **Last updated files:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelDiagnosticsTests.cs`, `.planning/phases/03-startup-diagnostics-and-log-isolation/03-02-SUMMARY.md`, `.planning/STATE.md`
-- **Last session:** 2026-02-21T21:51:47Z
-- **Stopped at:** Completed 03-02-PLAN.md
+- **Last completed artifact:** `.planning/phases/03-startup-diagnostics-and-log-isolation/03-03-SUMMARY.md`
+- **Last updated files:** `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelDiagnosticsTests.cs`, `.planning/phases/03-startup-diagnostics-and-log-isolation/03-03-SUMMARY.md`, `.planning/STATE.md`
+- **Last session:** 2026-02-21T21:55:53Z
+- **Stopped at:** Completed 03-03-PLAN.md
 - **Resume file:** None
-- **Next command:** `/gsd-execute-plan 03-03`
+- **Next command:** None
 
 ---
 *Initialized: 2026-02-21*
