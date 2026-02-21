@@ -4,9 +4,23 @@ using System.Text.RegularExpressions;
 
 namespace RcloneMountManager.Core.Helpers;
 
+public sealed record SizeSuffixUnit(string Value, string DisplayName)
+{
+    public override string ToString() => DisplayName;
+}
+
 public static partial class SizeSuffixHelper
 {
     public static IReadOnlyList<string> Units { get; } = ["B", "Ki", "Mi", "Gi", "Ti"];
+
+    public static IReadOnlyList<SizeSuffixUnit> UnitItems { get; } =
+    [
+        new("B", "Bytes"),
+        new("Ki", "Kibibytes"),
+        new("Mi", "Mebibytes"),
+        new("Gi", "Gibibytes"),
+        new("Ti", "Tebibytes"),
+    ];
 
     [GeneratedRegex(@"^(\d+(?:\.\d+)?)\s*(Ki|Mi|Gi|Ti|B)?$", RegexOptions.Compiled)]
     private static partial Regex SizeRegex();

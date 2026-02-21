@@ -1,3 +1,4 @@
+using RcloneMountManager.Core.Helpers;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.ViewModels;
 
@@ -189,7 +190,7 @@ public class MountOptionInputViewModelTests
         var vm = new MountOptionInputViewModel(option);
 
         vm.SizeSuffixNumericValue = 128;
-        vm.SizeSuffixUnit = "Mi";
+        vm.SizeSuffixUnit = SizeSuffixHelper.UnitItems.First(u => u.Value == "Mi");
 
         Assert.Equal("128Mi", vm.Value);
     }
@@ -201,7 +202,7 @@ public class MountOptionInputViewModelTests
         var vm = new MountOptionInputViewModel(option, "256Gi");
 
         Assert.Equal(256m, vm.SizeSuffixNumericValue);
-        Assert.Equal("Gi", vm.SizeSuffixUnit);
+        Assert.Equal("Gi", vm.SizeSuffixUnit.Value);
     }
 
     [Fact]

@@ -21,7 +21,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     public bool IsAdvanced => Option.Advanced;
     public OptionControlType ControlType => Option.GetControlType();
     public IReadOnlyList<string>? EnumValues => Option.GetEnumValues();
-    public IReadOnlyList<string> SizeSuffixUnits => SizeSuffixHelper.Units;
+    public IReadOnlyList<SizeSuffixUnit> SizeSuffixUnits => SizeSuffixHelper.UnitItems;
     public ObservableCollection<StringListItemViewModel> StringListItems { get; } = [];
     public bool IsKeyValue => Option.IsKeyValue;
     public string ListSeparator => Option.ListSeparator;
@@ -44,7 +44,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     private decimal? _sizeSuffixNumericValue;
 
     [ObservableProperty]
-    private string _sizeSuffixUnit = "B";
+    private SizeSuffixUnit _sizeSuffixUnit = SizeSuffixHelper.UnitItems[0];
 
     [ObservableProperty]
     private string? _selectedEnumValue;
@@ -103,7 +103,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
                     {
                         var (sv, su) = SizeSuffixHelper.Parse(sizeStr);
                         SizeSuffixNumericValue = sv;
-                        SizeSuffixUnit = su;
+                        SizeSuffixUnit = ResolveSizeSuffixUnit(su);
                     }
                     break;
                 case OptionControlType.ComboBox:
@@ -158,7 +158,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
         SyncSizeSuffix();
     }
 
-    partial void OnSizeSuffixUnitChanged(string value)
+    partial void OnSizeSuffixUnitChanged(SizeSuffixUnit value)
     {
         if (_syncing) return;
         SyncSizeSuffix();
@@ -173,8 +173,13 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     private void SyncSizeSuffix()
     {
         var val = SizeSuffixNumericValue ?? 0m;
-        SyncToString(SizeSuffixHelper.Format(val, SizeSuffixUnit));
+        SyncToString(SizeSuffixHelper.Format(val, SizeSuffixUnit.Value));
     }
+
+    private static SizeSuffixUnit ResolveSizeSuffixUnit(string unitValue) =>
+        SizeSuffixHelper.UnitItems.FirstOrDefault(u =>
+            string.Equals(u.Value, unitValue, StringComparison.OrdinalIgnoreCase))
+        ?? SizeSuffixHelper.UnitItems[0];
 
     protected virtual void SyncToString(string newValue)
     {
@@ -223,12 +228,12 @@ public abstract partial class TypedOptionViewModel : ObservableObject
                     {
                         var (sv, su) = SizeSuffixHelper.Parse(value);
                         SizeSuffixNumericValue = sv;
-                        SizeSuffixUnit = su;
+                        SizeSuffixUnit = ResolveSizeSuffixUnit(su);
                     }
                     else
                     {
                         SizeSuffixNumericValue = null;
-                        SizeSuffixUnit = "B";
+                        SizeSuffixUnit = SizeSuffixHelper.UnitItems[0];
                     }
                     break;
                 case OptionControlType.ComboBox:
