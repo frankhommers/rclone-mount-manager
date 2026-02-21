@@ -248,4 +248,69 @@ public class MountOptionInputViewModelTests
         Assert.Equal("*.txt", vm.Value);
         Assert.True(vm.IsSet);
     }
+
+    [Fact]
+    public void IsPinned_DefaultFalse()
+    {
+        var option = new RcloneOption { Name = "transfers", Type = "int" };
+        var vm = new MountOptionInputViewModel(option);
+        Assert.False(vm.IsPinned);
+    }
+
+    [Fact]
+    public void IsPinned_AutoPinsOnNonDefaultValue()
+    {
+        var option = new RcloneOption { Name = "transfers", Type = "int", DefaultStr = "4" };
+        var vm = new MountOptionInputViewModel(option);
+        vm.NumericValue = 8;
+        Assert.True(vm.IsPinned);
+    }
+
+    [Fact]
+    public void IsPinned_ResetUnpins()
+    {
+        var option = new RcloneOption { Name = "transfers", Type = "int", DefaultStr = "4" };
+        var vm = new MountOptionInputViewModel(option);
+        vm.NumericValue = 8;
+        Assert.True(vm.IsPinned);
+        vm.ResetToDefaultCommand.Execute(null);
+        Assert.False(vm.IsPinned);
+    }
+
+    [Fact]
+    public void ShouldInclude_FalseByDefault()
+    {
+        var option = new RcloneOption { Name = "transfers", Type = "int" };
+        var vm = new MountOptionInputViewModel(option);
+        Assert.False(vm.ShouldInclude);
+    }
+
+    [Fact]
+    public void ShouldInclude_TrueWhenNonDefault()
+    {
+        var option = new RcloneOption { Name = "transfers", Type = "int", DefaultStr = "4" };
+        var vm = new MountOptionInputViewModel(option);
+        vm.NumericValue = 8;
+        Assert.True(vm.ShouldInclude);
+    }
+
+    [Fact]
+    public void ShouldInclude_TrueWhenPinnedAtDefault()
+    {
+        var option = new RcloneOption { Name = "vfs_cache_mode", Type = "string", DefaultStr = "off" };
+        var vm = new MountOptionInputViewModel(option);
+        vm.IsPinned = true;
+        vm.Value = "off";
+        Assert.True(vm.ShouldInclude);
+    }
+
+    [Fact]
+    public void ShouldInclude_FalseWhenUnpinnedAtDefault()
+    {
+        var option = new RcloneOption { Name = "vfs_cache_mode", Type = "string", DefaultStr = "off" };
+        var vm = new MountOptionInputViewModel(option);
+        vm.Value = "off";
+        vm.IsPinned = false;
+        Assert.False(vm.ShouldInclude);
+    }
 }

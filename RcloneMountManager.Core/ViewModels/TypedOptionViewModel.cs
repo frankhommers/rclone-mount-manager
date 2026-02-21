@@ -21,7 +21,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     public bool IsAdvanced => Option.Advanced;
     public OptionControlType ControlType => Option.GetControlType();
     public IReadOnlyList<string>? EnumValues => Option.GetEnumValues();
-    public static IReadOnlyList<string> SizeSuffixUnits => SizeSuffixHelper.Units;
+    public IReadOnlyList<string> SizeSuffixUnits => SizeSuffixHelper.Units;
     public ObservableCollection<StringListItemViewModel> StringListItems { get; } = [];
     public bool IsKeyValue => Option.IsKeyValue;
     public string ListSeparator => Option.ListSeparator;
@@ -49,9 +49,15 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     [ObservableProperty]
     private string? _selectedEnumValue;
 
+    [ObservableProperty]
+    private bool _isPinned;
+
     public virtual bool HasNonDefaultValue =>
         !string.IsNullOrEmpty(Value) &&
         !string.Equals(Value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase);
+
+    public virtual bool ShouldInclude =>
+        IsPinned || HasNonDefaultValue;
 
     /// <summary>
     /// DefaultStr normalized through the same parse→format roundtrip as Value,
@@ -124,6 +130,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
             OnPropertyChanged(nameof(SizeSuffixUnit));
             OnPropertyChanged(nameof(SelectedEnumValue));
             OnPropertyChanged(nameof(HasNonDefaultValue));
+            OnPropertyChanged(nameof(ShouldInclude));
         }
     }
 
@@ -153,11 +160,6 @@ public abstract partial class TypedOptionViewModel : ObservableObject
 
     partial void OnSizeSuffixUnitChanged(string value)
     {
-        if (string.IsNullOrEmpty(value))
-        {
-            SizeSuffixUnit = "B";
-            return;
-        }
         if (_syncing) return;
         SyncSizeSuffix();
     }
@@ -181,6 +183,12 @@ public abstract partial class TypedOptionViewModel : ObservableObject
         {
             Value = newValue;
             OnPropertyChanged(nameof(HasNonDefaultValue));
+            if (!string.IsNullOrEmpty(newValue) &&
+                !string.Equals(newValue, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase))
+            {
+                IsPinned = true;
+            }
+            OnPropertyChanged(nameof(ShouldInclude));
         }
         finally
         {
@@ -193,6 +201,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
         if (_syncing) return;
 
         OnPropertyChanged(nameof(HasNonDefaultValue));
+        OnPropertyChanged(nameof(ShouldInclude));
         OnValueChangedExtra(value);
 
         _syncing = true;
@@ -287,9 +296,18 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void TogglePin()
+    {
+        IsPinned = !IsPinned;
+        OnPropertyChanged(nameof(ShouldInclude));
+    }
+
+    [RelayCommand]
     protected virtual void ResetToDefault()
     {
+        IsPinned = false;
         Value = string.Empty;
         OnPropertyChanged(nameof(HasNonDefaultValue));
+        OnPropertyChanged(nameof(ShouldInclude));
     }
 }

@@ -37,9 +37,13 @@ public partial class MountOptionInputViewModel : TypedOptionViewModel
         IsSet && !string.IsNullOrEmpty(Value) &&
         !string.Equals(Value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase);
 
+    public override bool ShouldInclude =>
+        (IsPinned && IsSet) || HasNonDefaultValue;
+
     partial void OnIsSetChanged(bool value)
     {
         OnPropertyChanged(nameof(HasNonDefaultValue));
+        OnPropertyChanged(nameof(ShouldInclude));
     }
 
     protected override void SyncToString(string newValue)
@@ -50,15 +54,17 @@ public partial class MountOptionInputViewModel : TypedOptionViewModel
         {
             IsSet = true;
         }
+        OnPropertyChanged(nameof(ShouldInclude));
     }
 
     protected override void OnValueChangedExtra(string value)
     {
         if (!string.IsNullOrEmpty(value) &&
-            !string.Equals(value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase))
+            (!string.Equals(value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase) || IsPinned))
         {
             IsSet = true;
         }
+        OnPropertyChanged(nameof(ShouldInclude));
     }
 
     protected override void ResetToDefault()
