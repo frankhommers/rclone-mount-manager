@@ -62,25 +62,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BOOT-01 | TBD | Pending |
-| BOOT-02 | TBD | Pending |
-| BOOT-03 | TBD | Pending |
-| SAFE-01 | TBD | Pending |
-| SAFE-02 | TBD | Pending |
-| SAFE-03 | TBD | Pending |
-| HEAL-01 | TBD | Pending |
-| HEAL-02 | TBD | Pending |
-| OBS-01 | TBD | Pending |
-| OBS-02 | TBD | Pending |
-| OBS-03 | TBD | Pending |
-| POL-01 | TBD | Pending |
-| POL-02 | TBD | Pending |
+| BOOT-01 | Phase 1 | Pending |
+| BOOT-02 | Phase 1 | Pending |
+| BOOT-03 | Phase 1 | Pending |
+| SAFE-01 | Phase 1 | Pending |
+| SAFE-02 | Phase 1 | Pending |
+| SAFE-03 | Phase 1 | Pending |
+| HEAL-01 | Phase 2 | Pending |
+| HEAL-02 | Phase 2 | Pending |
+| OBS-01 | Phase 2 | Pending |
+| OBS-02 | Phase 3 | Pending |
+| OBS-03 | Phase 3 | Pending |
+| POL-01 | Phase 4 | Pending |
+| POL-02 | Phase 4 | Pending |
 
 **Coverage:**
 - v1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 ⚠️
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after initial definition*
+*Last updated: 2026-02-21 after roadmap creation*
