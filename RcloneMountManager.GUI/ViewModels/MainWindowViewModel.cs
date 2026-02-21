@@ -372,6 +372,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanRunActions))]
     private async Task StartMountAsync()
     {
+        SyncMountOptionsToProfile();
         await RunBusyActionAsync(async cancellationToken =>
         {
             AppendLog($"Starting mount '{SelectedProfile.Name}'...");
@@ -411,6 +412,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanRunActions))]
     private void GenerateScript()
     {
+        SyncMountOptionsToProfile();
         GeneratedScript = _mountManagerService.GenerateScript(SelectedProfile);
         _profileScripts[SelectedProfile.Id] = GeneratedScript;
         AppendLog("Generated shell script preview.");
@@ -419,6 +421,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanSaveScript))]
     private async Task SaveScriptAsync()
     {
+        SyncMountOptionsToProfile();
         var scriptPath = _launchAgentService.GetScriptPath(SelectedProfile);
         Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
 
@@ -441,6 +444,7 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanToggleStartup))]
     private async Task ToggleStartupAsync()
     {
+        SyncMountOptionsToProfile();
         await RunBusyActionAsync(async cancellationToken =>
         {
             if (!IsStartupSupported)
@@ -975,6 +979,14 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(QuickConnectEndpointHint));
         OnPropertyChanged(nameof(IsStartupSupported));
         OnPropertyChanged(nameof(StartupButtonText));
+    }
+
+    private void SyncMountOptionsToProfile()
+    {
+        if (SelectedProfile is not null)
+        {
+            SelectedProfile.MountOptions = MountOptionsVm.GetNonDefaultValues();
+        }
     }
 
     private void ResetQuickConnectFields()
