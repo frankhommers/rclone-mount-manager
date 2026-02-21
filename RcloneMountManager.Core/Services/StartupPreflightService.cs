@@ -64,7 +64,12 @@ public sealed class StartupPreflightService
             return;
         }
 
-        var mountPath = ResolvePath(profile.MountPoint);
+        if (!TryResolvePath(profile.MountPoint, out var mountPath, out var resolveError))
+        {
+            report.AddCritical(MountPathCheckKey, $"Mount path '{profile.MountPoint}' is invalid: {resolveError}");
+            return;
+        }
+
         if (!TryEnsureWritableDirectory(mountPath, out var error))
         {
             report.AddCritical(MountPathCheckKey, $"Mount path '{profile.MountPoint}' is not writable: {error}");
@@ -88,7 +93,12 @@ public sealed class StartupPreflightService
             return;
         }
 
-        var cachePath = ResolvePath(configuredCachePath);
+        if (!TryResolvePath(configuredCachePath, out var cachePath, out var resolveError))
+        {
+            report.AddCritical(CachePathCheckKey, $"Cache path '{configuredCachePath}' is invalid: {resolveError}");
+            return;
+        }
+
         if (!TryEnsureWritableDirectory(cachePath, out var error))
         {
             report.AddCritical(CachePathCheckKey, $"Cache path '{configuredCachePath}' is not writable: {error}");
@@ -167,7 +177,12 @@ public sealed class StartupPreflightService
 
         if (configuredBinary.IndexOf(Path.DirectorySeparatorChar) >= 0 || configuredBinary.IndexOf(Path.AltDirectorySeparatorChar) >= 0 || Path.IsPathRooted(configuredBinary))
         {
-            var candidatePath = ResolvePath(configuredBinary);
+            if (!TryResolvePath(configuredBinary, out var candidatePath, out error))
+            {
+                error = $"invalid binary path: {error}";
+                return false;
+            }
+
             if (!File.Exists(candidatePath))
             {
                 error = "file does not exist.";
@@ -235,6 +250,23 @@ public sealed class StartupPreflightService
         }
 
         return Path.GetFullPath(trimmed);
+    }
+
+    private static bool TryResolvePath(string inputPath, out string resolvedPath, out string error)
+    {
+        resolvedPath = string.Empty;
+        error = string.Empty;
+
+        try
+        {
+            resolvedPath = ResolvePath(inputPath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
     }
 
     private static bool IsExecutable(string filePath)
