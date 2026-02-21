@@ -28,7 +28,7 @@
                                   IsChecked="{Binding BoolValue}"
                                    OnContent="Enabled" OffContent="Disabled"
                                   Margin="8,0,0,0"/>
-                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0">
                          <Button Command="{Binding TogglePinCommand}"
                                  Padding="6,4"
                                  ToolTip.Tip="Pin to always include in script">
@@ -82,7 +82,7 @@
                              </DataTemplate>
                          </ComboBox.ItemTemplate>
                      </ComboBox>
-                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0">
                          <Button Command="{Binding TogglePinCommand}"
                                  Padding="6,4"
                                  ToolTip.Tip="Pin to always include in script">
@@ -131,7 +131,7 @@
                                    MinWidth="200"
                                    HorizontalAlignment="Stretch"
                                    ShowButtonSpinner="True"/>
-                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0">
                          <Button Command="{Binding TogglePinCommand}"
                                  Padding="6,4"
                                  ToolTip.Tip="Pin to always include in script">
@@ -179,7 +179,7 @@
                                 Margin="8,0,0,0"
                                 MinWidth="200"
                                 HorizontalAlignment="Left"/>
-                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0">
                          <Button Command="{Binding TogglePinCommand}"
                                  Padding="6,4"
                                  ToolTip.Tip="Pin to always include in script">
@@ -235,7 +235,7 @@
                                   Margin="4,0,0,0"
                                   HorizontalAlignment="Right"/>
                     </Grid>
-                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0">
                          <Button Command="{Binding TogglePinCommand}"
                                  Padding="6,4"
                                  ToolTip.Tip="Pin to always include in script">
@@ -280,7 +280,7 @@
                               Watermark="{Binding DefaultStr}"
                               Margin="8,0,0,0"
                               HorizontalAlignment="Stretch"/>
-                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0">
                          <Button Command="{Binding TogglePinCommand}"
                                  Padding="6,4"
                                  ToolTip.Tip="Pin to always include in script">
@@ -361,7 +361,7 @@
                                       Width="12" Height="12"/>
                         </Button>
                     </StackPanel>
-                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0" VerticalAlignment="Top">
                          <Button Command="{Binding TogglePinCommand}"
                                  Padding="6,4"
                                  ToolTip.Tip="Pin to always include in script">
