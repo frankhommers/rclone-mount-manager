@@ -9,10 +9,10 @@
 ## Current Position
 
 - **Current Phase:** 2 - Boot Health Verification and Live State
-- **Current Plan:** Pending planning/execution for phase 2
-- **Overall Status:** Phase 1 complete and verified; phase 2 not started
-- **Last activity:** 2026-02-21 - Verified phase 1 goal (10/10)
-- **Progress:** [██░░░░░░░░] 1/4 phases complete (25%)
+- **Current Plan:** 1 of 3 completed in phase 2
+- **Overall Status:** Phase 1 complete and verified; phase 2 in progress
+- **Last activity:** 2026-02-21 - Completed 02-01-PLAN.md
+- **Progress:** [███████░░░] 4/6 plans complete (67%)
 
 ## Performance Metrics
 
@@ -21,7 +21,7 @@
 - **Mapped requirements:** 13
 - **Coverage:** 100%
 - **Completed phases:** 1
-- **Completed plans:** 3/3 (phase 1)
+- **Completed plans:** 4/6 (phase 1 complete, phase 2 in progress)
 
 ## Accumulated Context
 
@@ -36,11 +36,12 @@
 - Convert invalid preflight path inputs into typed critical results rather than throwing.
 - Keep startup preflight reports visible per profile so users can inspect startup readiness before toggling startup.
 - Enforce startup toggle order `preflight -> gate -> launch-agent apply -> persist` and only persist after successful apply.
+- Treat mounted-but-unusable and probe-timeout outcomes as `Degraded`, reserving `Failed` for mount absence or command-level failures.
+- Keep typed runtime state as the source of truth while synchronizing `IsMounted`, `IsRunning`, and `LastStatus` for compatibility.
 
 ### TODOs
 
-- Discuss and plan Phase 2 (`Boot Health Verification and Live State`).
-- Execute Phase 2 plans after planning is complete.
+- Execute remaining phase 2 plans (`02-02`, `02-03`).
 
 ### Blockers
 
@@ -48,12 +49,12 @@
 
 ## Session Continuity
 
-- **Last completed artifact:** `.planning/phases/01-startup-enablement-and-safety-gates/01-startup-enablement-and-safety-gates-VERIFICATION.md`
-- **Last updated files:** `.planning/phases/01-startup-enablement-and-safety-gates/01-03-SUMMARY.md`, `.planning/phases/01-startup-enablement-and-safety-gates/01-startup-enablement-and-safety-gates-VERIFICATION.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, `.planning/STATE.md`
-- **Last session:** 2026-02-21T19:26:30Z
-- **Stopped at:** Completed and verified phase 1
+- **Last completed artifact:** `.planning/phases/02-boot-health-verification-and-live-state/02-01-SUMMARY.md`
+- **Last updated files:** `RcloneMountManager.Core/Models/MountLifecycleState.cs`, `RcloneMountManager.Core/Models/MountHealthState.cs`, `RcloneMountManager.Core/Models/ProfileRuntimeState.cs`, `RcloneMountManager.Core/Models/MountProfile.cs`, `RcloneMountManager.Core/Services/MountHealthService.cs`, `RcloneMountManager.Tests/Services/MountHealthServiceTests.cs`, `.planning/phases/02-boot-health-verification-and-live-state/02-01-SUMMARY.md`, `.planning/STATE.md`
+- **Last session:** 2026-02-21T20:15:11Z
+- **Stopped at:** Completed 02-01-PLAN.md
 - **Resume file:** None
-- **Next command:** `/gsd-discuss-phase 2`
+- **Next command:** `/gsd-execute-plan .planning/phases/02-boot-health-verification-and-live-state/02-02-PLAN.md`
 
 ---
 *Initialized: 2026-02-21*
