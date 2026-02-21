@@ -21,12 +21,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Boot Verification
 
-- [ ] **HEAL-01**: User can see whether each auto-mount profile is healthy after login based on mount usability checks
-- [ ] **HEAL-02**: User can see when an auto-mount is in degraded or failed state after boot
+- [x] **HEAL-01**: User can see whether each auto-mount profile is healthy after login based on mount usability checks
+- [x] **HEAL-02**: User can see when an auto-mount is in degraded or failed state after boot
 
 ### Observability
 
-- [ ] **OBS-01**: User can see live per-profile mount status (idle, mounting, mounted, failed)
+- [x] **OBS-01**: User can see live per-profile mount status (idle, mounting, mounted, failed)
 - [ ] **OBS-02**: User can view timestamped logs for startup and mount lifecycle events
 - [ ] **OBS-03**: User can filter logs by profile to diagnose startup failures quickly
 
@@ -68,9 +68,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SAFE-01 | Phase 1 | Complete |
 | SAFE-02 | Phase 1 | Complete |
 | SAFE-03 | Phase 1 | Complete |
-| HEAL-01 | Phase 2 | Pending |
-| HEAL-02 | Phase 2 | Pending |
-| OBS-01 | Phase 2 | Pending |
+| HEAL-01 | Phase 2 | Complete |
+| HEAL-02 | Phase 2 | Complete |
+| OBS-01 | Phase 2 | Complete |
 | OBS-02 | Phase 3 | Pending |
 | OBS-03 | Phase 3 | Pending |
 | POL-01 | Phase 4 | Pending |
@@ -83,4 +83,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after phase 1 completion*
+*Last updated: 2026-02-21 after phase 2 completion*

@@ -44,9 +44,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md - Add typed runtime lifecycle/health models and implement bounded `MountHealthService` with classification tests.
-- [ ] 02-02-PLAN.md - Wire lifecycle/health state transitions into `MainWindowViewModel` and surface runtime state in the main UI.
-- [ ] 02-03-PLAN.md - Add startup fan-out verification and periodic live-state refresh loop with deterministic ViewModel tests.
+- [x] 02-01-PLAN.md - Add typed runtime lifecycle/health models and implement bounded `MountHealthService` with classification tests.
+- [x] 02-02-PLAN.md - Wire lifecycle/health state transitions into `MainWindowViewModel` and surface runtime state in the main UI.
+- [x] 02-03-PLAN.md - Add startup fan-out verification and periodic live-state refresh loop with deterministic ViewModel tests.
 
 ### Phase 3 - Startup Diagnostics and Log Isolation
 
@@ -79,7 +79,7 @@ Plans:
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
 | 1 | Startup Enablement and Safety Gates | BOOT-01, BOOT-02, BOOT-03, SAFE-01, SAFE-02, SAFE-03 | Complete |
-| 2 | Boot Health Verification and Live State | HEAL-01, HEAL-02, OBS-01 | Pending |
+| 2 | Boot Health Verification and Live State | HEAL-01, HEAL-02, OBS-01 | Complete |
 | 3 | Startup Diagnostics and Log Isolation | OBS-02, OBS-03 | Pending |
 | 4 | Per-Profile Reliability Policy Presets | POL-01, POL-02 | Pending |
 
