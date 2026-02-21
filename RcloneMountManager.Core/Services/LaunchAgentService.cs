@@ -63,6 +63,7 @@ public sealed class LaunchAgentService
         var plistContent = BuildPlist(profile, scriptPath);
         await File.WriteAllTextAsync(plistPath, plistContent, cancellationToken);
 
+        await RunPlutilLintAsync(plistPath, cancellationToken);
         await RunLaunchCtlAsync(["bootstrap", BuildGuiDomain(), plistPath], cancellationToken);
 
         log($"Enabled start at login for '{profile.Name}'.");
@@ -120,10 +121,33 @@ public sealed class LaunchAgentService
 
     private static async Task RunLaunchCtlAsync(string[] args, CancellationToken cancellationToken)
     {
-        await Cli.Wrap("launchctl")
+        await RunCommandWithStrictValidationAsync("launchctl", args, cancellationToken);
+    }
+
+    private static async Task RunPlutilLintAsync(string plistPath, CancellationToken cancellationToken)
+    {
+        await RunCommandWithStrictValidationAsync("plutil", ["-lint", plistPath], cancellationToken);
+    }
+
+    private static async Task RunCommandWithStrictValidationAsync(string command, string[] args, CancellationToken cancellationToken)
+    {
+        var result = await Cli.Wrap(command)
             .WithArguments(args)
             .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync(cancellationToken);
+
+        if (result.ExitCode != 0)
+        {
+            var stderr = string.IsNullOrWhiteSpace(result.StandardError)
+                ? "(empty)"
+                : result.StandardError.Trim();
+            var stdout = string.IsNullOrWhiteSpace(result.StandardOutput)
+                ? "(empty)"
+                : result.StandardOutput.Trim();
+
+            throw new InvalidOperationException(
+                $"Command '{command} {string.Join(' ', args)}' failed with exit code {result.ExitCode}. stdout: {stdout} stderr: {stderr}");
+        }
     }
 
     private static string BuildLabel(MountProfile profile)
