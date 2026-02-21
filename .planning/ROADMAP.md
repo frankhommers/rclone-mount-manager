@@ -21,6 +21,13 @@ This roadmap delivers the v1 promise: configure mounts once and trust they come 
 4. User can run preflight checks and see explicit failures for missing binary, invalid mount/cache paths, or unavailable credentials.
 5. User cannot enable startup behavior for a profile until critical preflight checks pass.
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md - Build typed startup preflight checks and safety report models.
+- [ ] 01-02-PLAN.md - Modernize LaunchAgent activation/deactivation with linted plist and explicit failures.
+- [ ] 01-03-PLAN.md - Wire preflight-gated startup toggle and persistence into ViewModel/UI with regression tests.
+
 ### Phase 2 - Boot Health Verification and Live State
 
 **Goal:** Users can trust post-login mount state because health is verified and surfaced as truthful runtime status.
