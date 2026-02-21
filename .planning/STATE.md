@@ -4,15 +4,15 @@
 
 **Core Value:** Users can configure mounts once and trust they are mounted automatically and reliably on boot.
 
-**Current Focus:** Prepare phase 3 planning for startup diagnostics and log isolation using the new runtime-state baseline.
+**Current Focus:** Execute remaining phase 3 plans to build startup diagnostics timeline isolation and observability UX on top of typed runtime state.
 
 ## Current Position
 
 - **Current Phase:** 3 - Startup Diagnostics and Log Isolation
-- **Current Plan:** Pending planning/execution for phase 3
-- **Overall Status:** Phase 1 and phase 2 complete and verified; phase 3 not started
-- **Last activity:** 2026-02-21 - Verified phase 2 goal (9/9)
-- **Progress:** [█████░░░░░] 2/4 phases complete (50%)
+- **Current Plan:** 1 of 3 complete in phase 3
+- **Overall Status:** Phase 1 and phase 2 complete and verified; phase 3 in progress
+- **Last activity:** 2026-02-21 - Completed 03-01-PLAN.md
+- **Progress:** [████████░░] 7/9 plans complete (78%)
 
 ## Performance Metrics
 
@@ -21,7 +21,7 @@
 - **Mapped requirements:** 13
 - **Coverage:** 100%
 - **Completed phases:** 2
-- **Completed plans:** 6/6 (phase 1 and phase 2 complete)
+- **Completed plans:** 7/9 (phase 3 plan 1 complete)
 
 ## Accumulated Context
 
@@ -44,11 +44,14 @@
 - Trigger runtime monitoring at app startup after main window ViewModel initialization.
 - Refresh runtime state continuously with a cancellation-safe 3-second monitoring cadence.
 - Keep runtime monitoring tests deterministic by injecting refresh wait and batch verification seams.
+- Model lifecycle diagnostics as typed `ProfileLogEvent` records with enum-backed category/stage/severity semantics.
+- Route async lifecycle logging through captured `profile.Id` context to prevent attribution drift when selection changes.
+- Keep diagnostics retention bounded at 250 entries per profile and project typed events to display strings only at the ViewModel edge.
 
 ### TODOs
 
-- Discuss and plan Phase 3 (`Startup Diagnostics and Log Isolation`).
-- Execute Phase 3 plans after planning is complete.
+- Execute `03-02-PLAN.md` (startup diagnostics filtering/projection UI work).
+- Execute `03-03-PLAN.md` (phase 3 completion and hardening).
 
 ### Blockers
 
@@ -56,12 +59,12 @@
 
 ## Session Continuity
 
-- **Last completed artifact:** `.planning/phases/02-boot-health-verification-and-live-state/02-boot-health-verification-and-live-state-VERIFICATION.md`
-- **Last updated files:** `.planning/phases/02-boot-health-verification-and-live-state/02-03-SUMMARY.md`, `.planning/phases/02-boot-health-verification-and-live-state/02-boot-health-verification-and-live-state-VERIFICATION.md`, `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, `.planning/STATE.md`
-- **Last session:** 2026-02-21T20:27:04Z
-- **Stopped at:** Completed and verified phase 2
+- **Last completed artifact:** `.planning/phases/03-startup-diagnostics-and-log-isolation/03-01-SUMMARY.md`
+- **Last updated files:** `RcloneMountManager.Core/Models/ProfileLogEvent.cs`, `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelDiagnosticsTests.cs`, `.planning/phases/03-startup-diagnostics-and-log-isolation/03-01-SUMMARY.md`, `.planning/STATE.md`
+- **Last session:** 2026-02-21T21:45:19Z
+- **Stopped at:** Completed 03-01-PLAN.md
 - **Resume file:** None
-- **Next command:** `/gsd-discuss-phase 3`
+- **Next command:** `/gsd-execute-plan 03-02`
 
 ---
 *Initialized: 2026-02-21*
