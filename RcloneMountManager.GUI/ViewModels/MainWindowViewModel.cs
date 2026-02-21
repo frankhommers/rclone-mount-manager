@@ -89,10 +89,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _startupPreflightReport = string.Empty;
 
+    [ObservableProperty]
+    private string? _selectedDiagnosticsProfileId;
+
+    [ObservableProperty]
+    private bool _startupTimelineOnly;
+
     public ObservableCollection<MountProfile> Profiles { get; } = new();
     public ObservableCollection<MountType> MountTypes { get; } = new(Enum.GetValues<MountType>());
     public ObservableCollection<QuickConnectMode> QuickConnectModes { get; } = new(Enum.GetValues<QuickConnectMode>());
     public ObservableCollection<string> ThemeModes { get; } = new() { "Follow system", "Dark", "Light" };
+    public ObservableCollection<DiagnosticsProfileFilterOption> DiagnosticsProfileFilters { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
     public ObservableCollection<RcloneBackendInfo> AvailableBackends { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> BackendOptionInputs { get; } = new();
@@ -151,6 +158,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         SelectedProfile = Profiles[0];
+        SyncDiagnosticsFilters();
         HasPendingChanges = false;
         AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Profiles file: {_profilesFilePath}");
 
@@ -890,16 +898,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             logEntries.RemoveAt(0);
         }
 
-        if (SelectedProfile is null || !string.Equals(SelectedProfile.Id, profileId, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        Logs.Add(ToDisplayLog(entry));
-        while (Logs.Count > MaxProfileLogEntries)
-        {
-            Logs.RemoveAt(0);
-        }
+        RefreshDiagnosticsTimeline();
     }
 
     private static ProfileLogSeverity ResolveSeverity(string message)
@@ -924,6 +923,90 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var severity = entry.Severity.ToString().ToLowerInvariant();
         return $"[{entry.Timestamp.LocalDateTime:HH:mm:ss}] [{category}/{stage}] [{severity}] {entry.Message}";
     }
+
+    partial void OnSelectedDiagnosticsProfileIdChanged(string? value)
+    {
+        RefreshDiagnosticsTimeline();
+    }
+
+    partial void OnStartupTimelineOnlyChanged(bool value)
+    {
+        RefreshDiagnosticsTimeline();
+    }
+
+    private void SyncDiagnosticsFilters()
+    {
+        DiagnosticsProfileFilters.Clear();
+        foreach (var profile in Profiles)
+        {
+            DiagnosticsProfileFilters.Add(new DiagnosticsProfileFilterOption(profile.Id, profile.Name));
+        }
+
+        EnsureDiagnosticsFilterSelection(SelectedProfile?.Id);
+        RefreshDiagnosticsTimeline();
+    }
+
+    private void EnsureDiagnosticsFilterSelection(string? preferredProfileId)
+    {
+        if (Profiles.Count == 0)
+        {
+            if (SelectedDiagnosticsProfileId is not null)
+            {
+                SelectedDiagnosticsProfileId = null;
+            }
+
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(SelectedDiagnosticsProfileId) &&
+            Profiles.Any(profile => string.Equals(profile.Id, SelectedDiagnosticsProfileId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        var fallbackProfileId = !string.IsNullOrWhiteSpace(preferredProfileId) &&
+            Profiles.Any(profile => string.Equals(profile.Id, preferredProfileId, StringComparison.OrdinalIgnoreCase))
+                ? preferredProfileId
+                : Profiles[0].Id;
+
+        if (!string.Equals(SelectedDiagnosticsProfileId, fallbackProfileId, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedDiagnosticsProfileId = fallbackProfileId;
+        }
+    }
+
+    private void RefreshDiagnosticsTimeline()
+    {
+        IEnumerable<ProfileLogEvent> events = _profileLogs.Values.SelectMany(entries => entries);
+
+        if (!string.IsNullOrWhiteSpace(SelectedDiagnosticsProfileId))
+        {
+            events = events.Where(entry => string.Equals(entry.ProfileId, SelectedDiagnosticsProfileId, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (StartupTimelineOnly)
+        {
+            events = events.Where(IsStartupTimelineEvent);
+        }
+
+        var rows = events
+            .OrderBy(entry => entry.Timestamp)
+            .ThenBy(entry => entry.ProfileId, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(entry => entry.Category)
+            .ThenBy(entry => entry.Stage)
+            .ThenBy(entry => entry.Message, StringComparer.Ordinal)
+            .Select(ToDisplayLog)
+            .ToList();
+
+        Logs.Clear();
+        foreach (var row in rows)
+        {
+            Logs.Add(row);
+        }
+    }
+
+    private static bool IsStartupTimelineEvent(ProfileLogEvent entry)
+        => entry.Category is ProfileLogCategory.Startup;
 
     private void RecordStartupPreflightReport(string profileId, StartupPreflightReport report)
     {
@@ -1116,14 +1199,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             StartupPreflightReport = string.Empty;
         }
 
-        Logs.Clear();
-        if (_profileLogs.TryGetValue(value.Id, out var profileEntries))
-        {
-            foreach (var entry in profileEntries)
-            {
-                Logs.Add(ToDisplayLog(entry));
-            }
-        }
+        EnsureDiagnosticsFilterSelection(preferredProfileId: value.Id);
+        RefreshDiagnosticsTimeline();
 
         if (_profileScripts.TryGetValue(value.Id, out var script))
         {
@@ -1201,6 +1278,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             MarkDirty();
         }
+
+        SyncDiagnosticsFilters();
     }
 
     private void OnAnyProfileChanged(object? sender, PropertyChangedEventArgs e)
@@ -1225,6 +1304,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             or nameof(MountProfile.StartAtLogin))
         {
             MarkDirty();
+
+            if (e.PropertyName is nameof(MountProfile.Name))
+            {
+                SyncDiagnosticsFilters();
+            }
         }
     }
 
@@ -1428,6 +1512,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         return Path.Combine(home, "Mounts", name);
     }
+
+    public sealed record DiagnosticsProfileFilterOption(string ProfileId, string DisplayName);
 
     private sealed class PersistedProfile
     {
