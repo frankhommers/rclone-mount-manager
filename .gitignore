@@ -485,3 +485,6 @@ dist-test/
 
 # Local/private NuGet feeds
 nuget.config
+
+# Local git worktrees
+.worktrees/
