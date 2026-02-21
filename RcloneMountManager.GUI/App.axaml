@@ -12,28 +12,39 @@
                                          FalseBrush="Transparent"/>
         <converters:BoolToFontWeightConverter x:Key="ModifiedFontWeightConverter"/>
         <converters:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <converters:BoolToOpacityConverter x:Key="PinOpacityConverter"
+                                           TrueOpacity="1.0"
+                                           FalseOpacity="0.3"/>
 
         <DataTemplate x:Key="Toggle" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
-                               FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                     <ToggleSwitch Grid.Row="0" Grid.Column="1"
                                   IsChecked="{Binding BoolValue}"
-                                  OnContent="True" OffContent="False"
+                                   OnContent="Enabled" OffContent="Disabled"
                                   Margin="8,0,0,0"/>
-                    <Button Grid.Row="0" Grid.Column="2"
-                            Command="{Binding ResetToDefaultCommand}"
-                            Padding="6,4" Margin="4,0,0,0"
-                            IsVisible="{Binding HasNonDefaultValue}"
-                            ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                     <Button Grid.Row="0" Grid.Column="2"
+                             Command="{Binding TogglePinCommand}"
+                             Padding="6,4" Margin="0,0,0,0"
+                             ToolTip.Tip="Pin to always include in script">
+                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
+                                   Width="12" Height="12"
+                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
+                     </Button>
+                     <Button Grid.Row="0" Grid.Column="3"
+                             Command="{Binding ResetToDefaultCommand}"
+                             Padding="6,4" Margin="4,0,0,0"
+                             IsVisible="{Binding ShouldInclude}"
+                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
                         <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
                                   Width="12" Height="12"/>
                     </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -43,13 +54,13 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ComboBox" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
-                               FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                      <ComboBox Grid.Row="0" Grid.Column="1"
                                ItemsSource="{Binding EnumValues}"
                                SelectedItem="{Binding SelectedEnumValue}"
@@ -64,15 +75,23 @@
                              </DataTemplate>
                          </ComboBox.ItemTemplate>
                      </ComboBox>
-                    <Button Grid.Row="0" Grid.Column="2"
-                            Command="{Binding ResetToDefaultCommand}"
-                            Padding="6,4" Margin="4,0,0,0"
-                            IsVisible="{Binding HasNonDefaultValue}"
-                            ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                     <Button Grid.Row="0" Grid.Column="2"
+                             Command="{Binding TogglePinCommand}"
+                             Padding="6,4" Margin="0,0,0,0"
+                             ToolTip.Tip="Pin to always include in script">
+                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
+                                   Width="12" Height="12"
+                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
+                     </Button>
+                     <Button Grid.Row="0" Grid.Column="3"
+                             Command="{Binding ResetToDefaultCommand}"
+                             Padding="6,4" Margin="4,0,0,0"
+                             IsVisible="{Binding ShouldInclude}"
+                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
                         <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
                                   Width="12" Height="12"/>
                     </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -82,13 +101,13 @@
         </DataTemplate>
 
         <DataTemplate x:Key="Numeric" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
-                               FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                     <NumericUpDown Grid.Row="0" Grid.Column="1"
                                    Value="{Binding NumericValue}"
                                    Watermark="{Binding DefaultStr}"
@@ -98,15 +117,23 @@
                                    MinWidth="200"
                                    HorizontalAlignment="Stretch"
                                    ShowButtonSpinner="True"/>
-                    <Button Grid.Row="0" Grid.Column="2"
-                            Command="{Binding ResetToDefaultCommand}"
-                            Padding="6,4" Margin="4,0,0,0"
-                            IsVisible="{Binding HasNonDefaultValue}"
-                            ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                     <Button Grid.Row="0" Grid.Column="2"
+                             Command="{Binding TogglePinCommand}"
+                             Padding="6,4" Margin="0,0,0,0"
+                             ToolTip.Tip="Pin to always include in script">
+                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
+                                   Width="12" Height="12"
+                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
+                     </Button>
+                     <Button Grid.Row="0" Grid.Column="3"
+                             Command="{Binding ResetToDefaultCommand}"
+                             Padding="6,4" Margin="4,0,0,0"
+                             IsVisible="{Binding ShouldInclude}"
+                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
                         <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
                                   Width="12" Height="12"/>
                     </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -116,13 +143,13 @@
         </DataTemplate>
 
         <DataTemplate x:Key="Duration" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
-                               FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                     <TimePicker Grid.Row="0" Grid.Column="1"
                                 SelectedTime="{Binding DurationValue}"
                                 ClockIdentifier="24HourClock"
@@ -131,15 +158,23 @@
                                 Margin="8,0,0,0"
                                 MinWidth="200"
                                 HorizontalAlignment="Left"/>
-                    <Button Grid.Row="0" Grid.Column="2"
-                            Command="{Binding ResetToDefaultCommand}"
-                            Padding="6,4" Margin="4,0,0,0"
-                            IsVisible="{Binding HasNonDefaultValue}"
-                            ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                     <Button Grid.Row="0" Grid.Column="2"
+                             Command="{Binding TogglePinCommand}"
+                             Padding="6,4" Margin="0,0,0,0"
+                             ToolTip.Tip="Pin to always include in script">
+                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
+                                   Width="12" Height="12"
+                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
+                     </Button>
+                     <Button Grid.Row="0" Grid.Column="3"
+                             Command="{Binding ResetToDefaultCommand}"
+                             Padding="6,4" Margin="4,0,0,0"
+                             IsVisible="{Binding ShouldInclude}"
+                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
                         <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
                                   Width="12" Height="12"/>
                     </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -149,13 +184,13 @@
         </DataTemplate>
 
         <DataTemplate x:Key="SizeSuffix" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
-                               FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                     <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="8,0,0,0">
                         <NumericUpDown Grid.Column="0"
                                        Value="{Binding SizeSuffixNumericValue}"
@@ -172,15 +207,23 @@
                                   Margin="4,0,0,0"
                                   HorizontalAlignment="Right"/>
                     </Grid>
-                    <Button Grid.Row="0" Grid.Column="2"
-                            Command="{Binding ResetToDefaultCommand}"
-                            Padding="6,4" Margin="4,0,0,0"
-                            IsVisible="{Binding HasNonDefaultValue}"
-                            ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                     <Button Grid.Row="0" Grid.Column="2"
+                             Command="{Binding TogglePinCommand}"
+                             Padding="6,4" Margin="0,0,0,0"
+                             ToolTip.Tip="Pin to always include in script">
+                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
+                                   Width="12" Height="12"
+                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
+                     </Button>
+                     <Button Grid.Row="0" Grid.Column="3"
+                             Command="{Binding ResetToDefaultCommand}"
+                             Padding="6,4" Margin="4,0,0,0"
+                             IsVisible="{Binding ShouldInclude}"
+                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
                         <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
                                   Width="12" Height="12"/>
                     </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -190,27 +233,35 @@
         </DataTemplate>
 
         <DataTemplate x:Key="Text" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
                                FontSize="12"
-                               FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                     <TextBox Grid.Row="0" Grid.Column="1"
                               Text="{Binding Value}"
                               Watermark="{Binding DefaultStr}"
                               Margin="8,0,0,0"
                               HorizontalAlignment="Stretch"/>
-                    <Button Grid.Row="0" Grid.Column="2"
-                            Command="{Binding ResetToDefaultCommand}"
-                            Padding="6,4" Margin="4,0,0,0"
-                            IsVisible="{Binding HasNonDefaultValue}"
-                            ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                     <Button Grid.Row="0" Grid.Column="2"
+                             Command="{Binding TogglePinCommand}"
+                             Padding="6,4" Margin="0,0,0,0"
+                             ToolTip.Tip="Pin to always include in script">
+                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
+                                   Width="12" Height="12"
+                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
+                     </Button>
+                     <Button Grid.Row="0" Grid.Column="3"
+                             Command="{Binding ResetToDefaultCommand}"
+                             Padding="6,4" Margin="4,0,0,0"
+                             IsVisible="{Binding ShouldInclude}"
+                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
                         <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
                                   Width="12" Height="12"/>
                     </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -220,14 +271,14 @@
         </DataTemplate>
 
         <DataTemplate x:Key="StringList" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Top"
                                Margin="0,6,0,0"
                                FontSize="12"
-                               FontWeight="{Binding HasNonDefaultValue, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                     <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,0" Spacing="4">
                         <ItemsControl ItemsSource="{Binding StringListItems}">
                             <ItemsControl.ItemTemplate>
@@ -268,16 +319,25 @@
                                       Width="12" Height="12"/>
                         </Button>
                     </StackPanel>
-                    <Button Grid.Row="0" Grid.Column="2"
-                            Command="{Binding ResetToDefaultCommand}"
-                            Padding="6,4" Margin="4,0,0,0"
-                            VerticalAlignment="Top"
-                            IsVisible="{Binding HasNonDefaultValue}"
-                            ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                     <Button Grid.Row="0" Grid.Column="2"
+                             Command="{Binding TogglePinCommand}"
+                             Padding="6,4" Margin="0,0,0,0"
+                             VerticalAlignment="Top"
+                             ToolTip.Tip="Pin to always include in script">
+                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
+                                   Width="12" Height="12"
+                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
+                     </Button>
+                     <Button Grid.Row="0" Grid.Column="3"
+                             Command="{Binding ResetToDefaultCommand}"
+                             Padding="6,4" Margin="4,0,0,0"
+                             VerticalAlignment="Top"
+                             IsVisible="{Binding ShouldInclude}"
+                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
                         <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
                                   Width="12" Height="12"/>
                     </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
