@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Threading;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -614,6 +615,50 @@ public partial class MainWindowViewModel : ViewModelBase
         AppendLog("Saved profile changes.");
         OnPropertyChanged(nameof(SaveChangesButtonText));
         NotifyCommandStateChanged();
+    }
+
+    public void InitializeRuntimeMonitoring()
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await VerifyStartupProfilesAsync(CancellationToken.None);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"ERR: Startup runtime verification failed: {ex.Message}");
+            }
+        });
+    }
+
+    private async Task VerifyStartupProfilesAsync(CancellationToken cancellationToken)
+    {
+        var startupProfiles = Profiles
+            .Where(profile => profile.StartAtLogin)
+            .ToList();
+
+        if (startupProfiles.Count == 0)
+        {
+            AppendLog("Startup runtime verification skipped: no start-at-login profiles.");
+            return;
+        }
+
+        var states = await _mountHealthService.VerifyAllAsync(startupProfiles, cancellationToken);
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            for (var index = 0; index < startupProfiles.Count; index++)
+            {
+                var profile = startupProfiles[index];
+                var state = states[index];
+                ApplyRuntimeState(profile, state);
+                AppendLog(profile.Id, $"Startup verification: lifecycle={FormatLifecycle(state.Lifecycle)}, health={FormatHealth(state.Health)}");
+            }
+        });
     }
 
     private async Task RunBusyActionAsync(Func<CancellationToken, Task> action)
