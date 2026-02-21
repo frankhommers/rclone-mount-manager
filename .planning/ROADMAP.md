@@ -24,9 +24,9 @@ This roadmap delivers the v1 promise: configure mounts once and trust they come 
 **Plans:** 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md - Build typed startup preflight checks and safety report models.
-- [ ] 01-02-PLAN.md - Modernize LaunchAgent activation/deactivation with linted plist and explicit failures.
-- [ ] 01-03-PLAN.md - Wire preflight-gated startup toggle and persistence into ViewModel/UI with regression tests.
+- [x] 01-01-PLAN.md - Build typed startup preflight checks and safety report models.
+- [x] 01-02-PLAN.md - Modernize LaunchAgent activation/deactivation with linted plist and explicit failures.
+- [x] 01-03-PLAN.md - Wire preflight-gated startup toggle and persistence into ViewModel/UI with regression tests.
 
 ### Phase 2 - Boot Health Verification and Live State
 
@@ -71,7 +71,7 @@ Plans:
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 1 | Startup Enablement and Safety Gates | BOOT-01, BOOT-02, BOOT-03, SAFE-01, SAFE-02, SAFE-03 | Pending |
+| 1 | Startup Enablement and Safety Gates | BOOT-01, BOOT-02, BOOT-03, SAFE-01, SAFE-02, SAFE-03 | Complete |
 | 2 | Boot Health Verification and Live State | HEAL-01, HEAL-02, OBS-01 | Pending |
 | 3 | Startup Diagnostics and Log Isolation | OBS-02, OBS-03 | Pending |
 | 4 | Per-Profile Reliability Policy Presets | POL-01, POL-02 | Pending |

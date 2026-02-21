@@ -9,15 +9,15 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Startup Automation
 
-- [ ] **BOOT-01**: User can enable auto-mount for a profile so it restores automatically at macOS login
-- [ ] **BOOT-02**: User can disable auto-mount for a profile without affecting manual mount capability
-- [ ] **BOOT-03**: User can persist startup settings so they survive app restarts and reboots
+- [x] **BOOT-01**: User can enable auto-mount for a profile so it restores automatically at macOS login
+- [x] **BOOT-02**: User can disable auto-mount for a profile without affecting manual mount capability
+- [x] **BOOT-03**: User can persist startup settings so they survive app restarts and reboots
 
 ### Startup Safety
 
-- [ ] **SAFE-01**: User can run preflight checks before enabling auto-mount
-- [ ] **SAFE-02**: User sees explicit preflight failures for missing binary, invalid mount path, invalid cache path, or unavailable credentials
-- [ ] **SAFE-03**: User can only enable startup behavior when critical preflight checks pass
+- [x] **SAFE-01**: User can run preflight checks before enabling auto-mount
+- [x] **SAFE-02**: User sees explicit preflight failures for missing binary, invalid mount path, invalid cache path, or unavailable credentials
+- [x] **SAFE-03**: User can only enable startup behavior when critical preflight checks pass
 
 ### Boot Verification
 
@@ -62,12 +62,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BOOT-01 | Phase 1 | Pending |
-| BOOT-02 | Phase 1 | Pending |
-| BOOT-03 | Phase 1 | Pending |
-| SAFE-01 | Phase 1 | Pending |
-| SAFE-02 | Phase 1 | Pending |
-| SAFE-03 | Phase 1 | Pending |
+| BOOT-01 | Phase 1 | Complete |
+| BOOT-02 | Phase 1 | Complete |
+| BOOT-03 | Phase 1 | Complete |
+| SAFE-01 | Phase 1 | Complete |
+| SAFE-02 | Phase 1 | Complete |
+| SAFE-03 | Phase 1 | Complete |
 | HEAL-01 | Phase 2 | Pending |
 | HEAL-02 | Phase 2 | Pending |
 | OBS-01 | Phase 2 | Pending |
@@ -83,4 +83,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-21*
-*Last updated: 2026-02-21 after roadmap creation*
+*Last updated: 2026-02-21 after phase 1 completion*
