@@ -1369,6 +1369,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             or nameof(MountProfile.QuickConnectUsername)
             or nameof(MountProfile.QuickConnectPassword)
             or nameof(MountProfile.AllowInsecurePasswordsInScript)
+            or nameof(MountProfile.SelectedReliabilityPresetId)
             or nameof(MountProfile.StartAtLogin))
         {
             MarkDirty();
@@ -1411,6 +1412,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     Source = saved.Source,
                     MountPoint = saved.MountPoint,
                     ExtraOptions = saved.ExtraOptions,
+                    SelectedReliabilityPresetId = ReliabilityPolicyPreset.GetByIdOrDefault(saved.SelectedReliabilityPresetId).Id,
                     MountOptions = saved.MountOptions ?? new Dictionary<string, string>(),
                     PinnedMountOptions = saved.PinnedMountOptions ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase),
                     RcloneBinaryPath = saved.RcloneBinaryPath,
@@ -1459,6 +1461,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     Source = profile.Source,
                     MountPoint = profile.MountPoint,
                     ExtraOptions = profile.ExtraOptions,
+                    SelectedReliabilityPresetId = profile.SelectedReliabilityPresetId,
                     MountOptions = profile.MountOptions,
                     PinnedMountOptions = profile.PinnedMountOptions,
                     RcloneBinaryPath = profile.RcloneBinaryPath,
@@ -1601,6 +1604,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         public string Source { get; set; } = string.Empty;
         public string MountPoint { get; set; } = string.Empty;
         public string ExtraOptions { get; set; } = string.Empty;
+        public string SelectedReliabilityPresetId { get; set; } = ReliabilityPolicyPreset.BalancedId;
         public Dictionary<string, string> MountOptions { get; set; } = new();
         public HashSet<string> PinnedMountOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string RcloneBinaryPath { get; set; } = "rclone";
