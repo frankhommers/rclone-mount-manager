@@ -17,7 +17,7 @@
                                            FalseOpacity="0.3"/>
 
         <DataTemplate x:Key="Toggle" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
@@ -28,23 +28,30 @@
                                   IsChecked="{Binding BoolValue}"
                                    OnContent="Enabled" OffContent="Disabled"
                                   Margin="8,0,0,0"/>
-                     <Button Grid.Row="0" Grid.Column="2"
-                             Command="{Binding TogglePinCommand}"
-                             Padding="6,4" Margin="0,0,0,0"
-                             ToolTip.Tip="Pin to always include in script">
-                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
-                                   Width="12" Height="12"
-                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
-                     </Button>
-                     <Button Grid.Row="0" Grid.Column="3"
-                             Command="{Binding ResetToDefaultCommand}"
-                             Padding="6,4" Margin="4,0,0,0"
-                             IsVisible="{Binding ShouldInclude}"
-                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
-                        <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
-                                  Width="12" Height="12"/>
-                    </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                         <Button Command="{Binding TogglePinCommand}"
+                                 Padding="6,4"
+                                 ToolTip.Tip="Pin to always include in script">
+                             <Panel>
+                                 <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding IsPinned}"/>
+                                 <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L12.8,16.07V22H11.2V16H6V14L8,12V11.27L2,5.27M16,12L18,14V16H17.82L8,6.18V4H7V2H17V4H16V12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding !IsPinned}"
+                                           Opacity="0.4"/>
+                             </Panel>
+                         </Button>
+                         <Button Command="{Binding ResetToDefaultCommand}"
+                                 Padding="6,4"
+                                 Opacity="{Binding ShouldInclude, Converter={StaticResource PinOpacityConverter}}"
+                                 IsHitTestVisible="{Binding ShouldInclude}"
+                                 ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                            <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
+                                      Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -54,7 +61,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ComboBox" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
@@ -75,23 +82,30 @@
                              </DataTemplate>
                          </ComboBox.ItemTemplate>
                      </ComboBox>
-                     <Button Grid.Row="0" Grid.Column="2"
-                             Command="{Binding TogglePinCommand}"
-                             Padding="6,4" Margin="0,0,0,0"
-                             ToolTip.Tip="Pin to always include in script">
-                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
-                                   Width="12" Height="12"
-                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
-                     </Button>
-                     <Button Grid.Row="0" Grid.Column="3"
-                             Command="{Binding ResetToDefaultCommand}"
-                             Padding="6,4" Margin="4,0,0,0"
-                             IsVisible="{Binding ShouldInclude}"
-                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
-                        <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
-                                  Width="12" Height="12"/>
-                    </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                         <Button Command="{Binding TogglePinCommand}"
+                                 Padding="6,4"
+                                 ToolTip.Tip="Pin to always include in script">
+                             <Panel>
+                                 <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding IsPinned}"/>
+                                 <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L12.8,16.07V22H11.2V16H6V14L8,12V11.27L2,5.27M16,12L18,14V16H17.82L8,6.18V4H7V2H17V4H16V12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding !IsPinned}"
+                                           Opacity="0.4"/>
+                             </Panel>
+                         </Button>
+                         <Button Command="{Binding ResetToDefaultCommand}"
+                                 Padding="6,4"
+                                 Opacity="{Binding ShouldInclude, Converter={StaticResource PinOpacityConverter}}"
+                                 IsHitTestVisible="{Binding ShouldInclude}"
+                                 ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                            <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
+                                      Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -101,7 +115,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="Numeric" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
@@ -117,23 +131,30 @@
                                    MinWidth="200"
                                    HorizontalAlignment="Stretch"
                                    ShowButtonSpinner="True"/>
-                     <Button Grid.Row="0" Grid.Column="2"
-                             Command="{Binding TogglePinCommand}"
-                             Padding="6,4" Margin="0,0,0,0"
-                             ToolTip.Tip="Pin to always include in script">
-                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
-                                   Width="12" Height="12"
-                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
-                     </Button>
-                     <Button Grid.Row="0" Grid.Column="3"
-                             Command="{Binding ResetToDefaultCommand}"
-                             Padding="6,4" Margin="4,0,0,0"
-                             IsVisible="{Binding ShouldInclude}"
-                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
-                        <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
-                                  Width="12" Height="12"/>
-                    </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                         <Button Command="{Binding TogglePinCommand}"
+                                 Padding="6,4"
+                                 ToolTip.Tip="Pin to always include in script">
+                             <Panel>
+                                 <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding IsPinned}"/>
+                                 <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L12.8,16.07V22H11.2V16H6V14L8,12V11.27L2,5.27M16,12L18,14V16H17.82L8,6.18V4H7V2H17V4H16V12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding !IsPinned}"
+                                           Opacity="0.4"/>
+                             </Panel>
+                         </Button>
+                         <Button Command="{Binding ResetToDefaultCommand}"
+                                 Padding="6,4"
+                                 Opacity="{Binding ShouldInclude, Converter={StaticResource PinOpacityConverter}}"
+                                 IsHitTestVisible="{Binding ShouldInclude}"
+                                 ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                            <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
+                                      Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -143,7 +164,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="Duration" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
@@ -158,23 +179,30 @@
                                 Margin="8,0,0,0"
                                 MinWidth="200"
                                 HorizontalAlignment="Left"/>
-                     <Button Grid.Row="0" Grid.Column="2"
-                             Command="{Binding TogglePinCommand}"
-                             Padding="6,4" Margin="0,0,0,0"
-                             ToolTip.Tip="Pin to always include in script">
-                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
-                                   Width="12" Height="12"
-                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
-                     </Button>
-                     <Button Grid.Row="0" Grid.Column="3"
-                             Command="{Binding ResetToDefaultCommand}"
-                             Padding="6,4" Margin="4,0,0,0"
-                             IsVisible="{Binding ShouldInclude}"
-                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
-                        <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
-                                  Width="12" Height="12"/>
-                    </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                         <Button Command="{Binding TogglePinCommand}"
+                                 Padding="6,4"
+                                 ToolTip.Tip="Pin to always include in script">
+                             <Panel>
+                                 <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding IsPinned}"/>
+                                 <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L12.8,16.07V22H11.2V16H6V14L8,12V11.27L2,5.27M16,12L18,14V16H17.82L8,6.18V4H7V2H17V4H16V12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding !IsPinned}"
+                                           Opacity="0.4"/>
+                             </Panel>
+                         </Button>
+                         <Button Command="{Binding ResetToDefaultCommand}"
+                                 Padding="6,4"
+                                 Opacity="{Binding ShouldInclude, Converter={StaticResource PinOpacityConverter}}"
+                                 IsHitTestVisible="{Binding ShouldInclude}"
+                                 ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                            <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
+                                      Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -184,7 +212,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="SizeSuffix" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
@@ -207,23 +235,30 @@
                                   Margin="4,0,0,0"
                                   HorizontalAlignment="Right"/>
                     </Grid>
-                     <Button Grid.Row="0" Grid.Column="2"
-                             Command="{Binding TogglePinCommand}"
-                             Padding="6,4" Margin="0,0,0,0"
-                             ToolTip.Tip="Pin to always include in script">
-                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
-                                   Width="12" Height="12"
-                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
-                     </Button>
-                     <Button Grid.Row="0" Grid.Column="3"
-                             Command="{Binding ResetToDefaultCommand}"
-                             Padding="6,4" Margin="4,0,0,0"
-                             IsVisible="{Binding ShouldInclude}"
-                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
-                        <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
-                                  Width="12" Height="12"/>
-                    </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                         <Button Command="{Binding TogglePinCommand}"
+                                 Padding="6,4"
+                                 ToolTip.Tip="Pin to always include in script">
+                             <Panel>
+                                 <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding IsPinned}"/>
+                                 <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L12.8,16.07V22H11.2V16H6V14L8,12V11.27L2,5.27M16,12L18,14V16H17.82L8,6.18V4H7V2H17V4H16V12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding !IsPinned}"
+                                           Opacity="0.4"/>
+                             </Panel>
+                         </Button>
+                         <Button Command="{Binding ResetToDefaultCommand}"
+                                 Padding="6,4"
+                                 Opacity="{Binding ShouldInclude, Converter={StaticResource PinOpacityConverter}}"
+                                 IsHitTestVisible="{Binding ShouldInclude}"
+                                 ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                            <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
+                                      Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -233,7 +268,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="Text" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
@@ -245,23 +280,30 @@
                               Watermark="{Binding DefaultStr}"
                               Margin="8,0,0,0"
                               HorizontalAlignment="Stretch"/>
-                     <Button Grid.Row="0" Grid.Column="2"
-                             Command="{Binding TogglePinCommand}"
-                             Padding="6,4" Margin="0,0,0,0"
-                             ToolTip.Tip="Pin to always include in script">
-                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
-                                   Width="12" Height="12"
-                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
-                     </Button>
-                     <Button Grid.Row="0" Grid.Column="3"
-                             Command="{Binding ResetToDefaultCommand}"
-                             Padding="6,4" Margin="4,0,0,0"
-                             IsVisible="{Binding ShouldInclude}"
-                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
-                        <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
-                                  Width="12" Height="12"/>
-                    </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2">
+                         <Button Command="{Binding TogglePinCommand}"
+                                 Padding="6,4"
+                                 ToolTip.Tip="Pin to always include in script">
+                             <Panel>
+                                 <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding IsPinned}"/>
+                                 <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L12.8,16.07V22H11.2V16H6V14L8,12V11.27L2,5.27M16,12L18,14V16H17.82L8,6.18V4H7V2H17V4H16V12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding !IsPinned}"
+                                           Opacity="0.4"/>
+                             </Panel>
+                         </Button>
+                         <Button Command="{Binding ResetToDefaultCommand}"
+                                 Padding="6,4"
+                                 Opacity="{Binding ShouldInclude, Converter={StaticResource PinOpacityConverter}}"
+                                 IsHitTestVisible="{Binding ShouldInclude}"
+                                 ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                            <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
+                                      Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
@@ -271,7 +313,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="StringList" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
@@ -319,25 +361,30 @@
                                       Width="12" Height="12"/>
                         </Button>
                     </StackPanel>
-                     <Button Grid.Row="0" Grid.Column="2"
-                             Command="{Binding TogglePinCommand}"
-                             Padding="6,4" Margin="0,0,0,0"
-                             VerticalAlignment="Top"
-                             ToolTip.Tip="Pin to always include in script">
-                         <PathIcon Data="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"
-                                   Width="12" Height="12"
-                                   Opacity="{Binding IsPinned, Converter={StaticResource PinOpacityConverter}}"/>
-                     </Button>
-                     <Button Grid.Row="0" Grid.Column="3"
-                             Command="{Binding ResetToDefaultCommand}"
-                             Padding="6,4" Margin="4,0,0,0"
-                             VerticalAlignment="Top"
-                             IsVisible="{Binding ShouldInclude}"
-                             ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
-                        <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
-                                  Width="12" Height="12"/>
-                    </Button>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Top">
+                         <Button Command="{Binding TogglePinCommand}"
+                                 Padding="6,4"
+                                 ToolTip.Tip="Pin to always include in script">
+                             <Panel>
+                                 <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding IsPinned}"/>
+                                 <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L12.8,16.07V22H11.2V16H6V14L8,12V11.27L2,5.27M16,12L18,14V16H17.82L8,6.18V4H7V2H17V4H16V12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding !IsPinned}"
+                                           Opacity="0.4"/>
+                             </Panel>
+                         </Button>
+                         <Button Command="{Binding ResetToDefaultCommand}"
+                                 Padding="6,4"
+                                 Opacity="{Binding ShouldInclude, Converter={StaticResource PinOpacityConverter}}"
+                                 IsHitTestVisible="{Binding ShouldInclude}"
+                                 ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                            <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
+                                      Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"
