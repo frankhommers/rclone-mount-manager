@@ -95,6 +95,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _startupTimelineOnly;
 
+    [ObservableProperty]
+    private string _selectedReliabilityPresetId = ReliabilityPolicyPreset.BalancedId;
+
     public ObservableCollection<MountProfile> Profiles { get; } = new();
     public ObservableCollection<MountType> MountTypes { get; } = new(Enum.GetValues<MountType>());
     public ObservableCollection<QuickConnectMode> QuickConnectModes { get; } = new(Enum.GetValues<QuickConnectMode>());
@@ -105,6 +108,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<RcloneBackendInfo> AvailableBackends { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> BackendOptionInputs { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> AdvancedBackendOptionInputs { get; } = new();
+    public ObservableCollection<ReliabilityPolicyPreset> ReliabilityPresets { get; } = new(ReliabilityPolicyPreset.Catalog);
     public bool HasDiagnosticsRows => DiagnosticsRows.Count > 0;
     public string DiagnosticsEmptyStateText => "No diagnostics for current filter.";
 
@@ -534,6 +538,41 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, "Generated shell script preview.");
     }
 
+    [RelayCommand]
+    private void ApplyReliabilityPreset()
+    {
+        var profile = SelectedProfile;
+        if (profile.Type is not MountType.RcloneAuto)
+        {
+            StatusText = "Reliability presets apply to rclone profiles only.";
+            return;
+        }
+
+        SyncMountOptionsToProfile();
+
+        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(SelectedReliabilityPresetId);
+        var patchedOptions = new Dictionary<string, string>(profile.MountOptions, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var key in ReliabilityPolicyPreset.ManagedReliabilityKeys)
+        {
+            patchedOptions.Remove(key);
+        }
+
+        foreach (var (key, value) in preset.OptionOverrides)
+        {
+            patchedOptions[key] = value;
+        }
+
+        profile.SelectedReliabilityPresetId = preset.Id;
+        profile.MountOptions = patchedOptions;
+        MountOptionsVm.UpdateFromProfile(profile.MountOptions, profile.PinnedMountOptions);
+        SelectedReliabilityPresetId = preset.Id;
+
+        StatusText = $"Applied reliability preset: {preset.DisplayName}.";
+        AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Applied reliability preset '{preset.DisplayName}' to profile '{profile.Name}'.");
+        MarkDirty();
+    }
+
     [RelayCommand(CanExecute = nameof(CanSaveScript))]
     private async Task SaveScriptAsync()
     {
@@ -940,6 +979,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         RefreshDiagnosticsTimeline();
     }
 
+    partial void OnSelectedReliabilityPresetIdChanged(string value)
+    {
+        var resolvedPresetId = ReliabilityPolicyPreset.GetByIdOrDefault(value).Id;
+        if (!string.Equals(value, resolvedPresetId, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedReliabilityPresetId = resolvedPresetId;
+            return;
+        }
+
+        if (!string.Equals(SelectedProfile.SelectedReliabilityPresetId, resolvedPresetId, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedProfile.SelectedReliabilityPresetId = resolvedPresetId;
+        }
+    }
+
     private void SyncDiagnosticsFilters()
     {
         DiagnosticsProfileFilters.Clear();
@@ -1225,6 +1279,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         MountOptionsVm.UpdateFromProfile(value.MountOptions, value.PinnedMountOptions);
+        SelectedReliabilityPresetId = ReliabilityPolicyPreset.GetByIdOrDefault(value.SelectedReliabilityPresetId).Id;
 
         OnPropertyChanged(nameof(StartupButtonText));
     }
