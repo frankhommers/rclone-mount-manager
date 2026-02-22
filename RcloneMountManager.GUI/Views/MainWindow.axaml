@@ -214,7 +214,7 @@
                                               ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
                             </Expander>
 
-                            <Button Content="Create remote and use in selected profile"
+                            <Button Content="Create remote"
                                     Command="{Binding CreateRemoteCommand}"
                                     HorizontalAlignment="Left"/>
 

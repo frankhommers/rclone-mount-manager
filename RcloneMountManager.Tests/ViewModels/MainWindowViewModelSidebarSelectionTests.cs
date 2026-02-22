@@ -63,6 +63,26 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
     }
 
     [Fact]
+    public void AddCommands_AreAvailableAndMutateTheirOwnCollections()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.True(viewModel.AddRemoteCommand.CanExecute(null));
+        Assert.True(viewModel.AddMountCommand.CanExecute(null));
+
+        var remoteCount = viewModel.RemoteProfiles.Count;
+        var mountCount = viewModel.MountProfiles.Count;
+
+        viewModel.AddRemoteCommand.Execute(null);
+        Assert.Equal(remoteCount + 1, viewModel.RemoteProfiles.Count);
+        Assert.Equal(mountCount, viewModel.MountProfiles.Count);
+
+        viewModel.AddMountCommand.Execute(null);
+        Assert.Equal(remoteCount + 1, viewModel.RemoteProfiles.Count);
+        Assert.Equal(mountCount + 1, viewModel.MountProfiles.Count);
+    }
+
+    [Fact]
     public void MountWithoutRemoteAssociation_CannotBeSaved_UntilRemoteAssigned()
     {
         var viewModel = CreateViewModel();
