@@ -21,6 +21,8 @@ provides:
   - Remote sidebar subtitle hides `name:/` placeholders and shows only meaningful target info
   - Save flow now persists remote-editor actions and empty-library deletions deterministically
   - Remotes and mounts empty copy is visually symmetric
+  - Clear-all restart path now preserves empty library without default profile reinsertion
+  - Remote alias rename now updates default alias-root mount sources while preserving custom paths
 affects: [phase-4-acceptance, ui-ux, profile-persistence]
 tech-stack:
   added: []
@@ -82,6 +84,7 @@ completed: 2026-02-22
 8. **Task 2 empty-state + modal deletion feedback + rename stability:** `c8d3cf3` (fix)
 9. **Task 2 mounts-empty copy + remote subtitle cleanup:** `7f9f8d2` (fix)
 10. **Task 2 persistence pipeline hardening + empty-copy symmetry:** `c2429ee` (fix)
+11. **Task 2 clear-all restart + alias-sync consistency hardening:** `5194557` (fix)
 
 ## Files Created/Modified
 
@@ -114,6 +117,8 @@ completed: 2026-02-22
 - Remote sidebar subtitle bound directly to raw `Source`, exposing confusing alias-root placeholder strings like `remote1:/`.
 - `Save remote` action only marked dirty and did not write profiles file, so users perceived saved changes as reverting on restart.
 - Empty-library delete flow wrote status but relied on later manual save, so clear-all could be lost after restart.
+- Constructor always seeded a default profile when loaded list was empty, so persisted empty-library state was overwritten on restart.
+- Remote name editor updates changed alias but dependent mount source stayed stale for generated alias-root sources.
 
 ## Deviations from Plan
 
@@ -207,9 +212,17 @@ completed: 2026-02-22
 - **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
 - **Committed in:** `c2429ee`
 
+**12. [Rule 1 - Bug] Fixed clear-all restart regression and default alias source sync**
+- **Found during:** Task 2 checkpoint feedback (critical)
+- **Issue:** Empty saved payload reloaded with seeded default profile; default-generated mount sources did not follow remote alias rename.
+- **Fix:** Only seed default profile when profiles file is missing (not when empty payload exists), and propagate remote alias rename to mount sources only when source was alias-root generated.
+- **Files modified:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `5194557`
+
 ---
 
-**Total deviations:** 11 auto-fixed (9 bug, 2 missing critical)
+**Total deviations:** 12 auto-fixed (10 bug, 2 missing critical)
 **Impact on plan:** Deviations were required to satisfy checkpoint-defined acceptance semantics for sidebar entity separation.
 
 ## Issues Encountered
