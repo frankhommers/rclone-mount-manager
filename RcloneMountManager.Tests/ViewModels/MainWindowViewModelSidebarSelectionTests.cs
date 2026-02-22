@@ -28,6 +28,8 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         viewModel.SelectedRemoteProfile = remoteSelection;
 
         Assert.Same(mountSelection, viewModel.SelectedMountProfile);
+        Assert.Null(viewModel.SidebarSelectedMountProfile);
+        Assert.Same(remoteSelection, viewModel.SidebarSelectedRemoteProfile);
     }
 
     [Fact]
@@ -44,6 +46,8 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         viewModel.SelectedMountProfile = mountSelection;
 
         Assert.Same(remoteSelection, viewModel.SelectedRemoteProfile);
+        Assert.Same(mountSelection, viewModel.SidebarSelectedMountProfile);
+        Assert.Null(viewModel.SidebarSelectedRemoteProfile);
     }
 
     [Fact]
@@ -98,6 +102,34 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
 
         Assert.True(viewModel.SaveChangesCommand.CanExecute(null));
         Assert.Contains(":", viewModel.SelectedMountProfile!.Source);
+    }
+
+    [Fact]
+    public void RemoveRemote_BlocksWhenRemoteIsReferencedByMount()
+    {
+        var viewModel = CreateViewModel();
+        var referencedRemote = viewModel.RemoteProfiles.First();
+
+        viewModel.SelectedProfile = referencedRemote;
+        viewModel.RemoveProfileCommand.Execute(null);
+
+        Assert.Contains(referencedRemote, viewModel.RemoteProfiles);
+        Assert.Contains("Cannot remove remote", viewModel.StatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RemoveRemote_AllowsDeletionWhenNotReferenced()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.AddRemoteCommand.Execute(null);
+        var unreferencedRemote = viewModel.SelectedRemoteProfile!;
+        var beforeCount = viewModel.RemoteProfiles.Count;
+
+        viewModel.SelectedProfile = unreferencedRemote;
+        viewModel.RemoveProfileCommand.Execute(null);
+
+        Assert.Equal(beforeCount - 1, viewModel.RemoteProfiles.Count);
+        Assert.DoesNotContain(unreferencedRemote, viewModel.RemoteProfiles);
     }
 
     private MainWindowViewModel CreateViewModel()

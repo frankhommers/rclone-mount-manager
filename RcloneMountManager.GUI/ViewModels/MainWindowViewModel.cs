@@ -125,6 +125,34 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<RcloneBackendOptionInput> AdvancedBackendOptionInputs { get; } = new();
     public ObservableCollection<ReliabilityPolicyPreset> ReliabilityPresets { get; } = new(ReliabilityPolicyPreset.Catalog);
     public ObservableCollection<MountProfile> RemoteProfiles { get; } = new();
+    public MountProfile? SidebarSelectedRemoteProfile
+    {
+        get => ShowRemoteEditor ? SelectedRemoteProfile : null;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            SelectedRemoteProfile = value;
+        }
+    }
+
+    public MountProfile? SidebarSelectedMountProfile
+    {
+        get => ShowRemoteEditor ? null : SelectedMountProfile;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            SelectedMountProfile = value;
+        }
+    }
+
     public bool HasDiagnosticsRows => DiagnosticsRows.Count > 0;
     public bool HasRemoteProfiles => RemoteProfiles.Count > 0;
     public string DiagnosticsEmptyStateText => "No diagnostics for current filter.";
@@ -507,15 +535,42 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (Profiles.Count <= 1)
         {
+            StatusText = "At least one mount profile must remain.";
             return;
         }
 
-        var index = Profiles.IndexOf(SelectedProfile);
-        var removedId = SelectedProfile.Id;
-        Profiles.Remove(SelectedProfile);
+        var profileToRemove = SelectedProfile;
+        if (profileToRemove.IsRemoteDefinition)
+        {
+            var remoteAlias = GetRemoteAlias(profileToRemove);
+            if (!string.IsNullOrWhiteSpace(remoteAlias))
+            {
+                var dependentMounts = Profiles
+                    .Where(IsMountProfileCandidate)
+                    .Where(RequiresRemoteAssociation)
+                    .Where(mount => TryGetRemoteAliasFromSource(mount.Source, out var mountAlias, out _) &&
+                        string.Equals(mountAlias, remoteAlias, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (dependentMounts.Count > 0)
+                {
+                    StatusText = $"Cannot remove remote '{profileToRemove.Name}' because it is used by {dependentMounts.Count} mount(s).";
+                    return;
+                }
+            }
+        }
+
+        var index = Profiles.IndexOf(profileToRemove);
+        var removedId = profileToRemove.Id;
+        Profiles.Remove(profileToRemove);
         _profileLogs.Remove(removedId);
         _profileScripts.Remove(removedId);
-        SelectedProfile = Profiles[Math.Max(0, index - 1)];
+
+        var fallback = Profiles[Math.Max(0, index - 1)];
+        SelectedProfile = fallback;
+        StatusText = profileToRemove.IsRemoteDefinition
+            ? $"Removed remote '{profileToRemove.Name}'."
+            : $"Removed mount '{profileToRemove.Name}'.";
         MarkDirty();
     }
 
@@ -1388,6 +1443,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedRemoteProfileChanged(MountProfile? value)
     {
+        OnPropertyChanged(nameof(SidebarSelectedRemoteProfile));
+
         if (_syncingSidebarSelection || value is null)
         {
             return;
@@ -1402,6 +1459,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedMountProfileChanged(MountProfile? value)
     {
+        OnPropertyChanged(nameof(SidebarSelectedMountProfile));
+
         if (_syncingSidebarSelection || value is null)
         {
             return;
@@ -1449,6 +1508,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(WorkspaceTitle));
         OnPropertyChanged(nameof(WorkspaceSubtitle));
+        OnPropertyChanged(nameof(SidebarSelectedRemoteProfile));
+        OnPropertyChanged(nameof(SidebarSelectedMountProfile));
 
         if (!value || SelectedRemoteProfile is not null)
         {
