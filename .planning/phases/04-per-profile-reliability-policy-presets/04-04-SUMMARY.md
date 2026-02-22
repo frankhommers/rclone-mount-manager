@@ -12,6 +12,7 @@ provides:
   - Single active sidebar highlight while preserving remembered selections
   - Mount-to-remote association gating before save and mount actions
   - Deterministic remote deletion blocking when mounts depend on remote alias
+  - Remote name field synchronizes immediately with REMOTES sidebar labels
 affects: [phase-4-acceptance, ui-ux, profile-persistence]
 tech-stack:
   added: []
@@ -30,6 +31,7 @@ key-decisions:
   - "Require rclone mounts to resolve to an existing remote alias before save."
   - "Keep remote and mount selection state independent and never auto-mirror across lists."
   - "Show only one active (blue) sidebar selection at a time to reduce dual-selection confusion."
+  - "Use explicit action labels (Save remote, Save mount) to remove persistence ambiguity."
 patterns-established:
   - "Sidebar separation: REMOTES and MOUNTS use distinct collections and selection state."
   - "Validation gate: Save/actions blocked when mount lacks remote association."
@@ -39,7 +41,7 @@ completed: 2026-02-22
 
 # Phase 4 Plan 4: Runtime Verification Gap Closure Summary
 
-**Sidebar UX now uses explicit plus affordances, single active selection highlighting, and deterministic remote deletion rules while preserving remotes/mounts separation.**
+**Sidebar UX now uses explicit plus affordances, single active selection highlighting, clear save actions, deterministic remote deletion rules, and immediate remote-name sidebar sync.**
 
 ## Performance
 
@@ -55,6 +57,8 @@ completed: 2026-02-22
 - Decoupled REMOTES and MOUNTS selection state so selection in one list does not overwrite the other.
 - Enforced remote association for mount save/action flow and added deterministic "in-use remote" deletion blocking.
 - Reduced sidebar confusion by keeping remembered selections but showing only one active list highlight at a time.
+- Clarified persistence affordances with context-specific action labels (`Save remote`, `Save mount`).
+- Synced remote name input to sidebar label updates immediately.
 
 ## Task Commits
 
@@ -62,6 +66,7 @@ completed: 2026-02-22
 2. **Task 2 entity split + mount remote gating:** `1dd9bd9` (fix)
 3. **Task 2 UX simplification + add-command coverage:** `4f2ccf4` (fix)
 4. **Task 2 active-highlight + remote delete guardrails:** `4df2508` (fix)
+5. **Task 2 save clarity + remote name sync + message clarity:** `90ae139` (fix)
 
 ## Files Created/Modified
 
@@ -84,6 +89,8 @@ completed: 2026-02-22
 - UI copy and control placement still implied mixed responsibilities (remote creation "and use in selected profile").
 - Sidebar bindings rendered both remembered selections as active at the same time, producing two blue highlights.
 - Deletion flow had no explicit dependency guardrails for mount->remote references, making failure mode unclear.
+- Deletion feedback omitted dependent mount names, so users could not immediately resolve blocked deletion.
+- Remote name input updated backend alias intent but not profile display name, causing sidebar label drift.
 
 ## Deviations from Plan
 
@@ -113,9 +120,17 @@ completed: 2026-02-22
 - **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
 - **Committed in:** `4df2508`
 
+**4. [Rule 1 - Bug] Fixed remote name sidebar sync and deletion feedback detail**
+- **Found during:** Task 2 checkpoint feedback (blocking UAT)
+- **Issue:** Remote-name edits did not immediately align with REMOTES sidebar labels; deletion block feedback lacked actionable detail.
+- **Fix:** Synced `NewRemoteName` changes into selected remote profile name and expanded block message with dependent mount names/count.
+- **Files modified:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `90ae139`
+
 ---
 
-**Total deviations:** 3 auto-fixed (1 bug, 2 missing critical)
+**Total deviations:** 4 auto-fixed (2 bug, 2 missing critical)
 **Impact on plan:** Deviations were required to satisfy checkpoint-defined acceptance semantics for sidebar entity separation.
 
 ## Issues Encountered
