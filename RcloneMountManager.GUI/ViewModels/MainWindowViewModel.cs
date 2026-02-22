@@ -310,7 +310,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public string StartupButtonText => SelectedProfile?.StartAtLogin is true ? "Disable start at login" : "Enable start at login";
 
-    public string SaveChangesButtonText => HasPendingChanges ? "Save changes *" : "Save changes";
+    public string SaveChangesButtonText => HasPendingChanges ? "Save mount *" : "Save mount";
 
     public string SelectedProfileLifecycleText => FormatLifecycle(SelectedProfile?.RuntimeState.Lifecycle ?? MountLifecycleState.Idle);
 
@@ -425,6 +425,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 BackendOptionInputs,
                 cancellationToken);
 
+            activeProfile.Name = NewRemoteName.Trim();
             activeProfile.Source = $"{NewRemoteName.Trim()}:/";
             activeProfile.Type = MountType.RcloneAuto;
             activeProfile.QuickConnectMode = QuickConnectMode.None;
@@ -554,7 +555,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
                 if (dependentMounts.Count > 0)
                 {
-                    StatusText = $"Cannot remove remote '{profileToRemove.Name}' because it is used by {dependentMounts.Count} mount(s).";
+                    var mountNames = string.Join(", ", dependentMounts.Select(m => m.Name));
+                    StatusText = $"Cannot delete remote '{profileToRemove.Name}' because {dependentMounts.Count} mount(s) still use it: {mountNames}.";
                     return;
                 }
             }
@@ -1358,6 +1360,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnNewRemoteNameChanged(string value)
     {
+        if (SelectedProfile is { IsRemoteDefinition: true } && !string.IsNullOrWhiteSpace(value))
+        {
+            SelectedProfile.Name = value.Trim();
+        }
+
         NotifyCommandStateChanged();
     }
 
@@ -1420,6 +1427,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _syncingSidebarSelection = true;
         if (value.IsRemoteDefinition)
         {
+            NewRemoteName = GetRemoteAlias(value) ?? value.Name;
             SelectedRemoteProfile = value;
             if (!ShowRemoteEditor)
             {

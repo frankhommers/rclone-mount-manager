@@ -109,12 +109,14 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
     {
         var viewModel = CreateViewModel();
         var referencedRemote = viewModel.RemoteProfiles.First();
+        var dependentMountName = viewModel.MountProfiles.First().Name;
 
         viewModel.SelectedProfile = referencedRemote;
         viewModel.RemoveProfileCommand.Execute(null);
 
         Assert.Contains(referencedRemote, viewModel.RemoteProfiles);
-        Assert.Contains("Cannot remove remote", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.Contains("Cannot delete remote", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.Contains(dependentMountName, viewModel.StatusText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -130,6 +132,19 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
 
         Assert.Equal(beforeCount - 1, viewModel.RemoteProfiles.Count);
         Assert.DoesNotContain(unreferencedRemote, viewModel.RemoteProfiles);
+    }
+
+    [Fact]
+    public void EditingRemoteNameField_UpdatesSidebarRemoteLabelImmediately()
+    {
+        var viewModel = CreateViewModel();
+        var remote = viewModel.RemoteProfiles.First();
+
+        viewModel.SelectedProfile = remote;
+        viewModel.NewRemoteName = "archive-remote";
+
+        Assert.Equal("archive-remote", remote.Name);
+        Assert.Contains(viewModel.RemoteProfiles, p => p.Name == "archive-remote");
     }
 
     private MainWindowViewModel CreateViewModel()

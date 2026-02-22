@@ -28,6 +28,10 @@
             <Setter Property="Padding" Value="6,4"/>
             <Setter Property="CornerRadius" Value="8"/>
         </Style>
+        <Style Selector="ListBox.sidebar-inactive ListBoxItem:selected">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
+        </Style>
     </Window.Styles>
 
     <Border Margin="14"
@@ -74,6 +78,7 @@
                                 </Grid>
                                 <ListBox ItemsSource="{Binding RemoteProfiles}"
                                          SelectedItem="{Binding SidebarSelectedRemoteProfile}"
+                                         Classes.sidebar-inactive="{Binding !ShowRemoteEditor}"
                                          IsVisible="{Binding HasRemoteProfiles}"
                                          Background="Transparent"
                                          BorderThickness="0"
@@ -108,6 +113,7 @@
                                 </Grid>
                                 <ListBox ItemsSource="{Binding MountProfiles}"
                                          SelectedItem="{Binding SidebarSelectedMountProfile}"
+                                         Classes.sidebar-inactive="{Binding ShowRemoteEditor}"
                                          Background="Transparent"
                                          BorderThickness="0"
                                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
@@ -218,7 +224,7 @@
                                               ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
                             </Expander>
 
-                            <Button Content="Create remote"
+                            <Button Content="Save remote"
                                     Command="{Binding CreateRemoteCommand}"
                                     HorizontalAlignment="Left"/>
 
