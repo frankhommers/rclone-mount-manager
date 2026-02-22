@@ -19,6 +19,8 @@ provides:
   - Blocked remote deletion uses explicit modal dialog with dependency details
   - Mount sidebar shows explicit "No mounts yet" copy when empty
   - Remote sidebar subtitle hides `name:/` placeholders and shows only meaningful target info
+  - Save flow now persists remote-editor actions and empty-library deletions deterministically
+  - Remotes and mounts empty copy is visually symmetric
 affects: [phase-4-acceptance, ui-ux, profile-persistence]
 tech-stack:
   added: []
@@ -79,6 +81,7 @@ completed: 2026-02-22
 7. **Task 2 cross-click active-selection hardening:** `804da4b` (fix)
 8. **Task 2 empty-state + modal deletion feedback + rename stability:** `c8d3cf3` (fix)
 9. **Task 2 mounts-empty copy + remote subtitle cleanup:** `7f9f8d2` (fix)
+10. **Task 2 persistence pipeline hardening + empty-copy symmetry:** `c2429ee` (fix)
 
 ## Files Created/Modified
 
@@ -109,6 +112,8 @@ completed: 2026-02-22
 - Last-profile delete path forced fallback mount insertion, producing ghost mount respawn after clearing everything.
 - Remote name edit buffer could be overwritten by backend/profile reseeding, causing visible rename jumps.
 - Remote sidebar subtitle bound directly to raw `Source`, exposing confusing alias-root placeholder strings like `remote1:/`.
+- `Save remote` action only marked dirty and did not write profiles file, so users perceived saved changes as reverting on restart.
+- Empty-library delete flow wrote status but relied on later manual save, so clear-all could be lost after restart.
 
 ## Deviations from Plan
 
@@ -186,9 +191,25 @@ completed: 2026-02-22
 - **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
 - **Committed in:** `7f9f8d2`
 
+**10. [Rule 1 - Bug] Fixed save/restart persistence for remote actions and empty-library clears**
+- **Found during:** Task 2 checkpoint feedback (critical)
+- **Issue:** Save pipeline did not persist remote-editor saves or empty-library clears reliably.
+- **Fix:** Persist immediately after `Save remote`, persist when delete reaches empty library, and keep explicit saved status feedback.
+- **Files modified:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `c2429ee`
+
+**11. [Rule 1 - Bug] Added symmetric remotes empty copy and stabilized subtitle semantics**
+- **Found during:** Task 2 checkpoint feedback
+- **Issue:** Empty-list guidance was inconsistent and remote subtitle still surfaced confusing placeholder forms.
+- **Fix:** Standardized remotes copy (`No remotes yet`) and constrained subtitle rendering to meaningful path target only.
+- **Files modified:** `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.Core/Models/MountProfile.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `c2429ee`
+
 ---
 
-**Total deviations:** 9 auto-fixed (7 bug, 2 missing critical)
+**Total deviations:** 11 auto-fixed (9 bug, 2 missing critical)
 **Impact on plan:** Deviations were required to satisfy checkpoint-defined acceptance semantics for sidebar entity separation.
 
 ## Issues Encountered
