@@ -17,6 +17,8 @@ provides:
   - Active sidebar selection is single-owner across cross-click transitions
   - True empty library state is supported (0 remotes, 0 mounts) without placeholder respawn
   - Blocked remote deletion uses explicit modal dialog with dependency details
+  - Mount sidebar shows explicit "No mounts yet" copy when empty
+  - Remote sidebar subtitle hides `name:/` placeholders and shows only meaningful target info
 affects: [phase-4-acceptance, ui-ux, profile-persistence]
 tech-stack:
   added: []
@@ -76,6 +78,7 @@ completed: 2026-02-22
 6. **Task 2 top-save placement + last-remote deletion unblock:** `a4c9dc3` (fix)
 7. **Task 2 cross-click active-selection hardening:** `804da4b` (fix)
 8. **Task 2 empty-state + modal deletion feedback + rename stability:** `c8d3cf3` (fix)
+9. **Task 2 mounts-empty copy + remote subtitle cleanup:** `7f9f8d2` (fix)
 
 ## Files Created/Modified
 
@@ -105,6 +108,7 @@ completed: 2026-02-22
 - Remove command required `Profiles.Count > 1`, which unintentionally blocked deleting the final remote after mounts were removed.
 - Last-profile delete path forced fallback mount insertion, producing ghost mount respawn after clearing everything.
 - Remote name edit buffer could be overwritten by backend/profile reseeding, causing visible rename jumps.
+- Remote sidebar subtitle bound directly to raw `Source`, exposing confusing alias-root placeholder strings like `remote1:/`.
 
 ## Deviations from Plan
 
@@ -174,9 +178,17 @@ completed: 2026-02-22
 - **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
 - **Committed in:** `c8d3cf3`
 
+**9. [Rule 1 - Bug] Cleaned remote subtitle formatting and added mounts-empty section copy**
+- **Found during:** Task 2 checkpoint feedback (blocking UAT)
+- **Issue:** Sidebar subtitle displayed confusing alias-root placeholders and mounts section lacked explicit empty copy.
+- **Fix:** Added `RemoteSidebarSubtitle` computed display (hide placeholder, show meaningful target only) and `No mounts yet` empty text in mounts list area.
+- **Files modified:** `RcloneMountManager.Core/Models/MountProfile.cs`, `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `7f9f8d2`
+
 ---
 
-**Total deviations:** 8 auto-fixed (6 bug, 2 missing critical)
+**Total deviations:** 9 auto-fixed (7 bug, 2 missing critical)
 **Impact on plan:** Deviations were required to satisfy checkpoint-defined acceptance semantics for sidebar entity separation.
 
 ## Issues Encountered
