@@ -4,15 +4,15 @@
 
 **Core Value:** Users can configure mounts once and trust they are mounted automatically and reliably on boot.
 
-**Current Focus:** Phase 4 completed; reliability policy preset UX and regression coverage are in place.
+**Current Focus:** Phase 4 complete with 04-04 checkpoint gap closed; remotes/mounts separation, persistence, and sidebar UX are verified.
 
 ## Current Position
 
 - **Current Phase:** 4 of 4 - Per-Profile Reliability Policy Presets
-- **Current Plan:** 3 of 3 completed in phase 4 (`04-03-PLAN.md`)
+- **Current Plan:** 4 of 4 completed in phase 4 (`04-04-PLAN.md`)
 - **Overall Status:** Phase 1 through phase 4 complete
-- **Last activity:** 2026-02-21 - Completed `04-03-PLAN.md`
-- **Progress:** [██████████] 12/12 plans complete (100%)
+- **Last activity:** 2026-02-22 - Completed `04-04-PLAN.md`
+- **Progress:** [██████████] 13/13 plans complete (100%)
 
 ## Performance Metrics
 
@@ -21,7 +21,7 @@
 - **Mapped requirements:** 13
 - **Coverage:** 100%
 - **Completed phases:** 4
-- **Completed plans:** 12/12 (phase 1 through phase 4 complete)
+- **Completed plans:** 13/13 (phase 1 through phase 4 complete)
 
 ## Accumulated Context
 
@@ -62,6 +62,10 @@
 - Keep reliability policy controls in Profile Settings with profile-scoped selected-value binding to `SelectedReliabilityPresetId`.
 - Require explicit `ApplyReliabilityPresetCommand` action rather than implicit apply-on-selection changes.
 - Prime `MountOptionsViewModel` option catalog in tests when startup loading is disabled to keep non-clobber regressions deterministic.
+- Keep REMOTES and MOUNTS as explicit separate entities with one active sidebar highlight owner at a time.
+- Allow true empty library persistence (0 remotes, 0 mounts) and do not reseed defaults when saved payload is empty.
+- Block remote deletion with explicit dependency modal feedback listing dependent mount names/count.
+- Update dependent mount source aliases only when sources use generated alias-root form during remote alias rename.
 
 ### TODOs
 
@@ -73,10 +77,10 @@
 
 ## Session Continuity
 
-- **Last completed artifact:** `.planning/phases/04-per-profile-reliability-policy-presets/04-03-SUMMARY.md`
-- **Last updated files:** `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelPolicyPresetTests.cs`, `.planning/phases/04-per-profile-reliability-policy-presets/04-03-SUMMARY.md`, `.planning/STATE.md`
-- **Last session:** 2026-02-21T22:27:41Z
-- **Stopped at:** Completed `04-03-PLAN.md`
+- **Last completed artifact:** `.planning/phases/04-per-profile-reliability-policy-presets/04-04-SUMMARY.md`
+- **Last updated files:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`, `.planning/phases/04-per-profile-reliability-policy-presets/04-04-SUMMARY.md`, `.planning/STATE.md`
+- **Last session:** 2026-02-22T21:17:08Z
+- **Stopped at:** Completed `04-04-PLAN.md`
 - **Resume file:** None
 - **Next command:** None
 
