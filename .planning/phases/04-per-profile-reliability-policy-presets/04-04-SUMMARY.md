@@ -15,6 +15,8 @@ provides:
   - Remote name field synchronizes immediately with REMOTES sidebar labels
   - Users can clear all remotes after removing dependent mounts (last-remote deletion unblocked)
   - Active sidebar selection is single-owner across cross-click transitions
+  - True empty library state is supported (0 remotes, 0 mounts) without placeholder respawn
+  - Blocked remote deletion uses explicit modal dialog with dependency details
 affects: [phase-4-acceptance, ui-ux, profile-persistence]
 tech-stack:
   added: []
@@ -73,6 +75,7 @@ completed: 2026-02-22
 5. **Task 2 save clarity + remote name sync + message clarity:** `90ae139` (fix)
 6. **Task 2 top-save placement + last-remote deletion unblock:** `a4c9dc3` (fix)
 7. **Task 2 cross-click active-selection hardening:** `804da4b` (fix)
+8. **Task 2 empty-state + modal deletion feedback + rename stability:** `c8d3cf3` (fix)
 
 ## Files Created/Modified
 
@@ -100,6 +103,8 @@ completed: 2026-02-22
 - Deletion feedback omitted dependent mount names, so users could not immediately resolve blocked deletion.
 - Remote name input updated backend alias intent but not profile display name, causing sidebar label drift.
 - Remove command required `Profiles.Count > 1`, which unintentionally blocked deleting the final remote after mounts were removed.
+- Last-profile delete path forced fallback mount insertion, producing ghost mount respawn after clearing everything.
+- Remote name edit buffer could be overwritten by backend/profile reseeding, causing visible rename jumps.
 
 ## Deviations from Plan
 
@@ -153,9 +158,25 @@ completed: 2026-02-22
 - **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
 - **Committed in:** `804da4b`
 
+**7. [Rule 1 - Bug] Removed ghost mount respawn and stabilized remote naming source**
+- **Found during:** Task 2 checkpoint feedback (blocking UAT)
+- **Issue:** Clearing all entities spawned a fallback mount unexpectedly; remote name field could jump due to reseeding from competing sources.
+- **Fix:** Removed fallback insertion for delete-to-empty, enabled explicit empty-library state, and anchored remote editor name to profile name without backend override while editing remotes.
+- **Files modified:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `c8d3cf3`
+
+**8. [Rule 2 - Missing Critical] Added modal contract for blocked remote deletion**
+- **Found during:** Task 2 checkpoint feedback (blocking UAT)
+- **Issue:** Status text alone was not sufficiently visible for destructive-operation block feedback.
+- **Fix:** Added dedicated deletion-block modal state and dismiss command with explicit dependent mount details.
+- **Files modified:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `c8d3cf3`
+
 ---
 
-**Total deviations:** 6 auto-fixed (4 bug, 2 missing critical)
+**Total deviations:** 8 auto-fixed (6 bug, 2 missing critical)
 **Impact on plan:** Deviations were required to satisfy checkpoint-defined acceptance semantics for sidebar entity separation.
 
 ## Issues Encountered
