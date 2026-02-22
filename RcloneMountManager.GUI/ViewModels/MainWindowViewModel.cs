@@ -54,6 +54,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _runtimeMonitoringActive;
     private bool _syncingSidebarSelection;
     private bool _syncingMountRemoteSelection;
+    private MountProfile? _rememberedRemoteProfile;
+    private MountProfile? _rememberedMountProfile;
 
     [ObservableProperty]
     private MountProfile _selectedProfile;
@@ -223,7 +225,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedMountProfile = MountProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? MountProfiles.FirstOrDefault();
         SelectedRemoteProfile = RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? RemoteProfiles.FirstOrDefault();
         _syncingSidebarSelection = false;
+        _rememberedMountProfile = SelectedMountProfile;
+        _rememberedRemoteProfile = SelectedRemoteProfile;
         ShowRemoteEditor = false;
+        EnsureSingleActiveSidebarSelection();
         UpdateSelectedMountRemoteFromSource(SelectedProfile);
         SyncDiagnosticsFilters();
         HasPendingChanges = false;
@@ -1464,6 +1469,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             UpdateSelectedMountRemoteFromSource(value);
         }
         _syncingSidebarSelection = false;
+        EnsureSingleActiveSidebarSelection();
 
         OnPropertyChanged(nameof(StartupButtonText));
     }
@@ -1471,6 +1477,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnSelectedRemoteProfileChanged(MountProfile? value)
     {
         OnPropertyChanged(nameof(SidebarSelectedRemoteProfile));
+
+        if (value is not null)
+        {
+            _rememberedRemoteProfile = value;
+        }
 
         if (_syncingSidebarSelection || value is null)
         {
@@ -1487,6 +1498,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnSelectedMountProfileChanged(MountProfile? value)
     {
         OnPropertyChanged(nameof(SidebarSelectedMountProfile));
+
+        if (value is not null)
+        {
+            _rememberedMountProfile = value;
+        }
 
         if (_syncingSidebarSelection || value is null)
         {
@@ -1538,25 +1554,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SidebarSelectedRemoteProfile));
         OnPropertyChanged(nameof(SidebarSelectedMountProfile));
 
-        if (!value || SelectedRemoteProfile is not null)
-        {
-            return;
-        }
-
-        var firstRemote = RemoteProfiles.FirstOrDefault();
-        if (firstRemote is null)
-        {
-            ShowRemoteEditor = false;
-            return;
-        }
-
-        _syncingSidebarSelection = true;
-        SelectedRemoteProfile = firstRemote;
-        _syncingSidebarSelection = false;
-        if (!ReferenceEquals(SelectedProfile, firstRemote))
-        {
-            SelectedProfile = firstRemote;
-        }
+        EnsureSingleActiveSidebarSelection();
     }
 
     private void OnObservedProfileChanged(object? sender, PropertyChangedEventArgs e)
@@ -1941,9 +1939,67 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _syncingMountRemoteSelection = false;
     }
 
+    private void EnsureSingleActiveSidebarSelection()
+    {
+        _syncingSidebarSelection = true;
+
+        try
+        {
+            if (ShowRemoteEditor)
+            {
+                if (SelectedMountProfile is not null)
+                {
+                    _rememberedMountProfile = SelectedMountProfile;
+                    SelectedMountProfile = null;
+                }
+
+                if (SelectedRemoteProfile is null && RemoteProfiles.Count > 0)
+                {
+                    var candidate = _rememberedRemoteProfile;
+                    if (candidate is null || !RemoteProfiles.Contains(candidate))
+                    {
+                        candidate = RemoteProfiles.FirstOrDefault();
+                    }
+
+                    SelectedRemoteProfile = candidate;
+                }
+
+                if (SelectedRemoteProfile is null)
+                {
+                    ShowRemoteEditor = false;
+                }
+            }
+            else
+            {
+                if (SelectedRemoteProfile is not null)
+                {
+                    _rememberedRemoteProfile = SelectedRemoteProfile;
+                    SelectedRemoteProfile = null;
+                }
+
+                if (SelectedMountProfile is null && MountProfiles.Count > 0)
+                {
+                    var candidate = _rememberedMountProfile;
+                    if (candidate is null || !MountProfiles.Contains(candidate))
+                    {
+                        candidate = MountProfiles.FirstOrDefault();
+                    }
+
+                    SelectedMountProfile = candidate;
+                }
+            }
+        }
+        finally
+        {
+            _syncingSidebarSelection = false;
+            OnPropertyChanged(nameof(SidebarSelectedRemoteProfile));
+            OnPropertyChanged(nameof(SidebarSelectedMountProfile));
+        }
+    }
+
     private void RefreshRemoteProfiles()
     {
-        var previousRemote = SelectedRemoteProfile;
+        var previousRemote = SelectedRemoteProfile ?? _rememberedRemoteProfile;
 
         RemoteProfiles.Clear();
         foreach (var profile in Profiles.Where(IsRemoteProfileCandidate))
@@ -1958,6 +2014,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _syncingSidebarSelection = true;
             SelectedRemoteProfile = null;
             _syncingSidebarSelection = false;
+            _rememberedRemoteProfile = null;
             ShowRemoteEditor = false;
             if (SelectedMountProfile is not null)
             {
@@ -1966,25 +2023,29 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        if (previousRemote is not null && RemoteProfiles.Contains(previousRemote))
-        {
-            return;
-        }
+        var replacement = previousRemote is not null && RemoteProfiles.Contains(previousRemote)
+            ? previousRemote
+            : RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? RemoteProfiles[0];
 
-        var replacement = RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? RemoteProfiles[0];
-        _syncingSidebarSelection = true;
-        SelectedRemoteProfile = replacement;
-        _syncingSidebarSelection = false;
+        _rememberedRemoteProfile = replacement;
+        if (ShowRemoteEditor)
+        {
+            _syncingSidebarSelection = true;
+            SelectedRemoteProfile = replacement;
+            _syncingSidebarSelection = false;
+        }
 
         if (SelectedMountProfile is not null)
         {
             UpdateSelectedMountRemoteFromSource(SelectedMountProfile);
         }
+
+        EnsureSingleActiveSidebarSelection();
     }
 
     private void RefreshMountProfiles()
     {
-        var previousMount = SelectedMountProfile;
+        var previousMount = SelectedMountProfile ?? _rememberedMountProfile;
 
         MountProfiles.Clear();
         foreach (var profile in Profiles.Where(IsMountProfileCandidate))
@@ -1997,18 +2058,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _syncingSidebarSelection = true;
             SelectedMountProfile = null;
             _syncingSidebarSelection = false;
+            _rememberedMountProfile = null;
             return;
         }
 
-        if (previousMount is not null && MountProfiles.Contains(previousMount))
+        var replacement = previousMount is not null && MountProfiles.Contains(previousMount)
+            ? previousMount
+            : MountProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? MountProfiles[0];
+
+        _rememberedMountProfile = replacement;
+        if (!ShowRemoteEditor)
         {
-            return;
+            _syncingSidebarSelection = true;
+            SelectedMountProfile = replacement;
+            _syncingSidebarSelection = false;
         }
 
-        var replacement = MountProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? MountProfiles[0];
-        _syncingSidebarSelection = true;
-        SelectedMountProfile = replacement;
-        _syncingSidebarSelection = false;
+        EnsureSingleActiveSidebarSelection();
     }
 
     private MountProfile CreateRemoteDefinitionProfile(string remoteAlias, string? name = null)

@@ -27,9 +27,12 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         viewModel.SelectedMountProfile = mountSelection;
         viewModel.SelectedRemoteProfile = remoteSelection;
 
-        Assert.Same(mountSelection, viewModel.SelectedMountProfile);
+        Assert.Null(viewModel.SelectedMountProfile);
         Assert.Null(viewModel.SidebarSelectedMountProfile);
         Assert.Same(remoteSelection, viewModel.SidebarSelectedRemoteProfile);
+
+        viewModel.ShowRemoteEditor = false;
+        Assert.Same(mountSelection, viewModel.SelectedMountProfile);
     }
 
     [Fact]
@@ -45,9 +48,35 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         viewModel.SelectedRemoteProfile = remoteSelection;
         viewModel.SelectedMountProfile = mountSelection;
 
-        Assert.Same(remoteSelection, viewModel.SelectedRemoteProfile);
+        Assert.Null(viewModel.SelectedRemoteProfile);
         Assert.Same(mountSelection, viewModel.SidebarSelectedMountProfile);
         Assert.Null(viewModel.SidebarSelectedRemoteProfile);
+
+        viewModel.ShowRemoteEditor = true;
+        Assert.Same(remoteSelection, viewModel.SelectedRemoteProfile);
+    }
+
+    [Fact]
+    public void CrossClickingLists_AlwaysKeepsSingleActiveSidebarSelection()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.AddRemoteCommand.Execute(null);
+        viewModel.AddMountCommand.Execute(null);
+
+        var remoteSelection = viewModel.RemoteProfiles[0];
+        var mountSelection = viewModel.MountProfiles[0];
+
+        viewModel.SelectedRemoteProfile = remoteSelection;
+        Assert.NotNull(viewModel.SidebarSelectedRemoteProfile);
+        Assert.Null(viewModel.SidebarSelectedMountProfile);
+
+        viewModel.SelectedMountProfile = mountSelection;
+        Assert.NotNull(viewModel.SidebarSelectedMountProfile);
+        Assert.Null(viewModel.SidebarSelectedRemoteProfile);
+
+        viewModel.SelectedRemoteProfile = remoteSelection;
+        Assert.NotNull(viewModel.SidebarSelectedRemoteProfile);
+        Assert.Null(viewModel.SidebarSelectedMountProfile);
     }
 
     [Fact]
@@ -150,6 +179,8 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         Assert.Empty(viewModel.RemoteProfiles);
         Assert.Single(viewModel.MountProfiles);
         Assert.Contains("All remotes are now cleared", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.NotNull(viewModel.SelectedProfile);
+        Assert.False(viewModel.SelectedProfile.IsRemoteDefinition);
     }
 
     [Fact]
