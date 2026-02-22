@@ -95,7 +95,7 @@ public partial class MountProfile : ObservableObject
                 return string.Empty;
             }
 
-            return $"Target: {target}";
+            return $"Path: {target}";
         }
     }
 

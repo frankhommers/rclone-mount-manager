@@ -249,14 +249,50 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         remote.Source = "archive:photos";
 
         Assert.True(remote.HasRemoteSidebarSubtitle);
-        Assert.Equal("Target: photos", remote.RemoteSidebarSubtitle);
+        Assert.Equal("Path: photos", remote.RemoteSidebarSubtitle);
     }
 
-    private MainWindowViewModel CreateViewModel()
+    [Fact]
+    public void CreateMountAndRemote_SaveAndReload_PreservesState()
+    {
+        var filePath = Path.Combine(_tempRoot, $"profiles-{Guid.NewGuid():N}.json");
+        var viewModel = CreateViewModel(filePath);
+
+        viewModel.AddRemoteCommand.Execute(null);
+        var remote = viewModel.SelectedRemoteProfile!;
+        remote.Name = "media-remote";
+        remote.Source = "media-remote:/";
+        viewModel.AddMountCommand.Execute(null);
+        viewModel.SelectedMountRemoteProfile = remote;
+        Assert.True(viewModel.SaveChangesCommand.CanExecute(null));
+        viewModel.SaveChangesCommand.Execute(null);
+
+        var reloaded = CreateViewModel(filePath);
+        Assert.Contains(reloaded.RemoteProfiles, p => p.Name == "media-remote");
+        Assert.NotEmpty(reloaded.MountProfiles);
+        Assert.Contains(reloaded.MountProfiles, m => m.Source.StartsWith("media-remote:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RenameRemote_SaveAndReload_PreservesName()
+    {
+        var filePath = Path.Combine(_tempRoot, $"profiles-{Guid.NewGuid():N}.json");
+        var viewModel = CreateViewModel(filePath);
+        var remote = viewModel.RemoteProfiles.First();
+
+        viewModel.SelectedProfile = remote;
+        viewModel.NewRemoteName = "archive-remote";
+        viewModel.SaveChangesCommand.Execute(null);
+
+        var reloaded = CreateViewModel(filePath);
+        Assert.Contains(reloaded.RemoteProfiles, p => p.Name == "archive-remote");
+    }
+
+    private MainWindowViewModel CreateViewModel(string? filePath = null)
     {
         Directory.CreateDirectory(_tempRoot);
         return new MainWindowViewModel(
-            profilesFilePath: Path.Combine(_tempRoot, "profiles.json"),
+            profilesFilePath: filePath ?? Path.Combine(_tempRoot, "profiles.json"),
             startupEnabledProbe: _ => false,
             loadStartupData: false);
     }

@@ -105,7 +105,7 @@
                                         </DataTemplate>
                                     </ListBox.ItemTemplate>
                                 </ListBox>
-                                <TextBlock Text="No remotes yet. Use + to add a remote."
+                                <TextBlock Text="No remotes yet"
                                            IsVisible="{Binding !HasRemoteProfiles}"
                                            Margin="8,0,8,2"
                                            FontSize="11"

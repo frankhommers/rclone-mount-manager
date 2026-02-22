@@ -446,6 +446,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Created remote '{NewRemoteName}' ({SelectedBackend.Name}).");
             StatusText = $"Remote '{NewRemoteName}' created.";
             MarkDirty();
+            SaveProfiles();
+            HasPendingChanges = false;
+            StatusText = $"Remote '{NewRemoteName}' saved.";
         });
     }
 
@@ -596,6 +599,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(HasProfiles));
             NotifyCommandStateChanged();
             MarkDirty();
+            SaveProfiles();
+            HasPendingChanges = false;
+            StatusText = "Library is now empty and saved.";
             return;
         }
 
@@ -1325,7 +1331,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private bool CanRunStartupPreflight() => HasProfiles && !IsBusy && SelectedProfile is not null && !SelectedProfile.IsRemoteDefinition && IsStartupSupported;
 
-    private bool CanSaveChanges() => HasProfiles && !IsBusy && HasPendingChanges && !HasAnyInvalidMountRemoteAssociations();
+    private bool CanSaveChanges() => !IsBusy && HasPendingChanges && !HasAnyInvalidMountRemoteAssociations();
 
     private bool CanRefreshBackends() => !IsBusy;
 
