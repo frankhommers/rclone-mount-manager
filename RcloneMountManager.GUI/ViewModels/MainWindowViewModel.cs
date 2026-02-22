@@ -1305,10 +1305,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedReliabilityPresetId = ReliabilityPolicyPreset.GetByIdOrDefault(value.SelectedReliabilityPresetId).Id;
 
         _syncingSidebarSelection = true;
-        SelectedMountProfile = value;
-        if (IsRemoteProfileCandidate(value))
+        if (ShowRemoteEditor && IsRemoteProfileCandidate(value))
         {
             SelectedRemoteProfile = value;
+        }
+        else
+        {
+            SelectedMountProfile = value;
+            if (ShowRemoteEditor && !IsRemoteProfileCandidate(value))
+            {
+                ShowRemoteEditor = false;
+            }
         }
         _syncingSidebarSelection = false;
 
