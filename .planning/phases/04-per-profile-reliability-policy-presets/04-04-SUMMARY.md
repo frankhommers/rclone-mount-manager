@@ -61,7 +61,7 @@ completed: 2026-02-22
 1. **Task 2 remediation pass:** `a8bf2bd` (fix)
 2. **Task 2 entity split + mount remote gating:** `1dd9bd9` (fix)
 3. **Task 2 UX simplification + add-command coverage:** `4f2ccf4` (fix)
-4. **Task 2 active-highlight + remote delete guardrails:** `(this checkpoint commit)` (fix)
+4. **Task 2 active-highlight + remote delete guardrails:** `4df2508` (fix)
 
 ## Files Created/Modified
 
@@ -111,7 +111,7 @@ completed: 2026-02-22
 - **Fix:** Bound sidebar selection visuals to active context proxy properties and blocked remote deletion when referenced by mounts with explicit status message.
 - **Files modified:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
 - **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
-- **Committed in:** this checkpoint commit
+- **Committed in:** `4df2508`
 
 ---
 
