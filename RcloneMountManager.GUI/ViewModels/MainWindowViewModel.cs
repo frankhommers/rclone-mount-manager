@@ -164,6 +164,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public bool HasDiagnosticsRows => DiagnosticsRows.Count > 0;
     public bool HasRemoteProfiles => RemoteProfiles.Count > 0;
+    public bool HasMountProfiles => MountProfiles.Count > 0;
     public string DiagnosticsEmptyStateText => "No diagnostics for current filter.";
     public string WorkspaceTitle => ShowRemoteEditor ? "Remote Assistant" : "Mount Assistant";
     public string WorkspaceSubtitle => ShowRemoteEditor
@@ -2028,6 +2029,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         OnPropertyChanged(nameof(HasRemoteProfiles));
+        OnPropertyChanged(nameof(HasProfiles));
 
         if (RemoteProfiles.Count == 0)
         {
@@ -2072,6 +2074,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             MountProfiles.Add(profile);
         }
+
+        OnPropertyChanged(nameof(HasMountProfiles));
+        OnPropertyChanged(nameof(HasProfiles));
 
         if (MountProfiles.Count == 0)
         {

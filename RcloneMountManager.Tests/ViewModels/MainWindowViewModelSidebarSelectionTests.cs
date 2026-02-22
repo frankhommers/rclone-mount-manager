@@ -147,7 +147,7 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         Assert.Contains(referencedRemote, viewModel.RemoteProfiles);
         Assert.True(viewModel.IsDeleteBlockedDialogVisible);
         Assert.Contains("Cannot delete remote", viewModel.DeleteBlockedDialogMessage, StringComparison.Ordinal);
-        Assert.Contains(dependentMountName, viewModel.StatusText, StringComparison.Ordinal);
+        Assert.Contains(dependentMountName, viewModel.DeleteBlockedDialogMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -231,8 +231,25 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         viewModel.RemoveProfileCommand.Execute(null);
 
         Assert.False(viewModel.HasProfiles);
+        Assert.False(viewModel.HasMountProfiles);
+        Assert.False(viewModel.HasRemoteProfiles);
         Assert.False(viewModel.RemoveProfileCommand.CanExecute(null));
         Assert.False(viewModel.StartMountCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void RemoteSidebarSubtitle_HidesAliasRootPlaceholder_AndShowsMeaningfulTarget()
+    {
+        var viewModel = CreateViewModel();
+        var remote = viewModel.RemoteProfiles.First();
+
+        Assert.False(remote.HasRemoteSidebarSubtitle);
+        Assert.Equal(string.Empty, remote.RemoteSidebarSubtitle);
+
+        remote.Source = "archive:photos";
+
+        Assert.True(remote.HasRemoteSidebarSubtitle);
+        Assert.Equal("Target: photos", remote.RemoteSidebarSubtitle);
     }
 
     private MainWindowViewModel CreateViewModel()

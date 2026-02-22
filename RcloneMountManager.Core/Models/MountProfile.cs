@@ -74,9 +74,53 @@ public partial class MountProfile : ObservableObject
 
     public string DisplayName => $"{Name} ({Type})";
 
+    public string RemoteSidebarSubtitle
+    {
+        get
+        {
+            if (!IsRemoteDefinition || string.IsNullOrWhiteSpace(Source))
+            {
+                return string.Empty;
+            }
+
+            var separatorIndex = Source.IndexOf(':');
+            if (separatorIndex <= 0 || separatorIndex >= Source.Length - 1)
+            {
+                return string.Empty;
+            }
+
+            var target = Source[(separatorIndex + 1)..].Trim();
+            if (string.IsNullOrWhiteSpace(target) || string.Equals(target, "/", StringComparison.Ordinal))
+            {
+                return string.Empty;
+            }
+
+            return $"Target: {target}";
+        }
+    }
+
+    public bool HasRemoteSidebarSubtitle => !string.IsNullOrWhiteSpace(RemoteSidebarSubtitle);
+
     partial void OnNameChanged(string value) => OnPropertyChanged(nameof(DisplayName));
 
-    partial void OnTypeChanged(MountType value) => OnPropertyChanged(nameof(DisplayName));
+    partial void OnTypeChanged(MountType value)
+    {
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(RemoteSidebarSubtitle));
+        OnPropertyChanged(nameof(HasRemoteSidebarSubtitle));
+    }
+
+    partial void OnSourceChanged(string value)
+    {
+        OnPropertyChanged(nameof(RemoteSidebarSubtitle));
+        OnPropertyChanged(nameof(HasRemoteSidebarSubtitle));
+    }
+
+    partial void OnIsRemoteDefinitionChanged(bool value)
+    {
+        OnPropertyChanged(nameof(RemoteSidebarSubtitle));
+        OnPropertyChanged(nameof(HasRemoteSidebarSubtitle));
+    }
 
     public override string ToString() => DisplayName;
 }
