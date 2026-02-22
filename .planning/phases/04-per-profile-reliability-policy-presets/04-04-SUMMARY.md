@@ -14,6 +14,7 @@ provides:
   - Deterministic remote deletion blocking when mounts depend on remote alias
   - Remote name field synchronizes immediately with REMOTES sidebar labels
   - Users can clear all remotes after removing dependent mounts (last-remote deletion unblocked)
+  - Active sidebar selection is single-owner across cross-click transitions
 affects: [phase-4-acceptance, ui-ux, profile-persistence]
 tech-stack:
   added: []
@@ -61,6 +62,7 @@ completed: 2026-02-22
 - Clarified persistence affordances with context-specific action labels (`Save remote`, `Save mount`).
 - Synced remote name input to sidebar label updates immediately.
 - Moved primary save actions to top of each editor and allowed deleting the final unreferenced remote.
+- Hardened cross-click selection handoff by keeping remembered list selections internally while nulling inactive list selection state.
 
 ## Task Commits
 
@@ -70,6 +72,7 @@ completed: 2026-02-22
 4. **Task 2 active-highlight + remote delete guardrails:** `4df2508` (fix)
 5. **Task 2 save clarity + remote name sync + message clarity:** `90ae139` (fix)
 6. **Task 2 top-save placement + last-remote deletion unblock:** `a4c9dc3` (fix)
+7. **Task 2 cross-click active-selection hardening:** `804da4b` (fix)
 
 ## Files Created/Modified
 
@@ -92,6 +95,7 @@ completed: 2026-02-22
 - UI copy and control placement still implied mixed responsibilities (remote creation "and use in selected profile").
 - Sidebar bindings rendered both remembered selections as active at the same time, producing two blue highlights.
 - Avalonia theme `ListBoxItem:selected:pointerover/focus` styles still applied on inactive list, overriding previous neutral-selected override.
+- Selection proxies still let both list selection models stay non-null after cross-clicking; style override alone was insufficient to guarantee one-active visual ownership.
 - Deletion flow had no explicit dependency guardrails for mount->remote references, making failure mode unclear.
 - Deletion feedback omitted dependent mount names, so users could not immediately resolve blocked deletion.
 - Remote name input updated backend alias intent but not profile display name, causing sidebar label drift.
@@ -141,9 +145,17 @@ completed: 2026-02-22
 - **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
 - **Committed in:** `a4c9dc3`
 
+**6. [Rule 1 - Bug] Fixed cross-click dual-highlight by single-owner selection state**
+- **Found during:** Task 2 checkpoint feedback (blocking UAT)
+- **Issue:** After cross-clicking between lists, both selection models remained non-null and both lists could still render selected visuals.
+- **Fix:** Added remembered remote/mount selection storage and enforced single active selection model (`SelectedRemoteProfile` xor `SelectedMountProfile`) at runtime.
+- **Files modified:** `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `804da4b`
+
 ---
 
-**Total deviations:** 5 auto-fixed (3 bug, 2 missing critical)
+**Total deviations:** 6 auto-fixed (4 bug, 2 missing critical)
 **Impact on plan:** Deviations were required to satisfy checkpoint-defined acceptance semantics for sidebar entity separation.
 
 ## Issues Encountered
