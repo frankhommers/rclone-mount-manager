@@ -13,6 +13,7 @@ provides:
   - Mount-to-remote association gating before save and mount actions
   - Deterministic remote deletion blocking when mounts depend on remote alias
   - Remote name field synchronizes immediately with REMOTES sidebar labels
+  - Users can clear all remotes after removing dependent mounts (last-remote deletion unblocked)
 affects: [phase-4-acceptance, ui-ux, profile-persistence]
 tech-stack:
   added: []
@@ -59,6 +60,7 @@ completed: 2026-02-22
 - Reduced sidebar confusion by keeping remembered selections but showing only one active list highlight at a time.
 - Clarified persistence affordances with context-specific action labels (`Save remote`, `Save mount`).
 - Synced remote name input to sidebar label updates immediately.
+- Moved primary save actions to top of each editor and allowed deleting the final unreferenced remote.
 
 ## Task Commits
 
@@ -67,6 +69,7 @@ completed: 2026-02-22
 3. **Task 2 UX simplification + add-command coverage:** `4f2ccf4` (fix)
 4. **Task 2 active-highlight + remote delete guardrails:** `4df2508` (fix)
 5. **Task 2 save clarity + remote name sync + message clarity:** `90ae139` (fix)
+6. **Task 2 top-save placement + last-remote deletion unblock:** `a4c9dc3` (fix)
 
 ## Files Created/Modified
 
@@ -88,9 +91,11 @@ completed: 2026-02-22
 - Earlier wiring treated remotes and mounts as behavior modes over overlapping profile state, causing conceptual and selection coupling.
 - UI copy and control placement still implied mixed responsibilities (remote creation "and use in selected profile").
 - Sidebar bindings rendered both remembered selections as active at the same time, producing two blue highlights.
+- Avalonia theme `ListBoxItem:selected:pointerover/focus` styles still applied on inactive list, overriding previous neutral-selected override.
 - Deletion flow had no explicit dependency guardrails for mount->remote references, making failure mode unclear.
 - Deletion feedback omitted dependent mount names, so users could not immediately resolve blocked deletion.
 - Remote name input updated backend alias intent but not profile display name, causing sidebar label drift.
+- Remove command required `Profiles.Count > 1`, which unintentionally blocked deleting the final remote after mounts were removed.
 
 ## Deviations from Plan
 
@@ -128,9 +133,17 @@ completed: 2026-02-22
 - **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
 - **Committed in:** `90ae139`
 
+**5. [Rule 1 - Bug] Fixed inactive-list selected visual override and last-remote deletion flow**
+- **Found during:** Task 2 checkpoint feedback (blocking UAT)
+- **Issue:** Inactive list still rendered blue selected state from higher-specificity Avalonia selected pseudo-class variants; final remote removal blocked by global count guard.
+- **Fix:** Added inactive-list style overrides for `:selected`, `:selected:pointerover`, and `:selected:focus`; removed global count guard and allowed deleting final unreferenced remote with empty-state fallback mount.
+- **Files modified:** `RcloneMountManager.GUI/Views/MainWindow.axaml`, `RcloneMountManager.GUI/ViewModels/MainWindowViewModel.cs`, `RcloneMountManager.Tests/ViewModels/MainWindowViewModelSidebarSelectionTests.cs`
+- **Verification:** `dotnet test --filter MainWindowViewModelSidebarSelectionTests`, `dotnet build`
+- **Committed in:** `a4c9dc3`
+
 ---
 
-**Total deviations:** 4 auto-fixed (2 bug, 2 missing critical)
+**Total deviations:** 5 auto-fixed (3 bug, 2 missing critical)
 **Impact on plan:** Deviations were required to satisfy checkpoint-defined acceptance semantics for sidebar entity separation.
 
 ## Issues Encountered
