@@ -58,6 +58,9 @@ public partial class MountProfile : ObservableObject
     private bool _startAtLogin;
 
     [ObservableProperty]
+    private bool _isRemoteDefinition;
+
+    [ObservableProperty]
     private bool _isMounted;
 
     [ObservableProperty]

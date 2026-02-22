@@ -53,6 +53,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private Task? _runtimeMonitoringTask;
     private bool _runtimeMonitoringActive;
     private bool _syncingSidebarSelection;
+    private bool _syncingMountRemoteSelection;
 
     [ObservableProperty]
     private MountProfile _selectedProfile;
@@ -108,7 +109,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool _showRemoteEditor;
 
+    [ObservableProperty]
+    private MountProfile? _selectedMountRemoteProfile;
+
     public ObservableCollection<MountProfile> Profiles { get; } = new();
+    public ObservableCollection<MountProfile> MountProfiles { get; } = new();
     public ObservableCollection<MountType> MountTypes { get; } = new(Enum.GetValues<MountType>());
     public ObservableCollection<QuickConnectMode> QuickConnectModes { get; } = new(Enum.GetValues<QuickConnectMode>());
     public ObservableCollection<string> ThemeModes { get; } = new() { "Follow system", "Dark", "Light" };
@@ -181,13 +186,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             _profileScripts[defaultProfile.Id] = string.Empty;
         }
 
+        EnsureRemoteDefinitionsForMountSources();
+
         SelectedProfile = Profiles[0];
         RefreshRemoteProfiles();
+        RefreshMountProfiles();
         _syncingSidebarSelection = true;
-        SelectedMountProfile = SelectedProfile;
-        SelectedRemoteProfile = RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile));
+        SelectedMountProfile = MountProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? MountProfiles.FirstOrDefault();
+        SelectedRemoteProfile = RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? RemoteProfiles.FirstOrDefault();
         _syncingSidebarSelection = false;
         ShowRemoteEditor = false;
+        UpdateSelectedMountRemoteFromSource(SelectedProfile);
         SyncDiagnosticsFilters();
         HasPendingChanges = false;
         AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Profiles file: {_profilesFilePath}");
@@ -285,17 +294,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public string SelectedBackendDescription => SelectedBackend?.Details ?? string.Empty;
 
     [RelayCommand]
-    private void AddProfile()
+    private void AddMount()
     {
         var profile = new MountProfile
         {
-            Name = $"Profile {Profiles.Count + 1}",
+            Name = $"Mount {MountProfiles.Count + 1}",
             Type = MountType.RcloneAuto,
-            Source = "remote:bucket",
+            Source = string.Empty,
             MountPoint = DefaultMountPoint("new-mount"),
             ExtraOptions = "--vfs-cache-mode full",
             MountOptions = GetDefaultMountOptions(MountType.RcloneAuto),
             QuickConnectMode = QuickConnectMode.None,
+            IsRemoteDefinition = false,
         };
 
         Profiles.Add(profile);
@@ -303,7 +313,31 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _profileScripts[profile.Id] = string.Empty;
         ShowRemoteEditor = false;
         SelectedProfile = profile;
+        SelectedMountProfile = profile;
+        UpdateSelectedMountRemoteFromSource(profile);
         MarkDirty();
+    }
+
+    [RelayCommand]
+    private void AddRemote()
+    {
+        var remoteNumber = RemoteProfiles.Count + 1;
+        var remoteAlias = $"remote{remoteNumber}";
+        var profile = CreateRemoteDefinitionProfile(remoteAlias, $"Remote {remoteNumber}");
+
+        Profiles.Add(profile);
+        _profileLogs[profile.Id] = new List<ProfileLogEvent>();
+        _profileScripts[profile.Id] = string.Empty;
+        ShowRemoteEditor = true;
+        SelectedProfile = profile;
+        SelectedRemoteProfile = profile;
+        MarkDirty();
+    }
+
+    [RelayCommand]
+    private void AddProfile()
+    {
+        AddMount();
     }
 
     [RelayCommand(CanExecute = nameof(CanRefreshBackends))]
@@ -351,6 +385,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
             var binary = SelectedProfile?.RcloneBinaryPath ?? "rclone";
             var activeProfile = SelectedProfile ?? throw new InvalidOperationException("No profile selected.");
+            if (!activeProfile.IsRemoteDefinition)
+            {
+                throw new InvalidOperationException("Create remote is only available for REMOTES entries.");
+            }
+
             await _rcloneBackendService.CreateRemoteAsync(
                 binary,
                 NewRemoteName,
@@ -358,9 +397,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 BackendOptionInputs,
                 cancellationToken);
 
+            activeProfile.Source = $"{NewRemoteName.Trim()}:/";
             activeProfile.Type = MountType.RcloneAuto;
             activeProfile.QuickConnectMode = QuickConnectMode.None;
-            activeProfile.Source = $"{NewRemoteName.Trim()}:/";
 
             AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Created remote '{NewRemoteName}' ({SelectedBackend.Name}).");
             StatusText = $"Remote '{NewRemoteName}' created.";
@@ -565,7 +604,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void ApplyReliabilityPreset()
     {
         var profile = SelectedProfile;
-        if (profile.Type is not MountType.RcloneAuto)
+        if (profile.IsRemoteDefinition || profile.Type is not MountType.RcloneAuto)
         {
             StatusText = "Reliability presets apply to rclone profiles only.";
             return;
@@ -704,6 +743,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand(CanExecute = nameof(CanSaveChanges))]
     private void SaveChanges()
     {
+        if (HasAnyInvalidMountRemoteAssociations())
+        {
+            StatusText = "Assign a remote to each rclone mount before saving.";
+            AppendLog(ProfileLogCategory.General, ProfileLogStage.Verification, "Save blocked: one or more mounts have no associated remote.", ProfileLogSeverity.Warning);
+            return;
+        }
+
         SaveProfiles();
         HasPendingChanges = false;
         StatusText = "Profile changes saved.";
@@ -777,7 +823,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private async Task VerifyStartupProfilesAsync(CancellationToken cancellationToken)
     {
         var startupProfiles = Profiles
-            .Where(profile => profile.StartAtLogin)
+            .Where(profile => !profile.IsRemoteDefinition && profile.StartAtLogin)
             .ToList();
 
         if (startupProfiles.Count == 0)
@@ -807,7 +853,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private async Task RefreshAllRuntimeStatesAsync(CancellationToken cancellationToken)
     {
-        var profilesSnapshot = Profiles.ToList();
+        var profilesSnapshot = Profiles.Where(IsMountProfileCandidate).ToList();
         if (profilesSnapshot.Count == 0)
         {
             return;
@@ -1138,6 +1184,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         CreateRemoteCommand.NotifyCanExecuteChanged();
         SaveChangesCommand.NotifyCanExecuteChanged();
         RunStartupPreflightCommand.NotifyCanExecuteChanged();
+        AddMountCommand.NotifyCanExecuteChanged();
+        AddRemoteCommand.NotifyCanExecuteChanged();
+        AddProfileCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnSelectedThemeModeChanged(string value)
@@ -1160,26 +1209,35 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool CanRunActions() =>
         !IsBusy &&
         SelectedProfile is not null &&
+        !SelectedProfile.IsRemoteDefinition &&
+        HasValidRemoteAssociation(SelectedProfile) &&
         !string.IsNullOrWhiteSpace(SelectedProfile.Source) &&
         !string.IsNullOrWhiteSpace(SelectedProfile.MountPoint);
 
     private bool CanTestConnection() =>
         !IsBusy &&
         SelectedProfile is not null &&
+        !SelectedProfile.IsRemoteDefinition &&
         SelectedProfile.Type is MountType.RcloneAuto &&
+        HasValidRemoteAssociation(SelectedProfile) &&
         !string.IsNullOrWhiteSpace(SelectedProfile.Source);
 
     private bool CanSaveScript() => !IsBusy && !string.IsNullOrWhiteSpace(GeneratedScript);
 
-    private bool CanToggleStartup() => !IsBusy && SelectedProfile is not null && IsStartupSupported;
+    private bool CanToggleStartup() => !IsBusy && SelectedProfile is not null && !SelectedProfile.IsRemoteDefinition && IsStartupSupported;
 
-    private bool CanRunStartupPreflight() => !IsBusy && SelectedProfile is not null && IsStartupSupported;
+    private bool CanRunStartupPreflight() => !IsBusy && SelectedProfile is not null && !SelectedProfile.IsRemoteDefinition && IsStartupSupported;
 
-    private bool CanSaveChanges() => !IsBusy && HasPendingChanges;
+    private bool CanSaveChanges() => !IsBusy && HasPendingChanges && !HasAnyInvalidMountRemoteAssociations();
 
     private bool CanRefreshBackends() => !IsBusy;
 
-    private bool CanCreateRemote() => !IsBusy && SelectedBackend is not null && !string.IsNullOrWhiteSpace(NewRemoteName);
+    private bool CanCreateRemote() =>
+        !IsBusy &&
+        SelectedBackend is not null &&
+        !string.IsNullOrWhiteSpace(NewRemoteName) &&
+        SelectedProfile is not null &&
+        SelectedProfile.IsRemoteDefinition;
 
     partial void OnSelectedBackendChanged(RcloneBackendInfo? value)
     {
@@ -1305,17 +1363,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedReliabilityPresetId = ReliabilityPolicyPreset.GetByIdOrDefault(value.SelectedReliabilityPresetId).Id;
 
         _syncingSidebarSelection = true;
-        if (ShowRemoteEditor && IsRemoteProfileCandidate(value))
+        if (value.IsRemoteDefinition)
         {
             SelectedRemoteProfile = value;
+            if (!ShowRemoteEditor)
+            {
+                ShowRemoteEditor = true;
+            }
         }
         else
         {
             SelectedMountProfile = value;
-            if (ShowRemoteEditor && !IsRemoteProfileCandidate(value))
+            if (ShowRemoteEditor)
             {
                 ShowRemoteEditor = false;
             }
+
+            UpdateSelectedMountRemoteFromSource(value);
         }
         _syncingSidebarSelection = false;
 
@@ -1348,6 +1412,37 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             SelectedProfile = value;
         }
+
+        UpdateSelectedMountRemoteFromSource(value);
+    }
+
+    partial void OnSelectedMountRemoteProfileChanged(MountProfile? value)
+    {
+        if (_syncingMountRemoteSelection || value is null)
+        {
+            return;
+        }
+
+        var mountProfile = SelectedMountProfile;
+        if (mountProfile is null || mountProfile.IsRemoteDefinition)
+        {
+            return;
+        }
+
+        var remoteAlias = GetRemoteAlias(value);
+        if (string.IsNullOrWhiteSpace(remoteAlias))
+        {
+            return;
+        }
+
+        var suffix = "/";
+        if (TryGetRemoteAliasFromSource(mountProfile.Source, out _, out var existingSuffix) && !string.IsNullOrWhiteSpace(existingSuffix))
+        {
+            suffix = existingSuffix;
+        }
+
+        mountProfile.Source = $"{remoteAlias}:{suffix}";
+        NotifyCommandStateChanged();
     }
 
     partial void OnShowRemoteEditorChanged(bool value)
@@ -1440,7 +1535,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         RefreshRemoteProfiles();
+        RefreshMountProfiles();
         SyncDiagnosticsFilters();
+        NotifyCommandStateChanged();
     }
 
     private void OnAnyProfileChanged(object? sender, PropertyChangedEventArgs e)
@@ -1463,7 +1560,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             or nameof(MountProfile.QuickConnectPassword)
             or nameof(MountProfile.AllowInsecurePasswordsInScript)
             or nameof(MountProfile.SelectedReliabilityPresetId)
-            or nameof(MountProfile.StartAtLogin))
+            or nameof(MountProfile.StartAtLogin)
+            or nameof(MountProfile.IsRemoteDefinition))
         {
             MarkDirty();
 
@@ -1473,9 +1571,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
         }
 
-        if (e.PropertyName is nameof(MountProfile.Type))
+        if (e.PropertyName is nameof(MountProfile.Type)
+            or nameof(MountProfile.IsRemoteDefinition)
+            or nameof(MountProfile.Source)
+            or nameof(MountProfile.Name))
         {
             RefreshRemoteProfiles();
+            RefreshMountProfiles();
+            if (SelectedMountProfile is not null)
+            {
+                UpdateSelectedMountRemoteFromSource(SelectedMountProfile);
+            }
+            NotifyCommandStateChanged();
         }
     }
 
@@ -1521,6 +1628,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     QuickConnectPassword = string.Empty,
                     AllowInsecurePasswordsInScript = saved.AllowInsecurePasswordsInScript,
                     StartAtLogin = saved.StartAtLogin,
+                    IsRemoteDefinition = saved.IsRemoteDefinition,
                 };
 
                 Profiles.Add(profile);
@@ -1570,6 +1678,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     QuickConnectPassword = profile.QuickConnectPassword,
                     AllowInsecurePasswordsInScript = profile.AllowInsecurePasswordsInScript,
                     StartAtLogin = profile.StartAtLogin,
+                    IsRemoteDefinition = profile.IsRemoteDefinition,
                 })
                 .ToList();
 
@@ -1676,7 +1785,73 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedProfile.QuickConnectPassword = string.Empty;
     }
 
-    private bool IsRemoteProfileCandidate(MountProfile profile) => profile.Type is not MountType.MacOsNfs;
+    private static bool IsRemoteProfileCandidate(MountProfile profile) => profile.IsRemoteDefinition;
+
+    private static bool IsMountProfileCandidate(MountProfile profile) => !profile.IsRemoteDefinition;
+
+    private static bool TryGetRemoteAliasFromSource(string source, out string remoteAlias, out string suffix)
+    {
+        remoteAlias = string.Empty;
+        suffix = string.Empty;
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return false;
+        }
+
+        var separator = source.IndexOf(':');
+        if (separator <= 0)
+        {
+            return false;
+        }
+
+        remoteAlias = source[..separator].Trim();
+        suffix = source[(separator + 1)..];
+        return !string.IsNullOrWhiteSpace(remoteAlias);
+    }
+
+    private static string? GetRemoteAlias(MountProfile profile)
+    {
+        if (!TryGetRemoteAliasFromSource(profile.Source, out var remoteAlias, out _))
+        {
+            return null;
+        }
+
+        return remoteAlias;
+    }
+
+    private MountProfile? ResolveAssociatedRemote(MountProfile profile)
+    {
+        if (!TryGetRemoteAliasFromSource(profile.Source, out var remoteAlias, out _))
+        {
+            return null;
+        }
+
+        return RemoteProfiles.FirstOrDefault(remote =>
+            string.Equals(GetRemoteAlias(remote), remoteAlias, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool RequiresRemoteAssociation(MountProfile profile)
+        => !profile.IsRemoteDefinition &&
+           profile.Type is MountType.RcloneAuto &&
+           profile.QuickConnectMode is QuickConnectMode.None;
+
+    private bool HasValidRemoteAssociation(MountProfile profile)
+        => !RequiresRemoteAssociation(profile) || ResolveAssociatedRemote(profile) is not null;
+
+    private bool HasAnyInvalidMountRemoteAssociations()
+        => Profiles.Where(IsMountProfileCandidate).Any(profile => !HasValidRemoteAssociation(profile));
+
+    private void UpdateSelectedMountRemoteFromSource(MountProfile profile)
+    {
+        if (profile.IsRemoteDefinition)
+        {
+            return;
+        }
+
+        _syncingMountRemoteSelection = true;
+        SelectedMountRemoteProfile = ResolveAssociatedRemote(profile);
+        _syncingMountRemoteSelection = false;
+    }
 
     private void RefreshRemoteProfiles()
     {
@@ -1696,6 +1871,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             SelectedRemoteProfile = null;
             _syncingSidebarSelection = false;
             ShowRemoteEditor = false;
+            if (SelectedMountProfile is not null)
+            {
+                UpdateSelectedMountRemoteFromSource(SelectedMountProfile);
+            }
             return;
         }
 
@@ -1708,6 +1887,86 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _syncingSidebarSelection = true;
         SelectedRemoteProfile = replacement;
         _syncingSidebarSelection = false;
+
+        if (SelectedMountProfile is not null)
+        {
+            UpdateSelectedMountRemoteFromSource(SelectedMountProfile);
+        }
+    }
+
+    private void RefreshMountProfiles()
+    {
+        var previousMount = SelectedMountProfile;
+
+        MountProfiles.Clear();
+        foreach (var profile in Profiles.Where(IsMountProfileCandidate))
+        {
+            MountProfiles.Add(profile);
+        }
+
+        if (MountProfiles.Count == 0)
+        {
+            _syncingSidebarSelection = true;
+            SelectedMountProfile = null;
+            _syncingSidebarSelection = false;
+            return;
+        }
+
+        if (previousMount is not null && MountProfiles.Contains(previousMount))
+        {
+            return;
+        }
+
+        var replacement = MountProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? MountProfiles[0];
+        _syncingSidebarSelection = true;
+        SelectedMountProfile = replacement;
+        _syncingSidebarSelection = false;
+    }
+
+    private MountProfile CreateRemoteDefinitionProfile(string remoteAlias, string? name = null)
+    {
+        return new MountProfile
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? $"{remoteAlias} remote" : name,
+            Type = MountType.RcloneAuto,
+            Source = $"{remoteAlias}:/",
+            MountPoint = DefaultMountPoint($"remote-{remoteAlias}"),
+            ExtraOptions = string.Empty,
+            MountOptions = GetDefaultMountOptions(MountType.RcloneAuto),
+            QuickConnectMode = QuickConnectMode.None,
+            IsRemoteDefinition = true,
+        };
+    }
+
+    private void EnsureRemoteDefinitionsForMountSources()
+    {
+        var knownAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var remote in Profiles.Where(IsRemoteProfileCandidate))
+        {
+            var alias = GetRemoteAlias(remote);
+            if (!string.IsNullOrWhiteSpace(alias))
+            {
+                knownAliases.Add(alias);
+            }
+        }
+
+        var missingAliases = Profiles
+            .Where(IsMountProfileCandidate)
+            .Select(GetRemoteAlias)
+            .Where(alias => !string.IsNullOrWhiteSpace(alias))
+            .Cast<string>()
+            .Where(alias => !knownAliases.Contains(alias))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var alias in missingAliases)
+        {
+            var remoteProfile = CreateRemoteDefinitionProfile(alias);
+            Profiles.Add(remoteProfile);
+            _profileLogs[remoteProfile.Id] = new List<ProfileLogEvent>();
+            _profileScripts[remoteProfile.Id] = string.Empty;
+            knownAliases.Add(alias);
+        }
     }
 
     private static string DefaultMountPoint(string name)
@@ -1747,5 +2006,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         public string QuickConnectPassword { get; set; } = string.Empty;
         public bool AllowInsecurePasswordsInScript { get; set; }
         public bool StartAtLogin { get; set; }
+        public bool IsRemoteDefinition { get; set; }
     }
 }
