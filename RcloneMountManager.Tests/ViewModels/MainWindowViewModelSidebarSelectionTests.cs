@@ -278,14 +278,62 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
     {
         var filePath = Path.Combine(_tempRoot, $"profiles-{Guid.NewGuid():N}.json");
         var viewModel = CreateViewModel(filePath);
+        viewModel.SelectedProfile = viewModel.MountProfiles.First();
+        viewModel.RemoveProfileCommand.Execute(null);
         var remote = viewModel.RemoteProfiles.First();
 
         viewModel.SelectedProfile = remote;
         viewModel.NewRemoteName = "archive-remote";
+        Assert.True(viewModel.SaveChangesCommand.CanExecute(null));
         viewModel.SaveChangesCommand.Execute(null);
 
         var reloaded = CreateViewModel(filePath);
         Assert.Contains(reloaded.RemoteProfiles, p => p.Name == "archive-remote");
+    }
+
+    [Fact]
+    public void ClearAll_SaveAndReload_RemainsEmpty()
+    {
+        var filePath = Path.Combine(_tempRoot, $"profiles-{Guid.NewGuid():N}.json");
+        var viewModel = CreateViewModel(filePath);
+
+        viewModel.SelectedProfile = viewModel.MountProfiles.First();
+        viewModel.RemoveProfileCommand.Execute(null);
+        viewModel.SelectedProfile = viewModel.RemoteProfiles.First();
+        viewModel.RemoveProfileCommand.Execute(null);
+
+        var reloaded = CreateViewModel(filePath);
+        Assert.Empty(reloaded.Profiles);
+        Assert.Empty(reloaded.RemoteProfiles);
+        Assert.Empty(reloaded.MountProfiles);
+    }
+
+    [Fact]
+    public void RenameRemote_UpdatesDefaultGeneratedMountSourceAlias()
+    {
+        var viewModel = CreateViewModel();
+        var remote = viewModel.RemoteProfiles.First();
+        var mount = viewModel.MountProfiles.First();
+        mount.Source = "remote:/";
+
+        viewModel.SelectedProfile = remote;
+        viewModel.NewRemoteName = "renamed-remote";
+
+        Assert.Equal("renamed-remote:/", mount.Source);
+    }
+
+    [Fact]
+    public void RenameRemote_DoesNotOverwriteCustomMountSourcePath()
+    {
+        var viewModel = CreateViewModel();
+        var remote = viewModel.RemoteProfiles.First();
+        var mount = viewModel.MountProfiles.First();
+        mount.Source = "remote:media/photos";
+
+        viewModel.SelectedProfile = remote;
+        viewModel.NewRemoteName = "renamed-remote";
+
+        Assert.Equal("remote:media/photos", mount.Source);
     }
 
     private MainWindowViewModel CreateViewModel(string? filePath = null)

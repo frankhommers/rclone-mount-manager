@@ -54,11 +54,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _runtimeMonitoringActive;
     private bool _syncingSidebarSelection;
     private bool _syncingMountRemoteSelection;
+    private bool _syncingRemoteNameInput;
     private MountProfile? _rememberedRemoteProfile;
     private MountProfile? _rememberedMountProfile;
 
     [ObservableProperty]
-    private MountProfile _selectedProfile;
+    private MountProfile _selectedProfile = new();
 
     [ObservableProperty]
     private bool _isBusy;
@@ -216,7 +217,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         DiagnosticsRows.CollectionChanged += OnDiagnosticsRowsCollectionChanged;
         LoadProfiles();
 
-        if (Profiles.Count == 0)
+        if (Profiles.Count == 0 && !File.Exists(_profilesFilePath))
         {
             var defaultProfile = CreateDefaultProfile();
             Profiles.Add(defaultProfile);
@@ -225,19 +226,34 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         EnsureRemoteDefinitionsForMountSources();
-
-        SelectedProfile = Profiles[0];
         RefreshRemoteProfiles();
         RefreshMountProfiles();
-        _syncingSidebarSelection = true;
-        SelectedMountProfile = MountProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? MountProfiles.FirstOrDefault();
-        SelectedRemoteProfile = RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? RemoteProfiles.FirstOrDefault();
-        _syncingSidebarSelection = false;
-        _rememberedMountProfile = SelectedMountProfile;
-        _rememberedRemoteProfile = SelectedRemoteProfile;
-        ShowRemoteEditor = false;
-        EnsureSingleActiveSidebarSelection();
-        UpdateSelectedMountRemoteFromSource(SelectedProfile);
+
+        if (Profiles.Count > 0)
+        {
+            SelectedProfile = Profiles[0];
+            _syncingSidebarSelection = true;
+            SelectedMountProfile = MountProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? MountProfiles.FirstOrDefault();
+            SelectedRemoteProfile = RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? RemoteProfiles.FirstOrDefault();
+            _syncingSidebarSelection = false;
+            _rememberedMountProfile = SelectedMountProfile;
+            _rememberedRemoteProfile = SelectedRemoteProfile;
+            ShowRemoteEditor = false;
+            EnsureSingleActiveSidebarSelection();
+            UpdateSelectedMountRemoteFromSource(SelectedProfile);
+        }
+        else
+        {
+            _syncingSidebarSelection = true;
+            SelectedMountProfile = null;
+            SelectedRemoteProfile = null;
+            _syncingSidebarSelection = false;
+            _rememberedMountProfile = null;
+            _rememberedRemoteProfile = null;
+            ShowRemoteEditor = false;
+            StatusText = "Library is empty.";
+        }
+
         SyncDiagnosticsFilters();
         HasPendingChanges = false;
         AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Profiles file: {_profilesFilePath}");
@@ -1359,7 +1375,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         if (!ShowRemoteEditor && string.IsNullOrWhiteSpace(NewRemoteName))
         {
-            NewRemoteName = $"{value.Name}-remote";
+            SetRemoteNameInput($"{value.Name}-remote");
         }
         HasAdvancedBackendOptions = value.Options.Any(o => o.Advanced && !o.Required);
 
@@ -1410,12 +1426,48 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnNewRemoteNameChanged(string value)
     {
+        if (_syncingRemoteNameInput)
+        {
+            NotifyCommandStateChanged();
+            return;
+        }
+
         if (SelectedProfile is { IsRemoteDefinition: true } && !string.IsNullOrWhiteSpace(value))
         {
-            SelectedProfile.Name = value.Trim();
+            var remote = SelectedProfile;
+            var newAlias = value.Trim();
+            var previousAlias = GetRemoteAlias(remote);
+
+            remote.Name = newAlias;
+            remote.Source = $"{newAlias}:/";
+
+            if (!string.IsNullOrWhiteSpace(previousAlias) &&
+                !string.Equals(previousAlias, newAlias, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var mount in Profiles.Where(IsMountProfileCandidate))
+                {
+                    if (!TryGetRemoteAliasFromSource(mount.Source, out var mountAlias, out var suffix) ||
+                        !string.Equals(mountAlias, previousAlias, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (string.IsNullOrEmpty(suffix) || string.Equals(suffix, "/", StringComparison.Ordinal))
+                    {
+                        mount.Source = $"{newAlias}:/";
+                    }
+                }
+            }
         }
 
         NotifyCommandStateChanged();
+    }
+
+    private void SetRemoteNameInput(string value)
+    {
+        _syncingRemoteNameInput = true;
+        NewRemoteName = value;
+        _syncingRemoteNameInput = false;
     }
 
     partial void OnSelectedProfileChanged(MountProfile value)
@@ -1477,7 +1529,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _syncingSidebarSelection = true;
         if (value.IsRemoteDefinition)
         {
-            NewRemoteName = value.Name;
+            SetRemoteNameInput(value.Name);
             SelectedRemoteProfile = value;
             if (!ShowRemoteEditor)
             {
