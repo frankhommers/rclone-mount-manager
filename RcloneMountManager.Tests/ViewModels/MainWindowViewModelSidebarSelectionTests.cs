@@ -135,6 +135,24 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
     }
 
     [Fact]
+    public void RemoveLastRemote_AfterRemovingMounts_ClearsAllRemotes()
+    {
+        var viewModel = CreateViewModel();
+        var existingMount = viewModel.MountProfiles.First();
+        var existingRemote = viewModel.RemoteProfiles.First();
+
+        viewModel.SelectedProfile = existingMount;
+        viewModel.RemoveProfileCommand.Execute(null);
+
+        viewModel.SelectedProfile = existingRemote;
+        viewModel.RemoveProfileCommand.Execute(null);
+
+        Assert.Empty(viewModel.RemoteProfiles);
+        Assert.Single(viewModel.MountProfiles);
+        Assert.Contains("All remotes are now cleared", viewModel.StatusText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void EditingRemoteNameField_UpdatesSidebarRemoteLabelImmediately()
     {
         var viewModel = CreateViewModel();

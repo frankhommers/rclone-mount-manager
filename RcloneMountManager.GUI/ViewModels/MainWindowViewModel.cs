@@ -534,12 +534,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand(CanExecute = nameof(CanRemoveProfile))]
     private void RemoveProfile()
     {
-        if (Profiles.Count <= 1)
-        {
-            StatusText = "At least one mount profile must remain.";
-            return;
-        }
-
         var profileToRemove = SelectedProfile;
         if (profileToRemove.IsRemoteDefinition)
         {
@@ -568,11 +562,34 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _profileLogs.Remove(removedId);
         _profileScripts.Remove(removedId);
 
+        if (Profiles.Count == 0)
+        {
+            var fallbackMount = new MountProfile
+            {
+                Name = "Mount 1",
+                Type = MountType.RcloneAuto,
+                Source = string.Empty,
+                MountPoint = DefaultMountPoint("new-mount"),
+                ExtraOptions = "--vfs-cache-mode full",
+                MountOptions = GetDefaultMountOptions(MountType.RcloneAuto),
+                QuickConnectMode = QuickConnectMode.None,
+                IsRemoteDefinition = false,
+            };
+
+            Profiles.Add(fallbackMount);
+            _profileLogs[fallbackMount.Id] = new List<ProfileLogEvent>();
+            _profileScripts[fallbackMount.Id] = string.Empty;
+            ShowRemoteEditor = false;
+            SelectedProfile = fallbackMount;
+            SelectedMountProfile = fallbackMount;
+            StatusText = $"Removed {GetProfileTypeLabel(profileToRemove)} '{profileToRemove.Name}'. All remotes are now cleared.";
+            MarkDirty();
+            return;
+        }
+
         var fallback = Profiles[Math.Max(0, index - 1)];
         SelectedProfile = fallback;
-        StatusText = profileToRemove.IsRemoteDefinition
-            ? $"Removed remote '{profileToRemove.Name}'."
-            : $"Removed mount '{profileToRemove.Name}'.";
+        StatusText = $"Removed {GetProfileTypeLabel(profileToRemove)} '{profileToRemove.Name}'.";
         MarkDirty();
     }
 
@@ -1261,7 +1278,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         };
     }
 
-    private bool CanRemoveProfile() => Profiles.Count > 1 && !IsBusy;
+    private bool CanRemoveProfile() => SelectedProfile is not null && !IsBusy;
+
+    private static string GetProfileTypeLabel(MountProfile profile) => profile.IsRemoteDefinition ? "remote" : "mount";
 
     private bool CanRunActions() =>
         !IsBusy &&

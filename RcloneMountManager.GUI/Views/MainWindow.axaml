@@ -32,6 +32,14 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
         </Style>
+        <Style Selector="ListBox.sidebar-inactive ListBoxItem:selected:pointerover">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
+        </Style>
+        <Style Selector="ListBox.sidebar-inactive ListBoxItem:selected:focus">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
+        </Style>
     </Window.Styles>
 
     <Border Margin="14"
@@ -180,9 +188,14 @@
                             <!-- Backend Configuration -->
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Text="Backend Configuration" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Content="Reload types"
-                                        Command="{Binding RefreshBackendsCommand}"
-                                        Padding="8,2" FontSize="11"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button Content="Save remote"
+                                            Command="{Binding CreateRemoteCommand}"
+                                            HorizontalAlignment="Left"/>
+                                    <Button Content="Reload types"
+                                            Command="{Binding RefreshBackendsCommand}"
+                                            Padding="8,2" FontSize="11"/>
+                                </StackPanel>
                             </Grid>
                             <TextBlock Text="Build any rclone remote type directly from this app." FontSize="11" Opacity="0.6" Margin="0,-6,0,0"/>
 
@@ -224,17 +237,16 @@
                                               ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
                             </Expander>
 
-                            <Button Content="Save remote"
-                                    Command="{Binding CreateRemoteCommand}"
-                                    HorizontalAlignment="Left"/>
-
                             </StackPanel>
 
                             <StackPanel IsVisible="{Binding !ShowRemoteEditor}" Spacing="10">
 
                             <Separator Margin="0,4"/>
 
-                            <TextBlock Text="Mount Settings" FontWeight="SemiBold" FontSize="14"/>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="Mount Settings" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="{Binding SaveChangesButtonText}" Command="{Binding SaveChangesCommand}"/>
+                            </Grid>
 
                             <Grid ColumnDefinitions="200,*">
                                 <TextBlock Text="Profile name" VerticalAlignment="Center"/>
@@ -344,7 +356,6 @@
 
                             <!-- Actions -->
                             <WrapPanel>
-                                <Button Content="{Binding SaveChangesButtonText}" Command="{Binding SaveChangesCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Test connection" Command="{Binding TestConnectionCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Start mount" Command="{Binding StartMountCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Stop mount" Command="{Binding StopMountCommand}" Margin="0,0,8,8"/>
