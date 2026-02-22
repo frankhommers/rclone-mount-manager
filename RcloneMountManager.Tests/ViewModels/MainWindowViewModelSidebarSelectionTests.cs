@@ -1,4 +1,5 @@
 using RcloneMountManager.ViewModels;
+using RcloneMountManager.Core.Models;
 
 namespace RcloneMountManager.Tests.ViewModels;
 
@@ -144,7 +145,8 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         viewModel.RemoveProfileCommand.Execute(null);
 
         Assert.Contains(referencedRemote, viewModel.RemoteProfiles);
-        Assert.Contains("Cannot delete remote", viewModel.StatusText, StringComparison.Ordinal);
+        Assert.True(viewModel.IsDeleteBlockedDialogVisible);
+        Assert.Contains("Cannot delete remote", viewModel.DeleteBlockedDialogMessage, StringComparison.Ordinal);
         Assert.Contains(dependentMountName, viewModel.StatusText, StringComparison.Ordinal);
     }
 
@@ -177,10 +179,10 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         viewModel.RemoveProfileCommand.Execute(null);
 
         Assert.Empty(viewModel.RemoteProfiles);
-        Assert.Single(viewModel.MountProfiles);
-        Assert.Contains("All remotes are now cleared", viewModel.StatusText, StringComparison.Ordinal);
-        Assert.NotNull(viewModel.SelectedProfile);
-        Assert.False(viewModel.SelectedProfile.IsRemoteDefinition);
+        Assert.Empty(viewModel.MountProfiles);
+        Assert.Empty(viewModel.Profiles);
+        Assert.False(viewModel.HasProfiles);
+        Assert.Contains("Library is now empty", viewModel.StatusText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -194,6 +196,43 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
 
         Assert.Equal("archive-remote", remote.Name);
         Assert.Contains(viewModel.RemoteProfiles, p => p.Name == "archive-remote");
+
+        viewModel.ShowRemoteEditor = false;
+        viewModel.ShowRemoteEditor = true;
+
+        Assert.Equal("archive-remote", viewModel.NewRemoteName);
+        Assert.Equal("archive-remote", remote.Name);
+    }
+
+    [Fact]
+    public void SelectingBackend_DoesNotOverrideEditedRemoteName()
+    {
+        var viewModel = CreateViewModel();
+        var remote = viewModel.RemoteProfiles.First();
+        viewModel.SelectedProfile = remote;
+        viewModel.NewRemoteName = "stable-remote";
+
+        viewModel.SelectedBackend = new RcloneBackendInfo { Name = "s3", Description = "Amazon S3" };
+
+        Assert.Equal("stable-remote", viewModel.NewRemoteName);
+        Assert.Equal("stable-remote", remote.Name);
+    }
+
+    [Fact]
+    public void EmptyState_AfterClearingAllProfiles_RemainsStable()
+    {
+        var viewModel = CreateViewModel();
+        var mount = viewModel.MountProfiles.First();
+        var remote = viewModel.RemoteProfiles.First();
+
+        viewModel.SelectedProfile = mount;
+        viewModel.RemoveProfileCommand.Execute(null);
+        viewModel.SelectedProfile = remote;
+        viewModel.RemoveProfileCommand.Execute(null);
+
+        Assert.False(viewModel.HasProfiles);
+        Assert.False(viewModel.RemoveProfileCommand.CanExecute(null));
+        Assert.False(viewModel.StartMountCommand.CanExecute(null));
     }
 
     private MainWindowViewModel CreateViewModel()

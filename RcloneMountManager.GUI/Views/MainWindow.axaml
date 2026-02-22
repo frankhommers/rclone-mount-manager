@@ -180,7 +180,7 @@
                         </Grid>
                     </Border>
 
-                    <ScrollViewer Grid.Row="1">
+                    <ScrollViewer Grid.Row="1" IsVisible="{Binding HasProfiles}">
                         <StackPanel Margin="20,14" Spacing="10">
 
                             <StackPanel IsVisible="{Binding ShowRemoteEditor}" Spacing="10">
@@ -475,6 +475,21 @@
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
+
+                    <Border Grid.Row="1"
+                            IsVisible="{Binding !HasProfiles}"
+                            Margin="20,14"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            CornerRadius="10"
+                            Padding="16">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Library is empty" FontWeight="SemiBold" FontSize="16"/>
+                            <TextBlock Text="Use + in REMOTES or MOUNTS to create a new entry."
+                                       Opacity="0.75"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Grid>
 
@@ -485,6 +500,27 @@
                     BorderThickness="0,1,0,0"
                     Padding="16,8">
                 <TextBlock Text="{Binding StatusText}" FontSize="12" VerticalAlignment="Center"/>
+            </Border>
+
+            <Border Grid.RowSpan="2"
+                    IsVisible="{Binding IsDeleteBlockedDialogVisible}"
+                    Background="#66000000"
+                    ZIndex="100">
+                <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="560" MaxWidth="760" Margin="20">
+                    <Border Background="{DynamicResource SystemControlPageBackgroundChromeLowBrush}"
+                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="16">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Cannot delete remote" FontSize="18" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding DeleteBlockedDialogMessage}" TextWrapping="Wrap"/>
+                            <Button Content="OK"
+                                    Command="{Binding DismissDeleteBlockedDialogCommand}"
+                                    HorizontalAlignment="Right"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </Border>
         </Grid>
     </Border>

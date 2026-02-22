@@ -112,6 +112,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _showRemoteEditor;
 
     [ObservableProperty]
+    private bool _isDeleteBlockedDialogVisible;
+
+    [ObservableProperty]
+    private string _deleteBlockedDialogMessage = string.Empty;
+
+    [ObservableProperty]
     private MountProfile? _selectedMountRemoteProfile;
 
     public ObservableCollection<MountProfile> Profiles { get; } = new();
@@ -127,6 +133,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<RcloneBackendOptionInput> AdvancedBackendOptionInputs { get; } = new();
     public ObservableCollection<ReliabilityPolicyPreset> ReliabilityPresets { get; } = new(ReliabilityPolicyPreset.Catalog);
     public ObservableCollection<MountProfile> RemoteProfiles { get; } = new();
+    public bool HasProfiles => Profiles.Count > 0;
     public MountProfile? SidebarSelectedRemoteProfile
     {
         get => ShowRemoteEditor ? SelectedRemoteProfile : null;
@@ -539,6 +546,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand(CanExecute = nameof(CanRemoveProfile))]
     private void RemoveProfile()
     {
+        if (!HasProfiles)
+        {
+            return;
+        }
+
         var profileToRemove = SelectedProfile;
         if (profileToRemove.IsRemoteDefinition)
         {
@@ -555,7 +567,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if (dependentMounts.Count > 0)
                 {
                     var mountNames = string.Join(", ", dependentMounts.Select(m => m.Name));
-                    StatusText = $"Cannot delete remote '{profileToRemove.Name}' because {dependentMounts.Count} mount(s) still use it: {mountNames}.";
+                    var message = $"Cannot delete remote '{profileToRemove.Name}'. It is still used by {dependentMounts.Count} mount(s): {mountNames}. Remove or reassign those mounts first.";
+                    DeleteBlockedDialogMessage = message;
+                    IsDeleteBlockedDialogVisible = true;
+                    StatusText = message;
                     return;
                 }
             }
@@ -569,25 +584,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         if (Profiles.Count == 0)
         {
-            var fallbackMount = new MountProfile
-            {
-                Name = "Mount 1",
-                Type = MountType.RcloneAuto,
-                Source = string.Empty,
-                MountPoint = DefaultMountPoint("new-mount"),
-                ExtraOptions = "--vfs-cache-mode full",
-                MountOptions = GetDefaultMountOptions(MountType.RcloneAuto),
-                QuickConnectMode = QuickConnectMode.None,
-                IsRemoteDefinition = false,
-            };
-
-            Profiles.Add(fallbackMount);
-            _profileLogs[fallbackMount.Id] = new List<ProfileLogEvent>();
-            _profileScripts[fallbackMount.Id] = string.Empty;
+            _syncingSidebarSelection = true;
+            SelectedRemoteProfile = null;
+            SelectedMountProfile = null;
+            _syncingSidebarSelection = false;
+            _rememberedRemoteProfile = null;
+            _rememberedMountProfile = null;
             ShowRemoteEditor = false;
-            SelectedProfile = fallbackMount;
-            SelectedMountProfile = fallbackMount;
-            StatusText = $"Removed {GetProfileTypeLabel(profileToRemove)} '{profileToRemove.Name}'. All remotes are now cleared.";
+            StatusText = $"Removed {GetProfileTypeLabel(profileToRemove)} '{profileToRemove.Name}'. Library is now empty.";
+            OnPropertyChanged(nameof(HasProfiles));
+            NotifyCommandStateChanged();
             MarkDirty();
             return;
         }
@@ -735,6 +741,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Script saved to: {scriptPath}");
+    }
+
+    [RelayCommand]
+    private void DismissDeleteBlockedDialog()
+    {
+        IsDeleteBlockedDialogVisible = false;
+        DeleteBlockedDialogMessage = string.Empty;
     }
 
     [RelayCommand(CanExecute = nameof(CanToggleStartup))]
@@ -1283,11 +1296,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         };
     }
 
-    private bool CanRemoveProfile() => SelectedProfile is not null && !IsBusy;
+    private bool CanRemoveProfile() => HasProfiles && !IsBusy;
 
     private static string GetProfileTypeLabel(MountProfile profile) => profile.IsRemoteDefinition ? "remote" : "mount";
 
     private bool CanRunActions() =>
+        HasProfiles &&
         !IsBusy &&
         SelectedProfile is not null &&
         !SelectedProfile.IsRemoteDefinition &&
@@ -1296,6 +1310,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         !string.IsNullOrWhiteSpace(SelectedProfile.MountPoint);
 
     private bool CanTestConnection() =>
+        HasProfiles &&
         !IsBusy &&
         SelectedProfile is not null &&
         !SelectedProfile.IsRemoteDefinition &&
@@ -1303,18 +1318,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         HasValidRemoteAssociation(SelectedProfile) &&
         !string.IsNullOrWhiteSpace(SelectedProfile.Source);
 
-    private bool CanSaveScript() => !IsBusy && !string.IsNullOrWhiteSpace(GeneratedScript);
+    private bool CanSaveScript() => HasProfiles && !IsBusy && !string.IsNullOrWhiteSpace(GeneratedScript);
 
-    private bool CanToggleStartup() => !IsBusy && SelectedProfile is not null && !SelectedProfile.IsRemoteDefinition && IsStartupSupported;
+    private bool CanToggleStartup() => HasProfiles && !IsBusy && SelectedProfile is not null && !SelectedProfile.IsRemoteDefinition && IsStartupSupported;
 
-    private bool CanRunStartupPreflight() => !IsBusy && SelectedProfile is not null && !SelectedProfile.IsRemoteDefinition && IsStartupSupported;
+    private bool CanRunStartupPreflight() => HasProfiles && !IsBusy && SelectedProfile is not null && !SelectedProfile.IsRemoteDefinition && IsStartupSupported;
 
-    private bool CanSaveChanges() => !IsBusy && HasPendingChanges && !HasAnyInvalidMountRemoteAssociations();
+    private bool CanSaveChanges() => HasProfiles && !IsBusy && HasPendingChanges && !HasAnyInvalidMountRemoteAssociations();
 
     private bool CanRefreshBackends() => !IsBusy;
 
     private bool CanCreateRemote() =>
         !IsBusy &&
+        HasProfiles &&
         SelectedBackend is not null &&
         !string.IsNullOrWhiteSpace(NewRemoteName) &&
         SelectedProfile is not null &&
@@ -1334,7 +1350,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        NewRemoteName = $"{value.Name}-remote";
+        if (!ShowRemoteEditor && string.IsNullOrWhiteSpace(NewRemoteName))
+        {
+            NewRemoteName = $"{value.Name}-remote";
+        }
         HasAdvancedBackendOptions = value.Options.Any(o => o.Advanced && !o.Required);
 
         PopulateBackendOptionInputs(value);
@@ -1451,7 +1470,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _syncingSidebarSelection = true;
         if (value.IsRemoteDefinition)
         {
-            NewRemoteName = GetRemoteAlias(value) ?? value.Name;
+            NewRemoteName = value.Name;
             SelectedRemoteProfile = value;
             if (!ShowRemoteEditor)
             {
@@ -1623,6 +1642,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         RefreshRemoteProfiles();
         RefreshMountProfiles();
         SyncDiagnosticsFilters();
+        OnPropertyChanged(nameof(HasProfiles));
         NotifyCommandStateChanged();
     }
 
