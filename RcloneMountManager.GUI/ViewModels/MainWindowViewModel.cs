@@ -52,6 +52,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private CancellationTokenSource? _runtimeMonitoringCts;
     private Task? _runtimeMonitoringTask;
     private bool _runtimeMonitoringActive;
+    private bool _syncingSidebarSelection;
 
     [ObservableProperty]
     private MountProfile _selectedProfile;
@@ -98,6 +99,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _selectedReliabilityPresetId = ReliabilityPolicyPreset.BalancedId;
 
+    [ObservableProperty]
+    private MountProfile? _selectedRemoteProfile;
+
+    [ObservableProperty]
+    private MountProfile? _selectedMountProfile;
+
+    [ObservableProperty]
+    private bool _showRemoteEditor;
+
     public ObservableCollection<MountProfile> Profiles { get; } = new();
     public ObservableCollection<MountType> MountTypes { get; } = new(Enum.GetValues<MountType>());
     public ObservableCollection<QuickConnectMode> QuickConnectModes { get; } = new(Enum.GetValues<QuickConnectMode>());
@@ -109,8 +119,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<RcloneBackendOptionInput> BackendOptionInputs { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> AdvancedBackendOptionInputs { get; } = new();
     public ObservableCollection<ReliabilityPolicyPreset> ReliabilityPresets { get; } = new(ReliabilityPolicyPreset.Catalog);
+    public ObservableCollection<MountProfile> RemoteProfiles { get; } = new();
     public bool HasDiagnosticsRows => DiagnosticsRows.Count > 0;
+    public bool HasRemoteProfiles => RemoteProfiles.Count > 0;
     public string DiagnosticsEmptyStateText => "No diagnostics for current filter.";
+    public string WorkspaceTitle => ShowRemoteEditor ? "Remote Assistant" : "Mount Assistant";
+    public string WorkspaceSubtitle => ShowRemoteEditor
+        ? "Choose backend -> set options -> create remote"
+        : "Preset -> credentials -> mount path -> Start mount";
 
     public MainWindowViewModel(
         string? profilesFilePath = null,
@@ -166,6 +182,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         SelectedProfile = Profiles[0];
+        RefreshRemoteProfiles();
+        _syncingSidebarSelection = true;
+        SelectedMountProfile = SelectedProfile;
+        SelectedRemoteProfile = RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile));
+        _syncingSidebarSelection = false;
+        ShowRemoteEditor = false;
         SyncDiagnosticsFilters();
         HasPendingChanges = false;
         AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Profiles file: {_profilesFilePath}");
@@ -279,6 +301,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Profiles.Add(profile);
         _profileLogs[profile.Id] = new List<ProfileLogEvent>();
         _profileScripts[profile.Id] = string.Empty;
+        ShowRemoteEditor = false;
         SelectedProfile = profile;
         MarkDirty();
     }
@@ -1281,7 +1304,69 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         MountOptionsVm.UpdateFromProfile(value.MountOptions, value.PinnedMountOptions);
         SelectedReliabilityPresetId = ReliabilityPolicyPreset.GetByIdOrDefault(value.SelectedReliabilityPresetId).Id;
 
+        _syncingSidebarSelection = true;
+        SelectedMountProfile = value;
+        if (IsRemoteProfileCandidate(value))
+        {
+            SelectedRemoteProfile = value;
+        }
+        _syncingSidebarSelection = false;
+
         OnPropertyChanged(nameof(StartupButtonText));
+    }
+
+    partial void OnSelectedRemoteProfileChanged(MountProfile? value)
+    {
+        if (_syncingSidebarSelection || value is null)
+        {
+            return;
+        }
+
+        ShowRemoteEditor = true;
+        if (!ReferenceEquals(SelectedProfile, value))
+        {
+            SelectedProfile = value;
+        }
+    }
+
+    partial void OnSelectedMountProfileChanged(MountProfile? value)
+    {
+        if (_syncingSidebarSelection || value is null)
+        {
+            return;
+        }
+
+        ShowRemoteEditor = false;
+        if (!ReferenceEquals(SelectedProfile, value))
+        {
+            SelectedProfile = value;
+        }
+    }
+
+    partial void OnShowRemoteEditorChanged(bool value)
+    {
+        OnPropertyChanged(nameof(WorkspaceTitle));
+        OnPropertyChanged(nameof(WorkspaceSubtitle));
+
+        if (!value || SelectedRemoteProfile is not null)
+        {
+            return;
+        }
+
+        var firstRemote = RemoteProfiles.FirstOrDefault();
+        if (firstRemote is null)
+        {
+            ShowRemoteEditor = false;
+            return;
+        }
+
+        _syncingSidebarSelection = true;
+        SelectedRemoteProfile = firstRemote;
+        _syncingSidebarSelection = false;
+        if (!ReferenceEquals(SelectedProfile, firstRemote))
+        {
+            SelectedProfile = firstRemote;
+        }
     }
 
     private void OnObservedProfileChanged(object? sender, PropertyChangedEventArgs e)
@@ -1347,6 +1432,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             MarkDirty();
         }
 
+        RefreshRemoteProfiles();
         SyncDiagnosticsFilters();
     }
 
@@ -1378,6 +1464,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             {
                 SyncDiagnosticsFilters();
             }
+        }
+
+        if (e.PropertyName is nameof(MountProfile.Type))
+        {
+            RefreshRemoteProfiles();
         }
     }
 
@@ -1576,6 +1667,40 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedProfile.QuickConnectPort = string.Empty;
         SelectedProfile.QuickConnectUsername = string.Empty;
         SelectedProfile.QuickConnectPassword = string.Empty;
+    }
+
+    private bool IsRemoteProfileCandidate(MountProfile profile) => profile.Type is not MountType.MacOsNfs;
+
+    private void RefreshRemoteProfiles()
+    {
+        var previousRemote = SelectedRemoteProfile;
+
+        RemoteProfiles.Clear();
+        foreach (var profile in Profiles.Where(IsRemoteProfileCandidate))
+        {
+            RemoteProfiles.Add(profile);
+        }
+
+        OnPropertyChanged(nameof(HasRemoteProfiles));
+
+        if (RemoteProfiles.Count == 0)
+        {
+            _syncingSidebarSelection = true;
+            SelectedRemoteProfile = null;
+            _syncingSidebarSelection = false;
+            ShowRemoteEditor = false;
+            return;
+        }
+
+        if (previousRemote is not null && RemoteProfiles.Contains(previousRemote))
+        {
+            return;
+        }
+
+        var replacement = RemoteProfiles.FirstOrDefault(p => ReferenceEquals(p, SelectedProfile)) ?? RemoteProfiles[0];
+        _syncingSidebarSelection = true;
+        SelectedRemoteProfile = replacement;
+        _syncingSidebarSelection = false;
     }
 
     private static string DefaultMountPoint(string name)

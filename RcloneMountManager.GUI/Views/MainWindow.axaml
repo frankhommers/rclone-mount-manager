@@ -47,45 +47,70 @@
                     <Grid RowDefinitions="Auto,*,Auto">
                         <Border Grid.Row="0" Padding="16,16,16,8">
                             <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto">
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Profiles" FontSize="16" FontWeight="SemiBold"/>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Library" FontSize="16" FontWeight="SemiBold"/>
                                 <TextBlock Grid.Row="1" Grid.Column="0"
-                                           Text="Choose one profile"
+                                           Text="Remotes and mounts"
                                            FontSize="12"
                                            Opacity="0.75"
                                            Margin="0,2,0,0"/>
                                 <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="1"
-                                        Content="+"
-                                        Command="{Binding AddProfileCommand}"
-                                        FontSize="16"
-                                        FontWeight="Bold"
-                                        Padding="8,4"/>
+                                         Content="+"
+                                         Command="{Binding AddProfileCommand}"
+                                         FontSize="16"
+                                         FontWeight="Bold"
+                                         ToolTip.Tip="Add mount"
+                                         Padding="8,4"/>
                             </Grid>
                         </Border>
 
-                        <ListBox Grid.Row="1"
-                                 Margin="8,0"
-                                 ItemsSource="{Binding Profiles}"
-                                 SelectedItem="{Binding SelectedProfile}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                     <StackPanel Margin="4,4,4,6" Spacing="2">
-                                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                         <TextBlock Text="{Binding Type}" FontSize="11" Opacity="0.75"/>
-                                         <TextBlock Text="{Binding RuntimeState.Lifecycle, StringFormat='Lifecycle: {0}'}"
-                                                    FontSize="11"
-                                                    Opacity="0.75"/>
-                                         <TextBlock Text="{Binding RuntimeState.Health, StringFormat='Health: {0}'}"
-                                                    FontSize="11"
-                                                    Opacity="0.75"/>
-                                         <TextBlock Text="{Binding MountPoint}" FontSize="11" Opacity="0.65" TextTrimming="CharacterEllipsis"/>
-                                     </StackPanel>
-                                 </DataTemplate>
-                             </ListBox.ItemTemplate>
-                        </ListBox>
+                        <ScrollViewer Grid.Row="1"
+                                      Margin="8,0"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="REMOTES" FontSize="11" FontWeight="SemiBold" Opacity="0.75" Margin="4,2,4,0"/>
+                                <ListBox ItemsSource="{Binding RemoteProfiles}"
+                                         SelectedItem="{Binding SelectedRemoteProfile}"
+                                         IsVisible="{Binding HasRemoteProfiles}"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="4,4,4,6" Spacing="2">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Source}" FontSize="11" Opacity="0.75" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Text="No remotes yet. Add a mount and set type to rclone."
+                                           IsVisible="{Binding !HasRemoteProfiles}"
+                                           Margin="8,0,8,2"
+                                           FontSize="11"
+                                           Opacity="0.65"
+                                           TextWrapping="Wrap"/>
+
+                                <TextBlock Text="MOUNTS" FontSize="11" FontWeight="SemiBold" Opacity="0.75" Margin="4,8,4,0"/>
+                                <ListBox ItemsSource="{Binding Profiles}"
+                                         SelectedItem="{Binding SelectedMountProfile}"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Margin="4,4,4,6" Spacing="2">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Type}" FontSize="11" Opacity="0.75"/>
+                                                <TextBlock Text="{Binding MountPoint}" FontSize="11" Opacity="0.65" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </ScrollViewer>
 
                         <Border Grid.Row="2"
                                 Padding="12"
@@ -116,8 +141,8 @@
                             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
                         <Grid ColumnDefinitions="*,Auto">
                             <StackPanel>
-                                <TextBlock Text="Mount Assistant" FontSize="20" FontWeight="SemiBold"/>
-                                <TextBlock Text="Preset -> credentials -> mount path -> Start mount"
+                                <TextBlock Text="{Binding WorkspaceTitle}" FontSize="20" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding WorkspaceSubtitle}"
                                            FontSize="12"
                                            Opacity="0.75"/>
                             </StackPanel>
@@ -130,6 +155,8 @@
 
                     <ScrollViewer Grid.Row="1">
                         <StackPanel Margin="20,14" Spacing="10">
+
+                            <StackPanel IsVisible="{Binding ShowRemoteEditor}" Spacing="10">
 
                             <!-- Backend Configuration -->
                             <Grid ColumnDefinitions="*,Auto">
@@ -181,6 +208,10 @@
                             <Button Content="Create remote and use in selected profile"
                                     Command="{Binding CreateRemoteCommand}"
                                     HorizontalAlignment="Left"/>
+
+                            </StackPanel>
+
+                            <StackPanel IsVisible="{Binding !ShowRemoteEditor}" Spacing="10">
 
                             <Separator Margin="0,4"/>
 
@@ -396,6 +427,8 @@
                                            FontSize="12"
                                            Opacity="0.75"/>
                             </Border>
+
+                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>
