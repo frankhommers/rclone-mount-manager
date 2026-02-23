@@ -151,6 +151,71 @@ public sealed class MountManagerService
         log("Connectivity test succeeded.");
     }
 
+    public async Task TestBackendConnectionAsync(
+        string rcloneBinaryPath,
+        string backendName,
+        IEnumerable<RcloneBackendOptionInput> options,
+        Action<string> log,
+        CancellationToken cancellationToken)
+    {
+        var binary = string.IsNullOrWhiteSpace(rcloneBinaryPath) ? "rclone" : rcloneBinaryPath;
+        var arguments = new List<string> { "lsd", $":{backendName}:", "--max-depth", "1" };
+
+        var secretFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var option in options)
+        {
+            if (string.IsNullOrWhiteSpace(option.Name) || string.IsNullOrWhiteSpace(option.Value))
+                continue;
+
+            var flagName = option.Name.Replace('_', '-');
+            var flag = $"--{backendName}-{flagName}";
+
+            if (option.ControlType == OptionControlType.Toggle)
+            {
+                if (string.Equals(option.Value, "true", StringComparison.OrdinalIgnoreCase))
+                    arguments.Add(flag);
+                continue;
+            }
+
+            var flagValue = option.Value;
+            if (option.IsPassword)
+            {
+                secretFlags.Add(flag);
+                var obscureResult = await Cli.Wrap(binary)
+                    .WithArguments(["obscure", option.Value])
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteBufferedAsync(cancellationToken);
+
+                if (obscureResult.ExitCode != 0)
+                    throw new InvalidOperationException($"Failed to obscure password for '{option.Name}'.");
+
+                flagValue = obscureResult.StandardOutput.Trim();
+            }
+
+            arguments.Add(flag);
+            arguments.Add(flagValue);
+        }
+
+        log($"$ {binary} {FormatCommandLine(arguments, secretFlags)}");
+
+        var result = await Cli.Wrap(binary)
+            .WithArguments(arguments)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(result.StandardOutput))
+            log(result.StandardOutput.Trim());
+
+        if (!string.IsNullOrWhiteSpace(result.StandardError))
+            log($"ERR: {result.StandardError.Trim()}");
+
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"Connectivity test failed with exit code {result.ExitCode}.");
+
+        log("Connectivity test succeeded.");
+    }
+
     public string GenerateScript(MountProfile profile)
     {
         var builder = new StringBuilder();
@@ -475,6 +540,27 @@ public sealed class MountManagerService
         }
 
         return args;
+    }
+
+    private static string FormatCommandLine(List<string> arguments, HashSet<string> secretFlags)
+    {
+        var parts = new List<string>();
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            var arg = arguments[i];
+            if (secretFlags.Contains(arg) && i + 1 < arguments.Count)
+            {
+                parts.Add(arg);
+                parts.Add("****");
+                i++;
+            }
+            else
+            {
+                parts.Add(arg.Contains(' ') ? $"\"{arg}\"" : arg);
+            }
+        }
+
+        return string.Join(" ", parts);
     }
 
     private static string EscapeForBash(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
