@@ -16,6 +16,86 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
     }
 
     [Fact]
+    public void ShowDiagnosticsView_DefaultsFalse()
+    {
+        var viewModel = CreateViewModel();
+        Assert.False(viewModel.ShowDiagnosticsView);
+    }
+
+    [Fact]
+    public void SelectDiagnostics_ShowsDiagnosticsView()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.SelectDiagnosticsCommand.Execute(null);
+
+        Assert.True(viewModel.ShowDiagnosticsView);
+        Assert.Equal("Diagnostics", viewModel.WorkspaceTitle);
+        Assert.True(viewModel.ShowDiagnosticsView);
+        Assert.False(viewModel.ShowRemoteEditorContent);
+        Assert.False(viewModel.ShowMountEditorContent);
+    }
+
+    [Fact]
+    public void SelectProfileAfterDiagnostics_HidesDiagnosticsView()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.SelectDiagnosticsCommand.Execute(null);
+        Assert.True(viewModel.ShowDiagnosticsView);
+
+        viewModel.AddProfileCommand.Execute(null);
+        Assert.False(viewModel.ShowDiagnosticsView);
+    }
+
+    [Fact]
+    public async Task DiagnosticsCategoryFilter_FiltersRemotesAndMounts()
+    {
+        var viewModel = CreateViewModel(
+            mountStartRunner: (profile, log, _) =>
+            {
+                log($"runner callback for {profile.Id}");
+                return Task.CompletedTask;
+            },
+            runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy)));
+
+        viewModel.AddRemoteCommand.Execute(null);
+        var remoteProfile = viewModel.SelectedProfile;
+
+        viewModel.AddProfileCommand.Execute(null);
+        var mountProfile = viewModel.SelectedProfile;
+        await viewModel.StartMountCommand.ExecuteAsync(null);
+
+        viewModel.SelectDiagnosticsCommand.Execute(null);
+
+        viewModel.SelectedDiagnosticsCategoryFilter = "Mounts";
+        Assert.All(viewModel.DiagnosticsRows, row =>
+        {
+            var isMount = viewModel.MountProfiles.Any(p => string.Equals(p.Id, row.ProfileId, StringComparison.OrdinalIgnoreCase));
+            Assert.True(isMount);
+        });
+    }
+
+    [Fact]
+    public async Task DiagnosticsSearchText_FiltersMessages()
+    {
+        var viewModel = CreateViewModel(
+            mountStartRunner: (profile, log, _) =>
+            {
+                log("unique-search-token");
+                log("other message");
+                return Task.CompletedTask;
+            },
+            runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy)));
+
+        await viewModel.StartMountCommand.ExecuteAsync(null);
+        viewModel.SelectDiagnosticsCommand.Execute(null);
+
+        viewModel.DiagnosticsSearchText = "unique-search-token";
+        Assert.NotEmpty(viewModel.DiagnosticsRows);
+        Assert.All(viewModel.DiagnosticsRows, row =>
+            Assert.Contains("unique-search-token", row.MessageText, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task DiagnosticsProfileFilter_ShowsOnlyMatchingProfileEvents()
     {
         var viewModel = CreateViewModel(

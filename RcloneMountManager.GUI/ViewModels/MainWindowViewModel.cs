@@ -40,6 +40,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly Func<MountProfile, bool> _startupEnabledProbe;
     private readonly Func<TimeSpan, CancellationToken, Task<bool>> _runtimeRefreshWaiter;
     private readonly Func<IEnumerable<MountProfile>, CancellationToken, Task<IReadOnlyList<ProfileRuntimeState>>> _runtimeStateBatchVerifier;
+    private readonly Func<MountProfile, Action<string>, CancellationToken, Task>? _testConnectionRunner;
     private readonly bool _isStartupSupported;
     public MountOptionsViewModel MountOptionsVm { get; } = new();
     private readonly string _profilesFilePath;
@@ -101,6 +102,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _startupTimelineOnly;
 
     [ObservableProperty]
+    private bool _showDiagnosticsView;
+
+    [ObservableProperty]
+    private string _selectedDiagnosticsCategoryFilter = "All";
+
+    [ObservableProperty]
+    private string _diagnosticsSearchText = string.Empty;
+
+    [ObservableProperty]
     private string _selectedReliabilityPresetId = ReliabilityPolicyPreset.NormalId;
 
     [ObservableProperty]
@@ -119,6 +129,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private string _deleteBlockedDialogMessage = string.Empty;
 
     [ObservableProperty]
+    private bool _isTestDialogVisible;
+
+    [ObservableProperty]
+    private string _testDialogTitle = string.Empty;
+
+    [ObservableProperty]
+    private bool? _testDialogSuccess;
+
+    [ObservableProperty]
     private MountProfile? _selectedMountRemoteProfile;
 
     public ObservableCollection<MountProfile> Profiles { get; } = new();
@@ -126,9 +145,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<MountType> MountTypes { get; } = new(Enum.GetValues<MountType>());
     public ObservableCollection<QuickConnectMode> QuickConnectModes { get; } = new(Enum.GetValues<QuickConnectMode>());
     public ObservableCollection<string> ThemeModes { get; } = new() { "Follow system", "Dark", "Light" };
+    public ObservableCollection<string> DiagnosticsCategoryFilters { get; } = new() { "All", "Remotes", "Mounts" };
     public ObservableCollection<DiagnosticsProfileFilterOption> DiagnosticsProfileFilters { get; } = new();
     public ObservableCollection<string> Logs { get; } = new();
     public ObservableCollection<DiagnosticsTimelineRow> DiagnosticsRows { get; } = new();
+    public ObservableCollection<string> TestDialogLines { get; } = new();
     public ObservableCollection<RcloneBackendInfo> AvailableBackends { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> BackendOptionInputs { get; } = new();
     public ObservableCollection<RcloneBackendOptionInput> AdvancedBackendOptionInputs { get; } = new();
@@ -164,13 +185,25 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     public bool HasDiagnosticsRows => DiagnosticsRows.Count > 0;
+    public bool IsTestDialogRunning => TestDialogSuccess is null && IsTestDialogVisible;
+    public bool ShowTestDialogSuccessIcon => TestDialogSuccess == true;
+    public bool ShowTestDialogFailureIcon => TestDialogSuccess == false;
     public bool HasRemoteProfiles => RemoteProfiles.Count > 0;
     public bool HasMountProfiles => MountProfiles.Count > 0;
     public string DiagnosticsEmptyStateText => "No diagnostics for current filter.";
-    public string WorkspaceTitle => ShowRemoteEditor ? "Remote Assistant" : "Mount Assistant";
-    public string WorkspaceSubtitle => ShowRemoteEditor
-        ? "Choose backend -> set options -> create remote"
-        : "Preset -> credentials -> mount path -> Start mount";
+    public string WorkspaceTitle => ShowDiagnosticsView
+        ? "Diagnostics"
+        : ShowRemoteEditor ? "Remote Assistant" : "Mount Assistant";
+    public string WorkspaceSubtitle => ShowDiagnosticsView
+        ? "View log entries across all profiles"
+        : ShowRemoteEditor
+            ? "Choose backend -> set options -> create remote"
+            : "Preset -> credentials -> mount path -> Start mount";
+    public bool ShowRemoteEditorContent => ShowRemoteEditor && !ShowDiagnosticsView;
+    public bool ShowMountEditorContent => !ShowRemoteEditor && !ShowDiagnosticsView;
+    public string DiagnosticsInfoCount => DiagnosticsRows.Count(r => string.Equals(r.SeverityText, "information", StringComparison.OrdinalIgnoreCase)).ToString();
+    public string DiagnosticsWarningCount => DiagnosticsRows.Count(r => string.Equals(r.SeverityText, "warning", StringComparison.OrdinalIgnoreCase)).ToString();
+    public string DiagnosticsErrorCount => DiagnosticsRows.Count(r => string.Equals(r.SeverityText, "error", StringComparison.OrdinalIgnoreCase)).ToString();
 
     public MainWindowViewModel(
         string? profilesFilePath = null,
@@ -181,6 +214,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         MountHealthService? mountHealthService = null,
         Func<MountProfile, Action<string>, CancellationToken, Task>? mountStartRunner = null,
         Func<MountProfile, Action<string>, CancellationToken, Task>? mountStopRunner = null,
+        Func<MountProfile, Action<string>, CancellationToken, Task>? testConnectionRunner = null,
         Func<MountProfile, CancellationToken, Task<bool>>? mountedProbe = null,
         Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>>? runtimeStateVerifier = null,
         Func<MountProfile, CancellationToken, Task<StartupPreflightReport>>? startupPreflightRunner = null,
@@ -198,6 +232,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _mountHealthService = mountHealthService ?? new MountHealthService();
         _mountStartRunner = mountStartRunner ?? _mountManagerService.StartAsync;
         _mountStopRunner = mountStopRunner ?? _mountManagerService.StopAsync;
+        _testConnectionRunner = testConnectionRunner;
         _mountedProbe = mountedProbe ?? ((profile, cancellationToken) => _mountManagerService.IsMountedAsync(profile.MountPoint, cancellationToken));
         _runtimeStateVerifier = runtimeStateVerifier ?? _mountHealthService.VerifyAsync;
         _startupPreflightRunner = startupPreflightRunner ?? _startupPreflightService.RunAsync;
@@ -384,6 +419,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void AddProfile()
     {
         AddMount();
+    }
+
+    [RelayCommand]
+    private void SelectDiagnostics()
+    {
+        ShowDiagnosticsView = true;
+        RefreshDiagnosticsTimeline();
     }
 
     private void LoadBackendsSync(bool enabled)
@@ -688,29 +730,54 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand(CanExecute = nameof(CanTestConnection))]
     private async Task TestConnectionAsync()
     {
-        await RunBusyActionAsync(async cancellationToken =>
+        TestDialogLines.Clear();
+        TestDialogSuccess = null;
+        TestDialogTitle = "Testing connection...";
+        IsTestDialogVisible = true;
+
+        try
         {
             var profile = SelectedProfile;
             var profileId = profile.Id;
             AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Initialization, $"Testing connection for '{profile.Name}'...");
 
-            if (profile.IsRemoteDefinition && SelectedBackend is not null)
+            void LogLine(string line)
+            {
+                AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Execution, line);
+                TestDialogLines.Add(line);
+            }
+
+            if (_testConnectionRunner is not null)
+            {
+                await _testConnectionRunner(profile, LogLine, CancellationToken.None);
+            }
+            else if (profile.IsRemoteDefinition && SelectedBackend is not null)
             {
                 var binary = profile.RcloneBinaryPath ?? "rclone";
                 await _mountManagerService.TestBackendConnectionAsync(
                     binary,
                     SelectedBackend.Name,
                     BackendOptionInputs.Concat(AdvancedBackendOptionInputs),
-                    line => AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Execution, line),
-                    cancellationToken);
+                    LogLine,
+                    CancellationToken.None);
             }
             else
             {
-                await _mountManagerService.TestConnectionAsync(profile, line => AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Execution, line), cancellationToken);
+                await _mountManagerService.TestConnectionAsync(profile, LogLine, CancellationToken.None);
             }
 
+            TestDialogSuccess = true;
+            TestDialogTitle = "Connection test passed";
             StatusText = "Connectivity test passed.";
-        });
+        }
+        catch (Exception ex)
+        {
+            TestDialogLines.Add(ex.Message);
+            TestDialogSuccess = false;
+            TestDialogTitle = "Connection test failed";
+            StatusText = "Connectivity test failed.";
+            AppendLog(ProfileLogCategory.General, ProfileLogStage.Execution, ex.Message, ProfileLogSeverity.Error, ex.Message);
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanRunActions))]
@@ -785,6 +852,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         IsDeleteBlockedDialogVisible = false;
         DeleteBlockedDialogMessage = string.Empty;
+    }
+
+    [RelayCommand]
+    private void DismissTestDialog()
+    {
+        IsTestDialogVisible = false;
+        TestDialogTitle = string.Empty;
+        TestDialogLines.Clear();
+        TestDialogSuccess = null;
     }
 
     [RelayCommand(CanExecute = nameof(CanToggleStartup))]
@@ -1157,14 +1233,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return ProfileLogSeverity.Information;
     }
 
-    private static DiagnosticsTimelineRow ToDiagnosticsRow(ProfileLogEvent entry)
+    private DiagnosticsTimelineRow ToDiagnosticsRow(ProfileLogEvent entry)
     {
         var timestamp = entry.Timestamp.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
         var category = entry.Category.ToString().ToLowerInvariant();
         var stage = entry.Stage.ToString().ToLowerInvariant();
         var severity = entry.Severity.ToString().ToLowerInvariant();
         var stageText = $"{category}/{stage}";
-        return new DiagnosticsTimelineRow(entry.ProfileId, timestamp, severity, stageText, entry.Message);
+        var profileName = Profiles.FirstOrDefault(p => string.Equals(p.Id, entry.ProfileId, StringComparison.OrdinalIgnoreCase))?.Name ?? entry.ProfileId;
+        return new DiagnosticsTimelineRow(entry.ProfileId, profileName, timestamp, severity, stageText, entry.Message);
     }
 
     partial void OnSelectedDiagnosticsProfileIdChanged(string? value)
@@ -1175,6 +1252,31 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnStartupTimelineOnlyChanged(bool value)
     {
         RefreshDiagnosticsTimeline();
+    }
+
+    partial void OnShowDiagnosticsViewChanged(bool value)
+    {
+        OnPropertyChanged(nameof(WorkspaceTitle));
+        OnPropertyChanged(nameof(WorkspaceSubtitle));
+        OnPropertyChanged(nameof(ShowRemoteEditorContent));
+        OnPropertyChanged(nameof(ShowMountEditorContent));
+    }
+
+    partial void OnSelectedDiagnosticsCategoryFilterChanged(string value)
+    {
+        RefreshDiagnosticsTimeline();
+    }
+
+    partial void OnDiagnosticsSearchTextChanged(string value)
+    {
+        RefreshDiagnosticsTimeline();
+    }
+
+    partial void OnTestDialogSuccessChanged(bool? value)
+    {
+        OnPropertyChanged(nameof(IsTestDialogRunning));
+        OnPropertyChanged(nameof(ShowTestDialogSuccessIcon));
+        OnPropertyChanged(nameof(ShowTestDialogFailureIcon));
     }
 
     partial void OnSelectedReliabilityPresetIdChanged(string value)
@@ -1237,6 +1339,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         IEnumerable<ProfileLogEvent> events = _profileLogs.Values.SelectMany(entries => entries);
 
+        if (string.Equals(SelectedDiagnosticsCategoryFilter, "Remotes", StringComparison.OrdinalIgnoreCase))
+        {
+            var remoteIds = Profiles.Where(p => p.IsRemoteDefinition).Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            events = events.Where(e => remoteIds.Contains(e.ProfileId));
+        }
+        else if (string.Equals(SelectedDiagnosticsCategoryFilter, "Mounts", StringComparison.OrdinalIgnoreCase))
+        {
+            var mountIds = Profiles.Where(p => !p.IsRemoteDefinition).Select(p => p.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            events = events.Where(e => mountIds.Contains(e.ProfileId));
+        }
+
         if (!string.IsNullOrWhiteSpace(SelectedDiagnosticsProfileId))
         {
             events = events.Where(entry => string.Equals(entry.ProfileId, SelectedDiagnosticsProfileId, StringComparison.OrdinalIgnoreCase));
@@ -1245,6 +1358,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (StartupTimelineOnly)
         {
             events = events.Where(IsStartupTimelineEvent);
+        }
+
+        if (!string.IsNullOrWhiteSpace(DiagnosticsSearchText))
+        {
+            var search = DiagnosticsSearchText;
+            events = events.Where(entry => entry.Message.Contains(search, StringComparison.OrdinalIgnoreCase));
         }
 
         var rows = events
@@ -1271,6 +1390,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void OnDiagnosticsRowsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         OnPropertyChanged(nameof(HasDiagnosticsRows));
+        OnPropertyChanged(nameof(DiagnosticsInfoCount));
+        OnPropertyChanged(nameof(DiagnosticsWarningCount));
+        OnPropertyChanged(nameof(DiagnosticsErrorCount));
     }
 
     private void RecordStartupPreflightReport(string profileId, StartupPreflightReport report)
@@ -1416,6 +1538,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         if (string.IsNullOrWhiteSpace(profile.BackendName))
         {
+            SelectedBackend = null;
             return;
         }
 
@@ -1525,6 +1648,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedProfileChanged(MountProfile value)
     {
+        if (ShowDiagnosticsView)
+        {
+            ShowDiagnosticsView = false;
+        }
+
         if (_observedProfile is not null)
         {
             _observedProfile.PropertyChanged -= OnObservedProfileChanged;
@@ -1683,6 +1811,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(WorkspaceTitle));
         OnPropertyChanged(nameof(WorkspaceSubtitle));
+        OnPropertyChanged(nameof(ShowRemoteEditorContent));
+        OnPropertyChanged(nameof(ShowMountEditorContent));
         OnPropertyChanged(nameof(SidebarSelectedRemoteProfile));
         OnPropertyChanged(nameof(SidebarSelectedMountProfile));
 
@@ -2274,12 +2404,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public sealed record DiagnosticsTimelineRow(
         string ProfileId,
+        string ProfileName,
         string TimestampText,
         string SeverityText,
         string StageText,
         string MessageText)
     {
-        public string DisplayText => $"[{TimestampText}] [profile:{ProfileId}] [{StageText}] [{SeverityText}] {MessageText}";
+        public string DisplayText => $"[{TimestampText}] [{ProfileName}] [{StageText}] [{SeverityText}] {MessageText}";
     }
 
     private sealed class PersistedProfile

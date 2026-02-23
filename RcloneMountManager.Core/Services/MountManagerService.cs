@@ -123,12 +123,12 @@ public sealed class MountManagerService
         if (profile.QuickConnectMode is QuickConnectMode.None)
         {
             var target = BuildConnectivityTarget(profile.Source);
-            arguments = new List<string> { "lsd", target, "--max-depth", "1" };
+            arguments = new List<string> { "lsd", target, "--max-depth", "1", "-vv" };
         }
         else
         {
             var source = ResolveRcloneSource(profile);
-            arguments = new List<string> { "lsd", source, "--max-depth", "1" };
+            arguments = new List<string> { "lsd", source, "--max-depth", "1", "-vv" };
             await AddQuickConnectArgumentsAsync(profile, arguments, cancellationToken);
         }
 
@@ -144,7 +144,16 @@ public sealed class MountManagerService
 
         if (!string.IsNullOrWhiteSpace(result.StandardError))
         {
-            log($"ERR: {result.StandardError.Trim()}");
+            foreach (var line in result.StandardError.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed))
+                    continue;
+                if (trimmed.Contains("ERROR", StringComparison.OrdinalIgnoreCase))
+                    log($"ERR: {trimmed}");
+                else
+                    log(trimmed);
+            }
         }
 
         if (result.ExitCode != 0)
@@ -163,7 +172,7 @@ public sealed class MountManagerService
         CancellationToken cancellationToken)
     {
         var binary = string.IsNullOrWhiteSpace(rcloneBinaryPath) ? "rclone" : rcloneBinaryPath;
-        var arguments = new List<string> { "lsd", $":{backendName}:", "--max-depth", "1" };
+        var arguments = new List<string> { "lsd", $":{backendName}:", "--max-depth", "1", "-vv" };
 
         var secretFlags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -201,6 +210,8 @@ public sealed class MountManagerService
             arguments.Add(flagValue);
         }
 
+        var secretValues = CollectSecretValues(arguments, secretFlags);
+
         log($"$ {binary} {FormatCommandLine(arguments, secretFlags)}");
 
         var result = await Cli.Wrap(binary)
@@ -209,10 +220,22 @@ public sealed class MountManagerService
             .ExecuteBufferedAsync(cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(result.StandardOutput))
-            log(result.StandardOutput.Trim());
+            log(RedactSecrets(result.StandardOutput.Trim(), secretValues));
 
         if (!string.IsNullOrWhiteSpace(result.StandardError))
-            log($"ERR: {result.StandardError.Trim()}");
+        {
+            foreach (var line in result.StandardError.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = line.Trim();
+                if (string.IsNullOrWhiteSpace(trimmed))
+                    continue;
+                var redacted = RedactSecrets(trimmed, secretValues);
+                if (redacted.Contains("ERROR", StringComparison.OrdinalIgnoreCase))
+                    log($"ERR: {redacted}");
+                else
+                    log(redacted);
+            }
+        }
 
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"Connectivity test failed with exit code {result.ExitCode}.");
@@ -571,6 +594,33 @@ public sealed class MountManagerService
         }
 
         return string.Join(" ", parts);
+    }
+
+    private static HashSet<string> CollectSecretValues(List<string> arguments, HashSet<string> secretFlags)
+    {
+        var values = new HashSet<string>(StringComparer.Ordinal);
+        for (var i = 0; i < arguments.Count; i++)
+        {
+            if (secretFlags.Contains(arguments[i]) && i + 1 < arguments.Count)
+            {
+                var secretValue = arguments[i + 1];
+                if (!string.IsNullOrWhiteSpace(secretValue))
+                    values.Add(secretValue);
+                i++;
+            }
+        }
+
+        return values;
+    }
+
+    private static string RedactSecrets(string text, HashSet<string> secretValues)
+    {
+        foreach (var secret in secretValues)
+        {
+            text = text.Replace(secret, "****", StringComparison.Ordinal);
+        }
+
+        return text;
     }
 
     private static string EscapeForBash(string value) => value.Replace("\\", "\\\\").Replace("\"", "\\\"");
