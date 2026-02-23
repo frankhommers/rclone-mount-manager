@@ -81,6 +81,10 @@ public sealed class MountManagerService
                 log("rclone process cancelled.");
             }
         }
+        else if (IsRcloneMountType(profile.Type))
+        {
+            log("No tracked rclone process found; attempting unmount of orphan mount.");
+        }
 
         await UnmountAsync(mountPoint, log, cancellationToken);
     }
@@ -294,6 +298,12 @@ public sealed class MountManagerService
         if (_runningMounts.ContainsKey(mountPoint))
         {
             throw new InvalidOperationException("rclone mount is already running for this mount point.");
+        }
+
+        if (await IsMountedAsync(mountPoint, cancellationToken))
+        {
+            throw new InvalidOperationException(
+                $"Mount point '{mountPoint}' is already in use (possibly from a previous session). Stop the existing mount first.");
         }
 
         var source = ResolveRcloneSource(profile);
