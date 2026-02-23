@@ -19,6 +19,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     public string Help => Option.Help;
     public string DefaultStr => Option.DefaultStr;
     public bool IsAdvanced => Option.Advanced;
+    public bool IsPassword => Option.IsPassword;
     public OptionControlType ControlType => Option.GetControlType();
     public IReadOnlyList<string>? EnumValues => Option.GetEnumValues();
     public IReadOnlyList<SizeSuffixUnit> SizeSuffixUnits => SizeSuffixHelper.UnitItems;
@@ -51,6 +52,16 @@ public abstract partial class TypedOptionViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isPinned;
+
+    [ObservableProperty]
+    private string _confirmValue = string.Empty;
+
+    [ObservableProperty]
+    private bool _isSecretVisible;
+
+    public bool HasSecretMismatch =>
+        IsPassword &&
+        !string.Equals(Value, ConfirmValue, StringComparison.Ordinal);
 
     public virtual bool HasNonDefaultValue =>
         !string.IsNullOrEmpty(Value) &&
@@ -171,6 +182,12 @@ public abstract partial class TypedOptionViewModel : ObservableObject
         SyncToString(value ?? string.Empty);
     }
 
+    partial void OnConfirmValueChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasSecretMismatch));
+        OnPropertyChanged(nameof(ShouldInclude));
+    }
+
     private void SyncSizeSuffix()
     {
         var val = SizeSuffixNumericValue ?? 0m;
@@ -207,6 +224,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
         if (_syncing) return;
 
         OnPropertyChanged(nameof(HasNonDefaultValue));
+        OnPropertyChanged(nameof(HasSecretMismatch));
         OnPropertyChanged(nameof(ShouldInclude));
         OnValueChangedExtra(value);
 
@@ -310,11 +328,20 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void ToggleSecretVisibility()
+    {
+        IsSecretVisible = !IsSecretVisible;
+    }
+
+    [RelayCommand]
     protected virtual void ResetToDefault()
     {
         IsPinned = false;
+        ConfirmValue = string.Empty;
+        IsSecretVisible = false;
         Value = string.Empty;
         OnPropertyChanged(nameof(HasNonDefaultValue));
+        OnPropertyChanged(nameof(HasSecretMismatch));
         OnPropertyChanged(nameof(ShouldInclude));
     }
 }

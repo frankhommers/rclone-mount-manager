@@ -1,7 +1,10 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using System.Linq;
 using Avalonia.Markup.Xaml;
 using RcloneMountManager.ViewModels;
@@ -34,6 +37,16 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    public void EditableComboBox_GotFocus(object? sender, GotFocusEventArgs e)
+    {
+        if (sender is ComboBox comboBox
+            && !comboBox.IsDropDownOpen
+            && e.NavigationMethod != NavigationMethod.Unspecified)
+        {
+            comboBox.IsDropDownOpen = true;
+        }
     }
 
     private void DisableAvaloniaDataAnnotationValidation()

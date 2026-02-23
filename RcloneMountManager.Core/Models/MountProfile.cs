@@ -25,7 +25,7 @@ public partial class MountProfile : ObservableObject
     private string _extraOptions = string.Empty;
 
     [ObservableProperty]
-    private string _selectedReliabilityPresetId = ReliabilityPolicyPreset.BalancedId;
+    private string _selectedReliabilityPresetId = ReliabilityPolicyPreset.NormalId;
 
     [ObservableProperty]
     private Dictionary<string, string> _mountOptions = new();
@@ -59,6 +59,12 @@ public partial class MountProfile : ObservableObject
 
     [ObservableProperty]
     private bool _isRemoteDefinition;
+
+    [ObservableProperty]
+    private string _backendName = string.Empty;
+
+    [ObservableProperty]
+    private Dictionary<string, string> _backendOptions = new();
 
     [ObservableProperty]
     private bool _isMounted;

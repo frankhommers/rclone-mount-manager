@@ -314,4 +314,52 @@ public class MountOptionInputViewModelTests
         vm.IsPinned = false;
         Assert.False(vm.ShouldInclude);
     }
+
+    [Fact]
+    public void IsPassword_True_ReflectsOptionMetadata()
+    {
+        var option = new RcloneOption { Name = "rc_pass", Type = "string", IsPassword = true };
+        var vm = new MountOptionInputViewModel(option);
+
+        Assert.True(vm.IsPassword);
+    }
+
+    [Fact]
+    public void ShouldInclude_IsPasswordFalse_UnaffectedByConfirmValue()
+    {
+        var option = new RcloneOption { Name = "include", Type = "string", DefaultStr = "" };
+        var vm = new MountOptionInputViewModel(option);
+
+        vm.Value = "*.txt";
+        vm.ConfirmValue = "different";
+
+        Assert.True(vm.ShouldInclude);
+        Assert.False(vm.HasSecretMismatch);
+    }
+
+    [Fact]
+    public void ShouldInclude_IsPasswordTrue_FalseWhenConfirmValueMismatches()
+    {
+        var option = new RcloneOption { Name = "rc_pass", Type = "string", IsPassword = true };
+        var vm = new MountOptionInputViewModel(option);
+
+        vm.Value = "topsecret";
+        vm.ConfirmValue = "different";
+
+        Assert.True(vm.HasSecretMismatch);
+        Assert.False(vm.ShouldInclude);
+    }
+
+    [Fact]
+    public void ShouldInclude_IsPasswordTrue_TrueWhenConfirmValueMatches()
+    {
+        var option = new RcloneOption { Name = "rc_pass", Type = "string", IsPassword = true };
+        var vm = new MountOptionInputViewModel(option);
+
+        vm.Value = "topsecret";
+        vm.ConfirmValue = "topsecret";
+
+        Assert.False(vm.HasSecretMismatch);
+        Assert.True(vm.ShouldInclude);
+    }
 }

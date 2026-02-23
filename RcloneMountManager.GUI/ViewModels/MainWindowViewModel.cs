@@ -101,7 +101,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _startupTimelineOnly;
 
     [ObservableProperty]
-    private string _selectedReliabilityPresetId = ReliabilityPolicyPreset.BalancedId;
+    private string _selectedReliabilityPresetId = ReliabilityPolicyPreset.NormalId;
 
     [ObservableProperty]
     private MountProfile? _selectedRemoteProfile;
@@ -216,6 +216,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         Profiles.CollectionChanged += OnProfilesCollectionChanged;
         DiagnosticsRows.CollectionChanged += OnDiagnosticsRowsCollectionChanged;
         LoadProfiles();
+        LoadBackendsSync(loadStartupData);
 
         if (Profiles.Count == 0 && !File.Exists(_profilesFilePath))
         {
@@ -262,18 +263,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             return;
         }
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await RefreshBackendsAsync();
-            }
-            catch (Exception ex)
-            {
-                AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Could not load backend list: {ex.Message}", ProfileLogSeverity.Error, ex.Message);
-            }
-        });
 
         _ = Task.Run(async () =>
         {
@@ -397,14 +386,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         AddMount();
     }
 
-    [RelayCommand(CanExecute = nameof(CanRefreshBackends))]
-    private async Task RefreshBackendsAsync()
+    private void LoadBackendsSync(bool enabled)
     {
-        var binary = SelectedProfile?.RcloneBinaryPath ?? "rclone";
-        var backends = await _rcloneBackendService.GetBackendsAsync(binary, CancellationToken.None);
+        if (!enabled) return;
 
-        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+        try
         {
+            var binary = SelectedProfile?.RcloneBinaryPath ?? "rclone";
+            var backends = Task.Run(() => _rcloneBackendService.GetBackendsAsync(binary, CancellationToken.None)).GetAwaiter().GetResult();
+
             AvailableBackends.Clear();
             foreach (var backend in backends)
             {
@@ -417,7 +407,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
 
             AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Loaded {AvailableBackends.Count} rclone backend types.");
-        });
+        }
+        catch (Exception ex)
+        {
+            AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Could not load backend list: {ex.Message}", ProfileLogSeverity.Error, ex.Message);
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanCreateRemote))]
@@ -458,6 +452,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             activeProfile.Source = $"{NewRemoteName.Trim()}:/";
             activeProfile.Type = MountType.RcloneAuto;
             activeProfile.QuickConnectMode = QuickConnectMode.None;
+            activeProfile.BackendName = SelectedBackend.Name;
+            activeProfile.BackendOptions = BackendOptionInputs
+                .Concat(AdvancedBackendOptionInputs)
+                .Where(o => !string.IsNullOrWhiteSpace(o.Value))
+                .ToDictionary(o => o.Name, o => o.Value);
 
             AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Created remote '{NewRemoteName}' ({SelectedBackend.Name}).");
             StatusText = $"Remote '{NewRemoteName}' created.";
@@ -694,7 +693,22 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             var profile = SelectedProfile;
             var profileId = profile.Id;
             AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Initialization, $"Testing connection for '{profile.Name}'...");
-            await _mountManagerService.TestConnectionAsync(profile, line => AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Execution, line), cancellationToken);
+
+            if (profile.IsRemoteDefinition && SelectedBackend is not null)
+            {
+                var binary = profile.RcloneBinaryPath ?? "rclone";
+                await _mountManagerService.TestBackendConnectionAsync(
+                    binary,
+                    SelectedBackend.Name,
+                    BackendOptionInputs.Concat(AdvancedBackendOptionInputs),
+                    line => AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Execution, line),
+                    cancellationToken);
+            }
+            else
+            {
+                await _mountManagerService.TestConnectionAsync(profile, line => AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Execution, line), cancellationToken);
+            }
+
             StatusText = "Connectivity test passed.";
         });
     }
@@ -1295,7 +1309,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         GenerateScriptCommand.NotifyCanExecuteChanged();
         SaveScriptCommand.NotifyCanExecuteChanged();
         ToggleStartupCommand.NotifyCanExecuteChanged();
-        RefreshBackendsCommand.NotifyCanExecuteChanged();
         CreateRemoteCommand.NotifyCanExecuteChanged();
         SaveChangesCommand.NotifyCanExecuteChanged();
         RunStartupPreflightCommand.NotifyCanExecuteChanged();
@@ -1336,10 +1349,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         HasProfiles &&
         !IsBusy &&
         SelectedProfile is not null &&
-        !SelectedProfile.IsRemoteDefinition &&
-        SelectedProfile.Type is MountType.RcloneAuto &&
-        HasValidRemoteAssociation(SelectedProfile) &&
-        !string.IsNullOrWhiteSpace(SelectedProfile.Source);
+        (SelectedProfile.IsRemoteDefinition
+            ? SelectedBackend is not null
+            : SelectedProfile.Type is MountType.RcloneAuto &&
+              HasValidRemoteAssociation(SelectedProfile) &&
+              !string.IsNullOrWhiteSpace(SelectedProfile.Source));
 
     private bool CanSaveScript() => HasProfiles && !IsBusy && !string.IsNullOrWhiteSpace(GeneratedScript);
 
@@ -1349,7 +1363,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private bool CanSaveChanges() => !IsBusy && HasPendingChanges && !HasAnyInvalidMountRemoteAssociations();
 
-    private bool CanRefreshBackends() => !IsBusy;
+
 
     private bool CanCreateRemote() =>
         !IsBusy &&
@@ -1396,6 +1410,45 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         PopulateBackendOptionInputs(SelectedBackend);
         OnPropertyChanged(nameof(HasBackendOptions));
         OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));
+    }
+
+    private void RestoreBackendSelection(MountProfile profile)
+    {
+        if (string.IsNullOrWhiteSpace(profile.BackendName))
+        {
+            return;
+        }
+
+        var backend = AvailableBackends.FirstOrDefault(b =>
+            string.Equals(b.Name, profile.BackendName, StringComparison.OrdinalIgnoreCase));
+
+        if (backend is null)
+        {
+            return;
+        }
+
+        SelectedBackend = backend;
+
+        // Restore saved option values into the populated inputs
+        if (profile.BackendOptions.Count > 0)
+        {
+            foreach (var input in BackendOptionInputs.Concat(AdvancedBackendOptionInputs))
+            {
+                if (profile.BackendOptions.TryGetValue(input.Name, out var savedValue))
+                {
+                    input.Value = savedValue;
+                    if (input.IsPassword)
+                    {
+                        input.ConfirmValue = savedValue;
+                    }
+                    if (input.ControlType is Core.Models.OptionControlType.EditableComboBox
+                        or Core.Models.OptionControlType.ComboBox)
+                    {
+                        input.SelectedEnumValue = savedValue;
+                    }
+                }
+            }
+        }
     }
 
     private void PopulateBackendOptionInputs(RcloneBackendInfo backend)
@@ -1530,6 +1583,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (value.IsRemoteDefinition)
         {
             SetRemoteNameInput(value.Name);
+            RestoreBackendSelection(value);
             SelectedRemoteProfile = value;
             if (!ShowRemoteEditor)
             {
@@ -1794,6 +1848,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     AllowInsecurePasswordsInScript = saved.AllowInsecurePasswordsInScript,
                     StartAtLogin = saved.StartAtLogin,
                     IsRemoteDefinition = saved.IsRemoteDefinition,
+                    BackendName = saved.BackendName,
+                    BackendOptions = saved.BackendOptions ?? new Dictionary<string, string>(),
                 };
 
                 Profiles.Add(profile);
@@ -1844,6 +1900,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     AllowInsecurePasswordsInScript = profile.AllowInsecurePasswordsInScript,
                     StartAtLogin = profile.StartAtLogin,
                     IsRemoteDefinition = profile.IsRemoteDefinition,
+                    BackendName = profile.BackendName,
+                    BackendOptions = profile.BackendOptions,
                 })
                 .ToList();
 
@@ -2232,7 +2290,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         public string Source { get; set; } = string.Empty;
         public string MountPoint { get; set; } = string.Empty;
         public string ExtraOptions { get; set; } = string.Empty;
-        public string SelectedReliabilityPresetId { get; set; } = ReliabilityPolicyPreset.BalancedId;
+        public string SelectedReliabilityPresetId { get; set; } = ReliabilityPolicyPreset.NormalId;
         public Dictionary<string, string> MountOptions { get; set; } = new();
         public HashSet<string> PinnedMountOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public string RcloneBinaryPath { get; set; } = "rclone";
@@ -2244,5 +2302,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         public bool AllowInsecurePasswordsInScript { get; set; }
         public bool StartAtLogin { get; set; }
         public bool IsRemoteDefinition { get; set; }
+        public string BackendName { get; set; } = string.Empty;
+        public Dictionary<string, string> BackendOptions { get; set; } = new();
     }
 }

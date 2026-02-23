@@ -17,7 +17,6 @@ public partial class RcloneBackendOptionInput : TypedOptionViewModel
     protected override IRcloneOptionDefinition Option => _option;
 
     public bool Required => _option.Required;
-    public bool IsPassword => _option.IsPassword;
 
     public override string Label
     {

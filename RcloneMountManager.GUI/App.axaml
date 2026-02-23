@@ -21,7 +21,8 @@
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
-                               VerticalAlignment="Center"
+                               VerticalAlignment="Top"
+                               Margin="0,6,0,0"
                                FontSize="12"
                                FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                     <ToggleSwitch Grid.Row="0" Grid.Column="1"
@@ -66,6 +67,14 @@
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
+                               IsVisible="{Binding !IsPassword}"
+                               FontSize="12"
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="{Binding Label}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Top"
+                               IsVisible="{Binding IsPassword}"
                                FontSize="12"
                                FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
                      <ComboBox Grid.Row="0" Grid.Column="1"
@@ -122,14 +131,22 @@
                                VerticalAlignment="Center"
                                FontSize="12"
                                FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
-                     <AutoCompleteBox Grid.Row="0" Grid.Column="1"
-                                      ItemsSource="{Binding EnumValues}"
-                                      Text="{Binding SelectedEnumValue}"
-                                      Watermark="{Binding DefaultStr}"
-                                      FilterMode="Contains"
-                                      Margin="8,0,0,0"
-                                      MinWidth="200"
-                                      HorizontalAlignment="Stretch"/>
+                     <ComboBox Grid.Row="0" Grid.Column="1"
+                               ItemsSource="{Binding EnumValues}"
+                               SelectedItem="{Binding SelectedEnumValue}"
+                               IsEditable="True"
+                               PlaceholderText="{Binding DefaultStr}"
+                               Margin="8,0,0,0"
+                               MinWidth="200"
+                               MaxDropDownHeight="300"
+                               HorizontalAlignment="Stretch"
+                               GotFocus="EditableComboBox_GotFocus">
+                         <ComboBox.ItemTemplate>
+                             <DataTemplate>
+                                 <TextBlock Text="{Binding}" TextTrimming="CharacterEllipsis" MaxWidth="500" ToolTip.Tip="{Binding}"/>
+                             </DataTemplate>
+                         </ComboBox.ItemTemplate>
+                     </ComboBox>
                      <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0">
                          <Button Command="{Binding TogglePinCommand}"
                                  Padding="6,4"
@@ -316,22 +333,86 @@
         </DataTemplate>
 
         <DataTemplate x:Key="Text" x:CompileBindings="False">
-            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto" Margin="0,2">
+            <Grid ColumnDefinitions="200,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,2">
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="{Binding Label}"
                                TextTrimming="CharacterEllipsis"
                                VerticalAlignment="Center"
+                               IsVisible="{Binding !IsPassword}"
                                FontSize="12"
                                FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
-                    <TextBox Grid.Row="0" Grid.Column="1"
-                              Text="{Binding Value}"
-                              Watermark="{Binding DefaultStr}"
-                              Margin="8,0,0,0"
-                              HorizontalAlignment="Stretch"/>
-                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0">
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="{Binding Label}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Top"
+                               Margin="0,6,0,0"
+                               IsVisible="{Binding IsPassword}"
+                               FontSize="12"
+                               FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}"/>
+                    <Grid Grid.Row="0" Grid.Column="1" Margin="8,0,0,0">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding Value}"
+                                 Watermark="{Binding DefaultStr}"
+                                 IsVisible="{Binding !IsPassword}"
+                                 HorizontalAlignment="Stretch"/>
+
+                        <StackPanel Grid.Column="0"
+                                    Spacing="4"
+                                    IsVisible="{Binding IsPassword}">
+                            <Grid>
+                                <TextBox
+                                         Text="{Binding Value}"
+                                         PasswordChar="•"
+                                         IsVisible="{Binding !IsSecretVisible}"
+                                         HorizontalAlignment="Stretch"/>
+                                <TextBox
+                                         Text="{Binding Value}"
+                                         IsVisible="{Binding IsSecretVisible}"
+                                         HorizontalAlignment="Stretch"/>
+
+                                <Button
+                                        Command="{Binding ToggleSecretVisibilityCommand}"
+                                        IsVisible="{Binding IsPassword}"
+                                        Padding="6,4"
+                                        Margin="0,0,6,0"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Right"
+                                        ToolTip.Tip="Show or hide secret">
+                                    <Panel>
+                                        <PathIcon Data="M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9Z"
+                                                  Width="12" Height="12"
+                                                  IsVisible="{Binding !IsSecretVisible}"/>
+                                        <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L15.65,18.92C14.5,19.29 13.28,19.5 12,19.5C7,19.5 2.73,16.39 1,12C1.69,10.24 2.79,8.69 4.19,7.46L2,5.27M12,7A5,5 0 0,1 17,12C17,13.18 16.59,14.27 15.9,15.14L14.44,13.68C14.78,13.19 15,12.62 15,12A3,3 0 0,0 12,9C11.38,9 10.81,9.22 10.32,9.56L8.86,8.1C9.73,7.41 10.82,7 12,7M12,4.5C17,4.5 21.27,7.61 23,12C22.18,14.08 20.79,15.88 19,17.19L17.58,15.77C18.76,14.92 19.77,13.62 20.5,12C18.77,8.11 15.63,6.5 12,6.5C10.98,6.5 10,6.63 9.07,6.87L7.43,5.23C8.84,4.76 10.39,4.5 12,4.5Z"
+                                                  Width="12" Height="12"
+                                                  IsVisible="{Binding IsSecretVisible}"/>
+                                    </Panel>
+                                </Button>
+                            </Grid>
+
+                            <TextBox Text="{Binding ConfirmValue}"
+                                     PasswordChar="•"
+                                     IsVisible="{Binding !IsSecretVisible}"
+                                     Watermark="Confirm"
+                                     HorizontalAlignment="Stretch"/>
+                            <TextBox Text="{Binding ConfirmValue}"
+                                     IsVisible="{Binding IsSecretVisible}"
+                                     Watermark="Confirm"
+                                     HorizontalAlignment="Stretch"/>
+                        </StackPanel>
+
+                    </Grid>
+
+                    <TextBlock Grid.Row="1" Grid.Column="1"
+                               Text="Values do not match"
+                               IsVisible="{Binding HasSecretMismatch}"
+                               Foreground="IndianRed"
+                               FontSize="11"
+                               Margin="8,2,0,0"/>
+                     <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0"
+                                IsVisible="{Binding !IsPassword}">
                          <Button Command="{Binding TogglePinCommand}"
-                                 Padding="6,4"
-                                 ToolTip.Tip="Pin to always include in script">
+                                  Padding="6,4"
+                                  ToolTip.Tip="Pin to always include in script">
                              <Panel>
                                  <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
                                            Width="12" Height="12"
@@ -351,7 +432,32 @@
                                       Width="12" Height="12"/>
                         </Button>
                     </StackPanel>
-                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                    <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="4,0,0,0"
+                                VerticalAlignment="Top"
+                                IsVisible="{Binding IsPassword}">
+                         <Button Command="{Binding TogglePinCommand}"
+                                  Padding="6,4"
+                                  ToolTip.Tip="Pin to always include in script">
+                             <Panel>
+                                 <PathIcon Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding IsPinned}"/>
+                                 <PathIcon Data="M2,5.27L3.28,4L20,20.72L18.73,22L12.8,16.07V22H11.2V16H6V14L8,12V11.27L2,5.27M16,12L18,14V16H17.82L8,6.18V4H7V2H17V4H16V12Z"
+                                           Width="12" Height="12"
+                                           IsVisible="{Binding !IsPinned}"
+                                           Opacity="0.4"/>
+                             </Panel>
+                         </Button>
+                         <Button Command="{Binding ResetToDefaultCommand}"
+                                 Padding="6,4"
+                                 Opacity="{Binding ShouldInclude, Converter={StaticResource PinOpacityConverter}}"
+                                 IsHitTestVisible="{Binding ShouldInclude}"
+                                 ToolTip.Tip="{Binding DefaultStr, StringFormat='Reset to default ({0})'}">
+                            <PathIcon Data="M17.65 6.35A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.76-4.24L13 11h7V4l-2.35 2.35z"
+                                      Width="12" Height="12"/>
+                        </Button>
+                    </StackPanel>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
                                Text="{Binding Help}" TextWrapping="Wrap"
                                FontSize="11" Opacity="0.5" FontStyle="Italic"
                                Margin="0,2,0,4"

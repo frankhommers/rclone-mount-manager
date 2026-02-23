@@ -14,6 +14,10 @@ public partial class MountOptionInputViewModel : TypedOptionViewModel
         _option = option;
         _isSet = !string.IsNullOrEmpty(currentValue);
         InitializeTypedValues(currentValue);
+        if (_option.IsPassword && !string.IsNullOrEmpty(currentValue))
+        {
+            ConfirmValue = currentValue;
+        }
     }
 
     protected override IRcloneOptionDefinition Option => _option;
@@ -38,7 +42,7 @@ public partial class MountOptionInputViewModel : TypedOptionViewModel
         !string.Equals(Value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase);
 
     public override bool ShouldInclude =>
-        (IsPinned && IsSet) || HasNonDefaultValue;
+        ((IsPinned && IsSet) || HasNonDefaultValue) && !HasSecretMismatch;
 
     partial void OnIsSetChanged(bool value)
     {
