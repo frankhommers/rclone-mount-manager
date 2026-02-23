@@ -9,9 +9,9 @@ public sealed record ReliabilityPolicyPreset(
     string Description,
     IReadOnlyDictionary<string, string> OptionOverrides)
 {
-    public const string ConservativeId = "conservative";
-    public const string BalancedId = "balanced";
-    public const string AggressiveId = "aggressive";
+    public const string StableId = "stable";
+    public const string NormalId = "normal";
+    public const string UnreliableId = "unreliable";
 
     public static IReadOnlySet<string> ManagedReliabilityKeys { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
@@ -26,9 +26,9 @@ public sealed record ReliabilityPolicyPreset(
     public static IReadOnlyList<ReliabilityPolicyPreset> Catalog { get; } =
     [
         new(
-            ConservativeId,
-            "Conservative",
-            "Prioritizes safer cache behavior and stronger retry tolerance.",
+            StableId,
+            "Stable connection",
+            "Minimal caching for fast, reliable networks. Sets writes-only VFS cache, short dir cache (2m), and moderate retries.",
             CreateOverrides(
                 ("vfs_cache_mode", "writes"),
                 ("dir_cache_time", "2m"),
@@ -37,9 +37,9 @@ public sealed record ReliabilityPolicyPreset(
                 ("low_level_retries", "20"),
                 ("retries_sleep", "10s"))),
         new(
-            BalancedId,
-            "Balanced",
-            "Balances responsiveness and resilience for day-to-day usage.",
+            NormalId,
+            "Normal",
+            "Moderate caching and retries for typical use. Sets writes-only VFS cache, 5m dir cache, and standard retries.",
             CreateOverrides(
                 ("vfs_cache_mode", "writes"),
                 ("dir_cache_time", "5m"),
@@ -48,9 +48,9 @@ public sealed record ReliabilityPolicyPreset(
                 ("low_level_retries", "10"),
                 ("retries_sleep", "5s"))),
         new(
-            AggressiveId,
-            "Aggressive",
-            "Optimizes for fewer metadata refreshes and heavier retry persistence.",
+            UnreliableId,
+            "Unreliable connection",
+            "Maximum caching and retries for slow or flaky networks. Sets full VFS cache, long dir cache (15m), and aggressive retries.",
             CreateOverrides(
                 ("vfs_cache_mode", "full"),
                 ("dir_cache_time", "15m"),
@@ -67,7 +67,7 @@ public sealed record ReliabilityPolicyPreset(
             return preset;
         }
 
-        return CatalogById[BalancedId];
+        return CatalogById[NormalId];
     }
 
     private static IReadOnlyDictionary<string, ReliabilityPolicyPreset> CatalogById { get; } = CreateCatalogById();

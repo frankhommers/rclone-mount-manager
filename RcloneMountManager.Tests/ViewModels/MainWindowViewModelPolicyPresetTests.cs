@@ -21,7 +21,7 @@ public sealed class MainWindowViewModelPolicyPresetTests : IDisposable
     public void ApplyReliabilityPreset_WritesManagedReliabilityKeys()
     {
         var viewModel = CreateViewModel(CreateProfilesPath());
-        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(ReliabilityPolicyPreset.AggressiveId);
+        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(ReliabilityPolicyPreset.UnreliableId);
 
         SeedMountOptions(viewModel, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -42,7 +42,7 @@ public sealed class MainWindowViewModelPolicyPresetTests : IDisposable
     public void ApplyReliabilityPreset_PreservesUnrelatedMountOptionKeys()
     {
         var viewModel = CreateViewModel(CreateProfilesPath());
-        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(ReliabilityPolicyPreset.ConservativeId);
+        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(ReliabilityPolicyPreset.StableId);
         const string customKey = "custom_flag";
         const string customValue = "true";
         const string rcAddrKey = "rc_addr";
@@ -68,7 +68,7 @@ public sealed class MainWindowViewModelPolicyPresetTests : IDisposable
     {
         var profilesPath = CreateProfilesPath();
         var viewModel = CreateViewModel(profilesPath);
-        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(ReliabilityPolicyPreset.ConservativeId);
+        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(ReliabilityPolicyPreset.StableId);
 
         viewModel.SelectedReliabilityPresetId = preset.Id;
         viewModel.ApplyReliabilityPresetCommand.Execute(null);
@@ -82,7 +82,7 @@ public sealed class MainWindowViewModelPolicyPresetTests : IDisposable
     public void LoadingProfiles_RestoresSelectedPresetIdAndEffectiveManagedOptions()
     {
         var profilesPath = CreateProfilesPath();
-        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(ReliabilityPolicyPreset.AggressiveId);
+        var preset = ReliabilityPolicyPreset.GetByIdOrDefault(ReliabilityPolicyPreset.UnreliableId);
 
         var saveViewModel = CreateViewModel(profilesPath);
         SeedMountOptions(saveViewModel, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
