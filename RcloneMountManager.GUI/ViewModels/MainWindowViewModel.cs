@@ -1,4 +1,6 @@
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Threading;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -1354,10 +1356,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var stage = entry.Stage.ToString().ToLowerInvariant();
         var severity = entry.Severity.ToString().ToLowerInvariant();
         var stageText = $"{category}/{stage}";
-        var profileName = string.Equals(entry.ProfileId, DiagnosticsSink.SystemProfileId, StringComparison.OrdinalIgnoreCase)
-            ? "System"
-            : Profiles.FirstOrDefault(p => string.Equals(p.Id, entry.ProfileId, StringComparison.OrdinalIgnoreCase))?.Name ?? entry.ProfileId;
-        return new DiagnosticsTimelineRow(entry.ProfileId, profileName, timestamp, severity, stageText, entry.Message);
+
+        string profileName;
+        string profileType;
+
+        if (string.Equals(entry.ProfileId, DiagnosticsSink.SystemProfileId, StringComparison.OrdinalIgnoreCase))
+        {
+            profileName = "System";
+            profileType = "system";
+        }
+        else
+        {
+            MountProfile? profile = Profiles.FirstOrDefault(p => string.Equals(p.Id, entry.ProfileId, StringComparison.OrdinalIgnoreCase));
+            profileName = profile?.Name ?? entry.ProfileId;
+            profileType = profile?.IsRemoteDefinition == true ? "remote" : "mount";
+        }
+
+        return new DiagnosticsTimelineRow(entry.ProfileId, profileName, profileType, timestamp, severity, stageText, entry.Message);
     }
 
     partial void OnSelectedDiagnosticsProfileIdChanged(string? value)
@@ -1418,10 +1433,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void SyncDiagnosticsFilters()
     {
         DiagnosticsProfileFilters.Clear();
-        DiagnosticsProfileFilters.Add(new DiagnosticsProfileFilterOption(string.Empty, "All"));
+        DiagnosticsProfileFilters.Add(new DiagnosticsProfileFilterOption(string.Empty, "All", "all"));
         foreach (var profile in Profiles)
         {
-            DiagnosticsProfileFilters.Add(new DiagnosticsProfileFilterOption(profile.Id, profile.Name));
+            var profileType = profile.IsRemoteDefinition ? "remote" : "mount";
+            DiagnosticsProfileFilters.Add(new DiagnosticsProfileFilterOption(profile.Id, profile.Name, profileType));
         }
 
         if (SelectedDiagnosticsProfileFilterOption is null ||
@@ -2598,17 +2614,64 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return Path.Combine(home, "Mounts", name);
     }
 
-    public sealed record DiagnosticsProfileFilterOption(string ProfileId, string DisplayName);
+    public sealed record DiagnosticsProfileFilterOption(string ProfileId, string DisplayName, string ProfileType)
+    {
+        public Geometry? TypeIconData => ProfileType switch
+        {
+            "remote" => Application.Current?.FindResource("MdiCloudOutline") as Geometry,
+            "system" => Application.Current?.FindResource("MdiCogOutline") as Geometry,
+            "all" => null,
+            _ => Application.Current?.FindResource("MdiFolderOutline") as Geometry,
+        };
+
+        public IBrush TypeIconBrush => ProfileType switch
+        {
+            "remote" => new SolidColorBrush(Color.Parse("#4CAF50")),
+            "system" => new SolidColorBrush(Color.Parse("#9E9E9E")),
+            _ => new SolidColorBrush(Color.Parse("#2196F3")),
+        };
+
+        public bool HasTypeIcon => TypeIconData is not null;
+    }
 
     public sealed record DiagnosticsTimelineRow(
         string ProfileId,
         string ProfileName,
+        string ProfileType,
         string TimestampText,
         string SeverityText,
         string StageText,
         string MessageText)
     {
+        private static readonly IBrush MountBrush = new SolidColorBrush(Color.Parse("#2196F3"));
+        private static readonly IBrush RemoteBrush = new SolidColorBrush(Color.Parse("#4CAF50"));
+        private static readonly IBrush SystemBrush = new SolidColorBrush(Color.Parse("#9E9E9E"));
+
         public string DisplayText => $"[{TimestampText}] [{ProfileName}] [{StageText}] [{SeverityText}] {MessageText}";
+
+        private static Geometry? ResolveIconGeometry(string resourceKey)
+        {
+            if (Application.Current?.TryFindResource(resourceKey, ThemeVariant.Default, out object? resource) == true)
+            {
+                return resource as Geometry;
+            }
+
+            return null;
+        }
+
+        public Geometry? TypeIconData => ProfileType switch
+        {
+            "remote" => ResolveIconGeometry("MdiCloudOutline"),
+            "system" => ResolveIconGeometry("MdiCogOutline"),
+            _ => ResolveIconGeometry("MdiFolderOutline"),
+        };
+
+        public IBrush TypeIconBrush => ProfileType switch
+        {
+            "remote" => RemoteBrush,
+            "system" => SystemBrush,
+            _ => MountBrush,
+        };
     }
 
     private sealed class PersistedProfile

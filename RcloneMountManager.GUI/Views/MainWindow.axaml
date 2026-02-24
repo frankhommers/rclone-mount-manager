@@ -469,15 +469,23 @@
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"/>
                                         <ComboBox Grid.Column="4"
-                                                  ItemsSource="{Binding DiagnosticsProfileFilters}"
-                                                  SelectedItem="{Binding SelectedDiagnosticsProfileFilterOption}"
-                                                  HorizontalAlignment="Stretch">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding DisplayName}"/>
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
+                                                   ItemsSource="{Binding DiagnosticsProfileFilters}"
+                                                   SelectedItem="{Binding SelectedDiagnosticsProfileFilterOption}"
+                                                   HorizontalAlignment="Stretch">
+                                             <ComboBox.ItemTemplate>
+                                                 <DataTemplate>
+                                                     <StackPanel Orientation="Horizontal" Spacing="6">
+                                                         <PathIcon Data="{Binding TypeIconData}"
+                                                                   Foreground="{Binding TypeIconBrush}"
+                                                                   Width="14" Height="14"
+                                                                   VerticalAlignment="Center"
+                                                                   IsVisible="{Binding HasTypeIcon}"/>
+                                                         <TextBlock Text="{Binding DisplayName}"
+                                                                    VerticalAlignment="Center"/>
+                                                     </StackPanel>
+                                                 </DataTemplate>
+                                             </ComboBox.ItemTemplate>
+                                         </ComboBox>
                                         <TextBlock Grid.Column="6"
                                                    Text="Search"
                                                    VerticalAlignment="Center"
@@ -542,29 +550,35 @@
                                          IsVisible="{Binding HasDiagnosticsRows}"
                                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                         MinHeight="300"
-                                         MaxHeight="600">
+                                          MinHeight="400"
+                                          MaxHeight="2000">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <Grid ColumnDefinitions="150,100,90,160,*" ColumnSpacing="10">
-                                                <TextBlock Grid.Column="0"
+                                            <Grid ColumnDefinitions="24,150,100,90,160,*" ColumnSpacing="10">
+                                                <PathIcon Grid.Column="0"
+                                                          Data="{Binding TypeIconData}"
+                                                          Foreground="{Binding TypeIconBrush}"
+                                                          Width="14"
+                                                          Height="14"
+                                                          VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="1"
                                                            Text="{Binding TimestampText}"
                                                            FontFamily="Cascadia Mono, Consolas, Menlo"
                                                            FontSize="12"/>
-                                                <TextBlock Grid.Column="1"
+                                                <TextBlock Grid.Column="2"
                                                            Text="{Binding ProfileName}"
                                                            FontFamily="Cascadia Mono, Consolas, Menlo"
                                                            FontSize="12"
                                                            TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Grid.Column="2"
+                                                <TextBlock Grid.Column="3"
                                                            Text="{Binding SeverityText}"
                                                            FontFamily="Cascadia Mono, Consolas, Menlo"
                                                            FontSize="12"/>
-                                                <TextBlock Grid.Column="3"
+                                                <TextBlock Grid.Column="4"
                                                            Text="{Binding StageText}"
                                                            FontFamily="Cascadia Mono, Consolas, Menlo"
                                                            FontSize="12"/>
-                                                <SelectableTextBlock Grid.Column="4"
+                                                <SelectableTextBlock Grid.Column="5"
                                                            Text="{Binding MessageText}"
                                                            FontFamily="Cascadia Mono, Consolas, Menlo"
                                                            FontSize="12"/>
