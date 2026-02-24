@@ -416,20 +416,30 @@ public sealed class MountManagerService
         Directory.CreateDirectory(logDir);
         var logFile = Path.Combine(logDir, $"{profile.Id}.log");
 
-        var rcloneArgs = string.Join(" ", arguments.Select(EscapeArgument));
-        var shellCommand = $"nohup \"{EscapeForBash(binary)}\" {rcloneArgs} >> \"{EscapeForBash(logFile)}\" 2>&1 &";
-
         log($"Launching detached: {binary} {mountCommand} {source} {mountPoint}");
 
-        var result = await Cli.Wrap("/bin/sh")
-            .WithArguments(["-c", shellCommand])
-            .WithValidation(CommandResultValidation.None)
-            .ExecuteBufferedAsync(cancellationToken);
+        var logStream = new FileStream(logFile, FileMode.Append, FileAccess.Write, FileShare.Read);
+        var command = Cli.Wrap(binary)
+            .WithArguments(arguments)
+            .WithStandardOutputPipe(PipeTarget.ToStream(logStream))
+            .WithStandardErrorPipe(PipeTarget.ToStream(logStream))
+            .WithValidation(CommandResultValidation.None);
 
-        if (result.ExitCode != 0)
+        _ = Task.Run(async () =>
         {
-            throw new InvalidOperationException($"Failed to launch rclone: {result.StandardError}");
-        }
+            try
+            {
+                await command.ExecuteAsync(CancellationToken.None);
+            }
+            catch
+            {
+            }
+            finally
+            {
+                await logStream.DisposeAsync();
+                _runningMounts.TryRemove(mountPoint, out _);
+            }
+        }, CancellationToken.None);
 
         if (rcEnabled)
         {
