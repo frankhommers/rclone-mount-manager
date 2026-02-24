@@ -471,7 +471,8 @@
 
                                 <!-- Summary counters -->
                                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
-                                    <Border BorderThickness="1"
+                                    <Border Grid.Column="0"
+                                            BorderThickness="1"
                                             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                             CornerRadius="10"
                                             Padding="14,10">
@@ -484,7 +485,8 @@
                                                        Opacity="0.6"/>
                                         </StackPanel>
                                     </Border>
-                                    <Border BorderThickness="1"
+                                    <Border Grid.Column="1"
+                                            BorderThickness="1"
                                             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                             CornerRadius="10"
                                             Padding="14,10">
@@ -498,7 +500,8 @@
                                                        Opacity="0.6"/>
                                         </StackPanel>
                                     </Border>
-                                    <Border BorderThickness="1"
+                                    <Border Grid.Column="2"
+                                            BorderThickness="1"
                                             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                             CornerRadius="10"
                                             Padding="14,10">
