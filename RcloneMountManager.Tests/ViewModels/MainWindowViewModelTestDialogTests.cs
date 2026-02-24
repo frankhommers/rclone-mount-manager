@@ -6,9 +6,15 @@ namespace RcloneMountManager.Tests.ViewModels;
 public sealed class MainWindowViewModelTestDialogTests : IDisposable
 {
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"test-dialog-tests-{Guid.NewGuid():N}");
+    private readonly List<MainWindowViewModel> _viewModels = [];
 
     public void Dispose()
     {
+        foreach (var viewModel in _viewModels)
+        {
+            viewModel.Dispose();
+        }
+
         if (Directory.Exists(_tempRoot))
         {
             Directory.Delete(_tempRoot, recursive: true);
@@ -19,10 +25,8 @@ public sealed class MainWindowViewModelTestDialogTests : IDisposable
     public async Task TestConnection_OpensDialogAndShowsSuccess()
     {
         var vm = CreateViewModel(
-            testConnectionRunner: (profile, log, _) =>
+            testConnectionRunner: (profile, _) =>
             {
-                log("Listing objects...");
-                log("Connectivity test succeeded.");
                 return Task.CompletedTask;
             });
 
@@ -35,16 +39,15 @@ public sealed class MainWindowViewModelTestDialogTests : IDisposable
         Assert.True(vm.TestDialogSuccess);
         Assert.True(vm.IsTestDialogVisible);
         Assert.Equal("Connection test passed", vm.TestDialogTitle);
-        Assert.Contains(vm.TestDialogLines, l => l.Contains("Connectivity test succeeded."));
+        Assert.Empty(vm.TestDialogLines);
     }
 
     [Fact]
     public async Task TestConnection_OpensDialogAndShowsFailure()
     {
         var vm = CreateViewModel(
-            testConnectionRunner: (profile, log, _) =>
+            testConnectionRunner: (profile, _) =>
             {
-                log("ERR: couldn't connect");
                 throw new InvalidOperationException("Connectivity test failed with exit code 1.");
             });
 
@@ -64,9 +67,8 @@ public sealed class MainWindowViewModelTestDialogTests : IDisposable
     public async Task DismissTestDialog_ClearsState()
     {
         var vm = CreateViewModel(
-            testConnectionRunner: (_, log, _) =>
+            testConnectionRunner: (_, _) =>
             {
-                log("OK");
                 return Task.CompletedTask;
             });
 
@@ -82,18 +84,22 @@ public sealed class MainWindowViewModelTestDialogTests : IDisposable
     }
 
     private MainWindowViewModel CreateViewModel(
-        Func<MountProfile, Action<string>, CancellationToken, Task>? testConnectionRunner = null)
+        Func<MountProfile, CancellationToken, Task>? testConnectionRunner = null)
     {
-        return new MainWindowViewModel(
+        var viewModel = new MainWindowViewModel(
             profilesFilePath: CreateProfilesPath(),
-            mountStartRunner: (_, _, _) => Task.CompletedTask,
+            mountStartRunner: (_, _) => Task.CompletedTask,
             testConnectionRunner: testConnectionRunner,
             runtimeStateVerifier: (_, _) => Task.FromResult(
                 new ProfileRuntimeState(MountLifecycleState.Idle, MountHealthState.Unknown, DateTimeOffset.UtcNow, null)),
             startupEnabledProbe: _ => false,
             runtimeRefreshWaiter: (_, _) => Task.FromResult(false),
             runtimeStateBatchVerifier: (_, _) => Task.FromResult<IReadOnlyList<ProfileRuntimeState>>(Array.Empty<ProfileRuntimeState>()),
-            loadStartupData: false);
+            loadStartupData: false,
+            logger: TestLogger.CreateMainWindowViewModelLogger());
+
+        _viewModels.Add(viewModel);
+        return viewModel;
     }
 
     private string CreateProfilesPath()

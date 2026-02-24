@@ -28,12 +28,12 @@ public sealed class MainWindowViewModelStartupTests : IDisposable
             profilesPath,
             profile,
             (_, _) => Task.FromResult(report),
-            (_, _, _, _) =>
+            (_, _, _) =>
             {
                 enableCalled = true;
                 return Task.CompletedTask;
             },
-            (_, _, _) => Task.CompletedTask);
+            (_, _) => Task.CompletedTask);
 
         await viewModel.ToggleStartupCommand.ExecuteAsync(null);
 
@@ -56,12 +56,12 @@ public sealed class MainWindowViewModelStartupTests : IDisposable
             profilesPath,
             profile,
             (_, _) => Task.FromResult(report),
-            (_, _, _, _) =>
+            (_, _, _) =>
             {
                 enableCalled = true;
                 return Task.CompletedTask;
             },
-            (_, _, _) => Task.CompletedTask);
+            (_, _) => Task.CompletedTask);
 
         await viewModel.ToggleStartupCommand.ExecuteAsync(null);
 
@@ -85,8 +85,8 @@ public sealed class MainWindowViewModelStartupTests : IDisposable
             profilesPath,
             profile,
             (_, _) => Task.FromResult(new StartupPreflightReport().AddPass("binary", "binary ok")),
-            (_, _, _, _) => Task.CompletedTask,
-            (_, _, _) =>
+            (_, _, _) => Task.CompletedTask,
+            (_, _) =>
             {
                 disableCalled = true;
                 return Task.CompletedTask;
@@ -113,8 +113,8 @@ public sealed class MainWindowViewModelStartupTests : IDisposable
             profilesPath,
             profile,
             (_, _) => Task.FromResult(new StartupPreflightReport().AddCritical("mount-path", "missing mount path")),
-            (_, _, _, _) => Task.CompletedTask,
-            (_, _, _) => Task.CompletedTask);
+            (_, _, _) => Task.CompletedTask,
+            (_, _) => Task.CompletedTask);
 
         var canStartBefore = viewModel.StartMountCommand.CanExecute(null);
         var canStopBefore = viewModel.StopMountCommand.CanExecute(null);
@@ -130,8 +130,8 @@ public sealed class MainWindowViewModelStartupTests : IDisposable
         string profilesPath,
         MountProfile profile,
         Func<MountProfile, CancellationToken, Task<StartupPreflightReport>> startupPreflightRunner,
-        Func<MountProfile, string, Action<string>, CancellationToken, Task> startupEnableRunner,
-        Func<MountProfile, Action<string>, CancellationToken, Task> startupDisableRunner)
+        Func<MountProfile, string, CancellationToken, Task> startupEnableRunner,
+        Func<MountProfile, CancellationToken, Task> startupDisableRunner)
     {
         var viewModel = new MainWindowViewModel(
             profilesFilePath: profilesPath,

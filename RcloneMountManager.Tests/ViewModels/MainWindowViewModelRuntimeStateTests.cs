@@ -7,9 +7,15 @@ namespace RcloneMountManager.Tests.ViewModels;
 public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
 {
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"main-window-runtime-state-tests-{Guid.NewGuid():N}");
+    private readonly List<MainWindowViewModel> _viewModels = [];
 
     public void Dispose()
     {
+        foreach (var viewModel in _viewModels)
+        {
+            viewModel.Dispose();
+        }
+
         if (Directory.Exists(_tempRoot))
         {
             Directory.Delete(_tempRoot, recursive: true);
@@ -23,7 +29,7 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
         var mountedState = CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy);
 
         var viewModel = CreateViewModel(
-            mountStartRunner: async (_, _, _) => await gate.Task,
+            mountStartRunner: async (_, _) => await gate.Task,
             runtimeStateVerifier: (_, _) => Task.FromResult(mountedState));
 
         var startTask = viewModel.StartMountCommand.ExecuteAsync(null);
@@ -199,8 +205,8 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
     }
 
     private MainWindowViewModel CreateViewModel(
-        Func<MountProfile, Action<string>, CancellationToken, Task>? mountStartRunner = null,
-        Func<MountProfile, Action<string>, CancellationToken, Task>? mountStopRunner = null,
+        Func<MountProfile, CancellationToken, Task>? mountStartRunner = null,
+        Func<MountProfile, CancellationToken, Task>? mountStopRunner = null,
         Func<MountProfile, CancellationToken, Task<bool>>? mountedProbe = null,
         Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>>? runtimeStateVerifier = null,
         Func<TimeSpan, CancellationToken, Task<bool>>? runtimeRefreshWaiter = null)
@@ -219,7 +225,7 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
             return states;
         }
 
-        return new MainWindowViewModel(
+        var viewModel = new MainWindowViewModel(
             profilesFilePath: CreateProfilesPath(),
             mountStartRunner: mountStartRunner,
             mountStopRunner: mountStopRunner,
@@ -228,7 +234,11 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
             startupEnabledProbe: _ => false,
             runtimeRefreshWaiter: runtimeRefreshWaiter,
             runtimeStateBatchVerifier: RuntimeStateBatchVerifier,
-            loadStartupData: false);
+            loadStartupData: false,
+            logger: TestLogger.CreateMainWindowViewModelLogger());
+
+        _viewModels.Add(viewModel);
+        return viewModel;
     }
 
     private string CreateProfilesPath()

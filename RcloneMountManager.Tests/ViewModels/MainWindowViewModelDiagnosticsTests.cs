@@ -6,9 +6,15 @@ namespace RcloneMountManager.Tests.ViewModels;
 public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
 {
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"main-window-diagnostics-tests-{Guid.NewGuid():N}");
+    private readonly List<MainWindowViewModel> _viewModels = [];
 
     public void Dispose()
     {
+        foreach (var viewModel in _viewModels)
+        {
+            viewModel.Dispose();
+        }
+
         if (Directory.Exists(_tempRoot))
         {
             Directory.Delete(_tempRoot, recursive: true);
@@ -50,11 +56,7 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
     public async Task DiagnosticsCategoryFilter_FiltersRemotesAndMounts()
     {
         var viewModel = CreateViewModel(
-            mountStartRunner: (profile, log, _) =>
-            {
-                log($"runner callback for {profile.Id}");
-                return Task.CompletedTask;
-            },
+            mountStartRunner: (_, _) => Task.CompletedTask,
             runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy)));
 
         viewModel.AddRemoteCommand.Execute(null);
@@ -78,13 +80,11 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
     public async Task DiagnosticsSearchText_FiltersMessages()
     {
         var viewModel = CreateViewModel(
-            mountStartRunner: (profile, log, _) =>
-            {
-                log("unique-search-token");
-                log("other message");
-                return Task.CompletedTask;
-            },
-            runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy)));
+            mountStartRunner: (_, _) => Task.CompletedTask,
+            runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(
+                MountLifecycleState.Mounted,
+                MountHealthState.Healthy,
+                "unique-search-token")));
 
         await viewModel.StartMountCommand.ExecuteAsync(null);
         viewModel.SelectDiagnosticsCommand.Execute(null);
@@ -99,11 +99,7 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
     public async Task DiagnosticsProfileFilter_ShowsOnlyMatchingProfileEvents()
     {
         var viewModel = CreateViewModel(
-            mountStartRunner: (profile, log, _) =>
-            {
-                log($"runner callback for {profile.Id}");
-                return Task.CompletedTask;
-            },
+            mountStartRunner: (_, _) => Task.CompletedTask,
             runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy)));
 
         var firstProfile = viewModel.SelectedProfile;
@@ -161,11 +157,7 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
     public async Task DiagnosticsTimeline_ProjectsEventsInChronologicalOrder()
     {
         var viewModel = CreateViewModel(
-            mountStartRunner: (profile, log, _) =>
-            {
-                log($"runner callback for {profile.Id}");
-                return Task.CompletedTask;
-            },
+            mountStartRunner: (_, _) => Task.CompletedTask,
             runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy)));
 
         var profile = viewModel.SelectedProfile;
@@ -178,23 +170,19 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
         Assert.All(viewModel.DiagnosticsRows, row => Assert.False(string.IsNullOrWhiteSpace(row.StageText)));
         Assert.All(viewModel.DiagnosticsRows, row => Assert.False(string.IsNullOrWhiteSpace(row.MessageText)));
 
+        var initializationIndex = FindLogIndex(viewModel.Logs, "Profiles file");
         var startedIndex = FindLogIndex(viewModel.Logs, "Starting mount");
-        var callbackIndex = FindLogIndex(viewModel.Logs, "runner callback");
-        var statusIndex = FindLogIndex(viewModel.Logs, "Status for");
+        var statusIndex = FindLogIndex(viewModel.Logs, "Status:");
 
-        Assert.True(startedIndex < callbackIndex, "Initialization event should appear before execution event.");
-        Assert.True(callbackIndex < statusIndex, "Execution event should appear before completion event.");
+        Assert.True(initializationIndex < startedIndex, "Initialization event should appear before execution event.");
+        Assert.True(startedIndex < statusIndex, "Execution event should appear before completion event.");
     }
 
     [Fact]
     public async Task ChangingDiagnosticsFilters_RecomputesTimelineDeterministically()
     {
         var viewModel = CreateViewModel(
-            mountStartRunner: (profile, log, _) =>
-            {
-                log($"runner callback for {profile.Id}");
-                return Task.CompletedTask;
-            },
+            mountStartRunner: (_, _) => Task.CompletedTask,
             runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy)),
             runtimeRefreshWaiter: (_, _) => Task.FromResult(false));
 
@@ -235,7 +223,7 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
     }
 
     private MainWindowViewModel CreateViewModel(
-        Func<MountProfile, Action<string>, CancellationToken, Task>? mountStartRunner = null,
+        Func<MountProfile, CancellationToken, Task>? mountStartRunner = null,
         Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>>? runtimeStateVerifier = null,
         Func<TimeSpan, CancellationToken, Task<bool>>? runtimeRefreshWaiter = null)
     {
@@ -253,14 +241,18 @@ public sealed class MainWindowViewModelDiagnosticsTests : IDisposable
             return states;
         }
 
-        return new MainWindowViewModel(
+        var viewModel = new MainWindowViewModel(
             profilesFilePath: CreateProfilesPath(),
             mountStartRunner: mountStartRunner,
             runtimeStateVerifier: runtimeStateVerifier,
             startupEnabledProbe: _ => false,
             runtimeRefreshWaiter: runtimeRefreshWaiter,
             runtimeStateBatchVerifier: RuntimeStateBatchVerifier,
-            loadStartupData: false);
+            loadStartupData: false,
+            logger: TestLogger.CreateMainWindowViewModelLogger());
+
+        _viewModels.Add(viewModel);
+        return viewModel;
     }
 
     private string CreateProfilesPath()
