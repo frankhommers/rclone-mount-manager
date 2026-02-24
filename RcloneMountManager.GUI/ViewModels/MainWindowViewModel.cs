@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.Core.Services;
 using Serilog;
+using Serilog.Context;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -1241,17 +1242,21 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ? message
             : error;
 
-        if (resolvedSeverity is ProfileLogSeverity.Error)
+        var profileName = Profiles.FirstOrDefault(p => string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase))?.Name ?? profileId;
+        using (LogContext.PushProperty("ProfileName", profileName))
         {
-            Log.Error("{Message}", message);
-        }
-        else if (resolvedSeverity is ProfileLogSeverity.Warning)
-        {
-            Log.Warning("{Message}", message);
-        }
-        else
-        {
-            Log.Information("{Message}", message);
+            if (resolvedSeverity is ProfileLogSeverity.Error)
+            {
+                Log.Error("[{ProfileName}] {Message}", profileName, message);
+            }
+            else if (resolvedSeverity is ProfileLogSeverity.Warning)
+            {
+                Log.Warning("[{ProfileName}] {Message}", profileName, message);
+            }
+            else
+            {
+                Log.Information("[{ProfileName}] {Message}", profileName, message);
+            }
         }
 
         var entry = new ProfileLogEvent(profileId, DateTimeOffset.UtcNow, category, stage, resolvedSeverity, message, resolvedError);
@@ -1552,6 +1557,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     partial void OnSelectedBackendChanged(RcloneBackendInfo? value)
     {
         OnPropertyChanged(nameof(SelectedBackendDescription));
+
+        var previousValues = BackendOptionInputs
+            .Concat(AdvancedBackendOptionInputs)
+            .Where(o => !string.IsNullOrWhiteSpace(o.Value))
+            .ToDictionary(o => o.Name, o => (o.Value, o.IsPassword));
+
         BackendOptionInputs.Clear();
         AdvancedBackendOptionInputs.Clear();
         if (value is null)
@@ -1570,6 +1581,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         HasAdvancedBackendOptions = value.Options.Any(o => o.Advanced && !o.Required);
 
         PopulateBackendOptionInputs(value);
+
+        foreach (var input in BackendOptionInputs.Concat(AdvancedBackendOptionInputs))
+        {
+            if (previousValues.TryGetValue(input.Name, out var saved))
+            {
+                input.Value = saved.Value;
+                if (input.IsPassword)
+                {
+                    input.ConfirmValue = saved.Value;
+                }
+            }
+        }
 
         OnPropertyChanged(nameof(HasBackendOptions));
         OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));

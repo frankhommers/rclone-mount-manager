@@ -134,5 +134,20 @@ public partial class MountProfile : ObservableObject
         OnPropertyChanged(nameof(HasRemoteSidebarSubtitle));
     }
 
+    partial void OnRuntimeStateChanged(ProfileRuntimeState value)
+    {
+        OnPropertyChanged(nameof(SidebarStatusColor));
+    }
+
+    public string SidebarStatusColor => RuntimeState.Lifecycle switch
+    {
+        MountLifecycleState.Mounted when RuntimeState.Health is MountHealthState.Healthy => "#22C55E",
+        MountLifecycleState.Mounted when RuntimeState.Health is MountHealthState.Degraded => "#EAB308",
+        MountLifecycleState.Mounted => "#22C55E",
+        MountLifecycleState.Mounting => "#F97316",
+        MountLifecycleState.Failed => "#EF4444",
+        _ => "#6B7280",
+    };
+
     public override string ToString() => DisplayName;
 }
