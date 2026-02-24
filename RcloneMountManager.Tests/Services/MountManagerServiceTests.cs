@@ -154,6 +154,41 @@ public class MountManagerServiceTests
         Assert.DoesNotContain("--rc --rc-no-auth --rc-addr", script);
     }
 
+    [Fact]
+    public void ResolveAbsoluteBinaryPath_ReturnsAbsolutePath_WhenAlreadyRooted()
+    {
+        string result = MountManagerService.ResolveAbsoluteBinaryPath("/usr/local/bin/rclone");
+
+        Assert.Equal("/usr/local/bin/rclone", result);
+    }
+
+    [Fact]
+    public void ResolveAbsoluteBinaryPath_ResolvesFromPath_WhenRelativeName()
+    {
+        string result = MountManagerService.ResolveAbsoluteBinaryPath("rclone");
+
+        Assert.True(Path.IsPathRooted(result), $"Expected absolute path but got: {result}");
+        Assert.EndsWith("rclone", result);
+    }
+
+    [Fact]
+    public void ResolveAbsoluteBinaryPath_FallsBackToOriginal_WhenNotFound()
+    {
+        string result = MountManagerService.ResolveAbsoluteBinaryPath("nonexistent-binary-xyz");
+
+        Assert.Equal("nonexistent-binary-xyz", result);
+    }
+
+    [Fact]
+    public void ResolveAbsoluteBinaryPath_TreatsEmptyAsRclone()
+    {
+        string result = MountManagerService.ResolveAbsoluteBinaryPath("");
+
+        Assert.True(
+            Path.IsPathRooted(result) || result == "rclone",
+            $"Expected resolved path or 'rclone' fallback but got: {result}");
+    }
+
     private static MountProfile CreateProfile()
     {
         return new MountProfile

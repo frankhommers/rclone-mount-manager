@@ -906,6 +906,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     return;
                 }
 
+                var resolved = MountManagerService.ResolveAbsoluteBinaryPath(profile.RcloneBinaryPath);
+                if (!string.Equals(profile.RcloneBinaryPath, resolved, StringComparison.Ordinal))
+                {
+                    profile.RcloneBinaryPath = resolved;
+                    AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution, $"Resolved rclone binary path to '{resolved}'.");
+                }
+
                 var script = _mountManagerService.GenerateScript(profile);
                 await _startupEnableRunner(profile, script, line => AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution, line), cancellationToken);
                 profile.StartAtLogin = true;

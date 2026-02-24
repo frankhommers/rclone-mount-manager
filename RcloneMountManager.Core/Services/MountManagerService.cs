@@ -1087,5 +1087,26 @@ public sealed class MountManagerService
         return await rcClient.GetPidAsync(rcPort, cancellationToken);
     }
 
+    public static string ResolveAbsoluteBinaryPath(string binaryPath)
+    {
+        if (string.IsNullOrWhiteSpace(binaryPath))
+            binaryPath = "rclone";
+
+        if (Path.IsPathRooted(binaryPath))
+            return binaryPath;
+
+        var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+        var separator = OperatingSystem.IsWindows() ? ';' : ':';
+
+        foreach (var dir in pathEnv.Split(separator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(dir, binaryPath);
+            if (File.Exists(candidate))
+                return candidate;
+        }
+
+        return binaryPath;
+    }
+
     private sealed record RunningMount(int Pid, int RcPort);
 }
