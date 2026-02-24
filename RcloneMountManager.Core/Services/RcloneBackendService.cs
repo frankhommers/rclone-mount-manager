@@ -80,8 +80,9 @@ public sealed class RcloneBackendService
 
         var binary = string.IsNullOrWhiteSpace(rcloneBinaryPath) ? "rclone" : rcloneBinaryPath;
 
+        var optionList = options.ToList();
         var args = new List<string> { "config", "create", remoteName.Trim(), backendName.Trim() };
-        foreach (var option in options)
+        foreach (var option in optionList)
         {
             if (string.IsNullOrWhiteSpace(option.Name) || string.IsNullOrWhiteSpace(option.Value))
             {
@@ -90,6 +91,11 @@ public sealed class RcloneBackendService
 
             args.Add(option.Name);
             args.Add(option.Value);
+        }
+
+        if (optionList.Any(o => o.IsPassword && !string.IsNullOrWhiteSpace(o.Value)))
+        {
+            args.Add("--obscure");
         }
 
         var result = await Cli.Wrap(binary)
