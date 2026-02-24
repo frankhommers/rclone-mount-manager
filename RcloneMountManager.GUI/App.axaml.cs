@@ -5,6 +5,7 @@ using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
 using System.IO.Pipes;
@@ -20,6 +21,8 @@ namespace RcloneMountManager;
 
 public partial class App : Application
 {
+  public static IServiceProvider Services { get; set; } = null!;
+
   private const string PipeName = "RcloneMountManager_Activate";
   private CancellationTokenSource? _pipeCts;
 
@@ -33,7 +36,7 @@ public partial class App : Application
     if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
     {
       DisableAvaloniaDataAnnotationValidation();
-      var viewModel = new MainWindowViewModel();
+      var viewModel = Services.GetRequiredService<MainWindowViewModel>();
       var mainWindow = new MainWindow
       {
         DataContext = viewModel,

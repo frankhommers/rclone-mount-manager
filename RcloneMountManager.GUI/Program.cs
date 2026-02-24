@@ -1,5 +1,9 @@
 using Avalonia;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using RcloneMountManager.Core.Services;
 using RcloneMountManager.Services;
+using RcloneMountManager.ViewModels;
 using Serilog;
 using System;
 using System.IO;
@@ -26,9 +30,31 @@ sealed class Program
       return;
     }
 
+    var host = Host.CreateDefaultBuilder(args)
+      .UseSerilog()
+      .ConfigureServices(services =>
+      {
+        services.AddSingleton<MountManagerService>();
+        services.AddSingleton<LaunchAgentService>();
+        services.AddSingleton<RcloneBackendService>();
+        services.AddSingleton<StartupPreflightService>();
+        services.AddSingleton<MountHealthService>();
+        services.AddSingleton<MainWindowViewModel>(sp =>
+          new MainWindowViewModel(
+            mountManagerService: sp.GetRequiredService<MountManagerService>(),
+            launchAgentService: sp.GetRequiredService<LaunchAgentService>(),
+            rcloneBackendService: sp.GetRequiredService<RcloneBackendService>(),
+            startupPreflightService: sp.GetRequiredService<StartupPreflightService>(),
+            mountHealthService: sp.GetRequiredService<MountHealthService>()));
+      })
+      .Build();
+
+    App.Services = host.Services;
+
     try
     {
       Log.Information("Starting Rclone Mount Manager");
+      host.Start();
       BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
     catch (Exception ex)
@@ -38,6 +64,8 @@ sealed class Program
     }
     finally
     {
+      host.StopAsync().GetAwaiter().GetResult();
+      host.Dispose();
       Log.CloseAndFlush();
     }
   }
