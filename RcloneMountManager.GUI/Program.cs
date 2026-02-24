@@ -1,4 +1,5 @@
 using Avalonia;
+using RcloneMountManager.Services;
 using Serilog;
 using System;
 using System.IO;
@@ -80,6 +81,7 @@ sealed class Program
         retainedFileCountLimit: 14,
         shared: true,
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+      .WriteTo.Sink(DiagnosticsSink.Instance)
       .CreateLogger();
   }
 }

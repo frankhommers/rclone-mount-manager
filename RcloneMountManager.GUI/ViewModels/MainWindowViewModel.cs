@@ -5,8 +5,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.Core.Services;
+using RcloneMountManager.Services;
 using Serilog;
 using Serilog.Context;
+using Serilog.Events;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -976,6 +978,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 return;
             }
 
+            _profileLogs.TryAdd(DiagnosticsSink.SystemProfileId, new List<ProfileLogEvent>());
+            DiagnosticsSink.Instance.RegisterHandler(OnSerilogEvent);
+
             _runtimeMonitoringCts = new CancellationTokenSource();
             _runtimeMonitoringTask = Task.Run(() => RunRuntimeMonitoringLoopAsync(_runtimeMonitoringCts.Token));
             _runtimeMonitoringActive = true;
@@ -1244,6 +1249,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         var profileName = Profiles.FirstOrDefault(p => string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase))?.Name ?? profileId;
         using (LogContext.PushProperty("ProfileName", profileName))
+        using (LogContext.PushProperty("ProfileId", profileId))
+        using (LogContext.PushProperty("FromAppendLog", true))
         {
             if (resolvedSeverity is ProfileLogSeverity.Error)
             {
@@ -1276,6 +1283,53 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         RefreshDiagnosticsTimeline();
     }
 
+    private void OnSerilogEvent(LogEvent logEvent)
+    {
+        if (logEvent.Properties.TryGetValue("FromAppendLog", out LogEventPropertyValue? flag)
+            && flag is ScalarValue { Value: true })
+        {
+            return;
+        }
+
+        var profileId = DiagnosticsSink.ExtractProfileId(logEvent);
+        var message = DiagnosticsSink.RenderMessage(logEvent);
+        var severity = logEvent.Level switch
+        {
+            LogEventLevel.Error or LogEventLevel.Fatal => ProfileLogSeverity.Error,
+            LogEventLevel.Warning => ProfileLogSeverity.Warning,
+            _ => ProfileLogSeverity.Information,
+        };
+
+        string? errorText = logEvent.Exception?.Message;
+        if (string.IsNullOrWhiteSpace(errorText) && severity is ProfileLogSeverity.Error)
+        {
+            errorText = message;
+        }
+
+        var entry = new ProfileLogEvent(profileId, DateTimeOffset.UtcNow, ProfileLogCategory.General, ProfileLogStage.Execution, severity, message, errorText);
+
+        if (!_profileLogs.TryGetValue(profileId, out var logEntries))
+        {
+            logEntries = new List<ProfileLogEvent>();
+            _profileLogs[profileId] = logEntries;
+        }
+
+        logEntries.Add(entry);
+        while (logEntries.Count > MaxProfileLogEntries)
+        {
+            logEntries.RemoveAt(0);
+        }
+
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            RefreshDiagnosticsTimeline();
+        }
+        else
+        {
+            Dispatcher.UIThread.Post(RefreshDiagnosticsTimeline);
+        }
+    }
+
     private static ProfileLogSeverity ResolveSeverity(string message)
     {
         if (message.StartsWith("ERR:", StringComparison.OrdinalIgnoreCase))
@@ -1299,7 +1353,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         var stage = entry.Stage.ToString().ToLowerInvariant();
         var severity = entry.Severity.ToString().ToLowerInvariant();
         var stageText = $"{category}/{stage}";
-        var profileName = Profiles.FirstOrDefault(p => string.Equals(p.Id, entry.ProfileId, StringComparison.OrdinalIgnoreCase))?.Name ?? entry.ProfileId;
+        var profileName = string.Equals(entry.ProfileId, DiagnosticsSink.SystemProfileId, StringComparison.OrdinalIgnoreCase)
+            ? "System"
+            : Profiles.FirstOrDefault(p => string.Equals(p.Id, entry.ProfileId, StringComparison.OrdinalIgnoreCase))?.Name ?? entry.ProfileId;
         return new DiagnosticsTimelineRow(entry.ProfileId, profileName, timestamp, severity, stageText, entry.Message);
     }
 
