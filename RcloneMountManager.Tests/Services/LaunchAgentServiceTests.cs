@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.Core.Services;
 
@@ -22,7 +24,7 @@ public sealed class LaunchAgentServiceTests : IDisposable
         var service = CreateService(calls);
         var profile = CreateProfile();
 
-        await service.EnableAsync(profile, "#!/bin/bash\nexit 0\n", _ => { }, CancellationToken.None);
+        await service.EnableAsync(profile, "#!/bin/bash\nexit 0\n", CancellationToken.None);
 
         var plistPath = service.GetLaunchAgentPlistPath(profile);
         Assert.Equal(3, calls.Count);
@@ -45,7 +47,7 @@ public sealed class LaunchAgentServiceTests : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(plistPath)!);
         await File.WriteAllTextAsync(plistPath, "plist");
 
-        await service.DisableAsync(profile, _ => { }, CancellationToken.None);
+        await service.DisableAsync(profile, CancellationToken.None);
 
         Assert.Single(calls);
         Assert.Equal("launchctl", calls[0].Command);
@@ -60,7 +62,7 @@ public sealed class LaunchAgentServiceTests : IDisposable
         var profile = CreateProfile();
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.EnableAsync(profile, "#!/bin/bash\nexit 0\n", _ => { }, CancellationToken.None));
+            service.EnableAsync(profile, "#!/bin/bash\nexit 0\n", CancellationToken.None));
 
         Assert.Contains("plutil -lint", ex.Message);
         Assert.Contains("exit code 1", ex.Message);
@@ -71,17 +73,15 @@ public sealed class LaunchAgentServiceTests : IDisposable
     [Fact]
     public async Task DisableAsync_ToleratesBootoutFailure_StillDeletesPlist()
     {
-        var logMessages = new List<string>();
         var service = CreateServiceForFailure("launchctl", 3, "", "No such process");
         var profile = CreateProfile();
         var plistPath = service.GetLaunchAgentPlistPath(profile);
         Directory.CreateDirectory(Path.GetDirectoryName(plistPath)!);
         await File.WriteAllTextAsync(plistPath, "plist");
 
-        await service.DisableAsync(profile, logMessages.Add, CancellationToken.None);
+        await service.DisableAsync(profile, CancellationToken.None);
 
         Assert.False(File.Exists(plistPath));
-        Assert.Contains(logMessages, m => m.Contains("exited with code 3"));
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public sealed class LaunchAgentServiceTests : IDisposable
         var profile = CreateProfile();
         var expectedLabel = "com.rclonemountmanager.profile.profile-123";
 
-        await service.EnableAsync(profile, "#!/bin/bash\nexit 0\n", _ => { }, CancellationToken.None);
+        await service.EnableAsync(profile, "#!/bin/bash\nexit 0\n", CancellationToken.None);
 
         var plistPath = service.GetLaunchAgentPlistPath(profile);
         var plistContent = await File.ReadAllTextAsync(plistPath);
@@ -107,6 +107,7 @@ public sealed class LaunchAgentServiceTests : IDisposable
         var userProfile = Path.Combine(_tempRoot, "User");
 
         return new LaunchAgentService(
+            NullLogger<LaunchAgentService>.Instance,
             appData,
             userProfile,
             (command, args, _) =>
@@ -123,6 +124,7 @@ public sealed class LaunchAgentServiceTests : IDisposable
         var userProfile = Path.Combine(_tempRoot, "User");
 
         return new LaunchAgentService(
+            NullLogger<LaunchAgentService>.Instance,
             appData,
             userProfile,
             (command, _, _) =>

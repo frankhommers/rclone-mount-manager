@@ -3,11 +3,11 @@ using Avalonia.Threading;
 using Avalonia.Styling;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.Core.Services;
 using RcloneMountManager.Services;
-using Serilog;
-using Serilog.Context;
 using Serilog.Events;
 using System;
 using System.Collections.Generic;
@@ -33,17 +33,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly RcloneBackendService _rcloneBackendService;
     private readonly StartupPreflightService _startupPreflightService;
     private readonly MountHealthService _mountHealthService;
+    private readonly ILogger<MainWindowViewModel> _logger;
     private readonly Func<MountProfile, CancellationToken, Task<StartupPreflightReport>> _startupPreflightRunner;
-    private readonly Func<MountProfile, Action<string>, CancellationToken, Task> _mountStartRunner;
-    private readonly Func<MountProfile, Action<string>, CancellationToken, Task> _mountStopRunner;
+    private readonly Func<MountProfile, CancellationToken, Task> _mountStartRunner;
+    private readonly Func<MountProfile, CancellationToken, Task> _mountStopRunner;
     private readonly Func<MountProfile, CancellationToken, Task<bool>> _mountedProbe;
     private readonly Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>> _runtimeStateVerifier;
-    private readonly Func<MountProfile, string, Action<string>, CancellationToken, Task> _startupEnableRunner;
-    private readonly Func<MountProfile, Action<string>, CancellationToken, Task> _startupDisableRunner;
+    private readonly Func<MountProfile, string, CancellationToken, Task> _startupEnableRunner;
+    private readonly Func<MountProfile, CancellationToken, Task> _startupDisableRunner;
     private readonly Func<MountProfile, bool> _startupEnabledProbe;
     private readonly Func<TimeSpan, CancellationToken, Task<bool>> _runtimeRefreshWaiter;
     private readonly Func<IEnumerable<MountProfile>, CancellationToken, Task<IReadOnlyList<ProfileRuntimeState>>> _runtimeStateBatchVerifier;
-    private readonly Func<MountProfile, Action<string>, CancellationToken, Task>? _testConnectionRunner;
+    private readonly Func<MountProfile, CancellationToken, Task>? _testConnectionRunner;
     private readonly bool _isStartupSupported;
     public MountOptionsViewModel MountOptionsVm { get; } = new();
     private readonly string _profilesFilePath;
@@ -215,24 +216,26 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         RcloneBackendService? rcloneBackendService = null,
         StartupPreflightService? startupPreflightService = null,
         MountHealthService? mountHealthService = null,
-        Func<MountProfile, Action<string>, CancellationToken, Task>? mountStartRunner = null,
-        Func<MountProfile, Action<string>, CancellationToken, Task>? mountStopRunner = null,
-        Func<MountProfile, Action<string>, CancellationToken, Task>? testConnectionRunner = null,
+        Func<MountProfile, CancellationToken, Task>? mountStartRunner = null,
+        Func<MountProfile, CancellationToken, Task>? mountStopRunner = null,
+        Func<MountProfile, CancellationToken, Task>? testConnectionRunner = null,
         Func<MountProfile, CancellationToken, Task<bool>>? mountedProbe = null,
         Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>>? runtimeStateVerifier = null,
         Func<MountProfile, CancellationToken, Task<StartupPreflightReport>>? startupPreflightRunner = null,
-        Func<MountProfile, string, Action<string>, CancellationToken, Task>? startupEnableRunner = null,
-        Func<MountProfile, Action<string>, CancellationToken, Task>? startupDisableRunner = null,
+        Func<MountProfile, string, CancellationToken, Task>? startupEnableRunner = null,
+        Func<MountProfile, CancellationToken, Task>? startupDisableRunner = null,
         Func<MountProfile, bool>? startupEnabledProbe = null,
         Func<TimeSpan, CancellationToken, Task<bool>>? runtimeRefreshWaiter = null,
         Func<IEnumerable<MountProfile>, CancellationToken, Task<IReadOnlyList<ProfileRuntimeState>>>? runtimeStateBatchVerifier = null,
-        bool loadStartupData = true)
+        bool loadStartupData = true,
+        ILogger<MainWindowViewModel>? logger = null)
     {
-        _mountManagerService = mountManagerService ?? new MountManagerService();
-        _launchAgentService = launchAgentService ?? new LaunchAgentService();
-        _rcloneBackendService = rcloneBackendService ?? new RcloneBackendService();
-        _startupPreflightService = startupPreflightService ?? new StartupPreflightService();
-        _mountHealthService = mountHealthService ?? new MountHealthService();
+        _mountManagerService = mountManagerService ?? new MountManagerService(NullLogger<MountManagerService>.Instance);
+        _launchAgentService = launchAgentService ?? new LaunchAgentService(NullLogger<LaunchAgentService>.Instance);
+        _rcloneBackendService = rcloneBackendService ?? new RcloneBackendService(NullLogger<RcloneBackendService>.Instance);
+        _startupPreflightService = startupPreflightService ?? new StartupPreflightService(NullLogger<StartupPreflightService>.Instance);
+        _mountHealthService = mountHealthService ?? new MountHealthService(NullLogger<MountHealthService>.Instance);
+        _logger = logger ?? NullLogger<MainWindowViewModel>.Instance;
         _mountStartRunner = mountStartRunner ?? _mountManagerService.StartAsync;
         _mountStopRunner = mountStopRunner ?? _mountManagerService.StopAsync;
         _testConnectionRunner = testConnectionRunner;
@@ -297,7 +300,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         SyncDiagnosticsFilters();
         HasPendingChanges = false;
-        AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Profiles file: {_profilesFilePath}");
+        if (SelectedProfile is { } selectedProfile)
+            using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Initialization))
+                _logger.LogInformation("Profiles file: {ProfilesFilePath}", _profilesFilePath);
 
         if (!loadStartupData)
         {
@@ -313,7 +318,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
             catch (Exception ex)
             {
-                AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Could not load mount options: {ex.Message}", ProfileLogSeverity.Error, ex.Message);
+                if (SelectedProfile is { } selectedProfile)
+                    using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Initialization))
+                        _logger.LogError(ex, "Could not load mount options: {ErrorMessage}", ex.Message);
             }
         });
     }
@@ -456,11 +463,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 SelectedBackend = AvailableBackends[0];
             }
 
-            AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Loaded {AvailableBackends.Count} rclone backend types.");
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Completion))
+                    _logger.LogInformation("Loaded {BackendCount} rclone backend types.", AvailableBackends.Count);
         }
         catch (Exception ex)
         {
-            AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Could not load backend list: {ex.Message}", ProfileLogSeverity.Error, ex.Message);
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Initialization))
+                    _logger.LogError(ex, "Could not load backend list: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -508,7 +519,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 .Where(o => !string.IsNullOrWhiteSpace(o.Value))
                 .ToDictionary(o => o.Name, o => o.Value);
 
-            AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Created remote '{NewRemoteName}' ({SelectedBackend.Name}).");
+            using (ProfileScope(activeProfile.Id, ProfileLogCategory.General, ProfileLogStage.Completion))
+                _logger.LogInformation("Created remote '{RemoteName}' ({BackendName}).", NewRemoteName, SelectedBackend.Name);
             StatusText = $"Remote '{NewRemoteName}' created.";
             MarkDirty();
             SaveProfiles();
@@ -684,12 +696,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             var profile = SelectedProfile;
             var profileId = profile.Id;
-            AppendLog(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Initialization, $"Starting mount '{profile.Name}'...");
+            using (ProfileScope(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Initialization))
+                _logger.LogInformation("Starting mount...");
             ApplyRuntimeState(profile, new ProfileRuntimeState(MountLifecycleState.Mounting, MountHealthState.Unknown, DateTimeOffset.UtcNow, null));
 
             try
             {
-                await Task.Run(() => _mountStartRunner(profile, line => AppendLog(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Execution, line), cancellationToken), cancellationToken);
+                using (ProfileScope(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Execution))
+                    await Task.Run(() => _mountStartRunner(profile, cancellationToken), cancellationToken);
                 await RefreshRuntimeStateInternalAsync(profile, cancellationToken);
             }
             catch (Exception ex)
@@ -707,11 +721,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             var profile = SelectedProfile;
             var profileId = profile.Id;
-            AppendLog(profileId, ProfileLogCategory.ManualStop, ProfileLogStage.Initialization, $"Stopping mount '{profile.Name}'...");
+            using (ProfileScope(profileId, ProfileLogCategory.ManualStop, ProfileLogStage.Initialization))
+                _logger.LogInformation("Stopping mount...");
 
             try
             {
-                await Task.Run(() => _mountStopRunner(profile, line => AppendLog(profileId, ProfileLogCategory.ManualStop, ProfileLogStage.Execution, line), cancellationToken), cancellationToken);
+                using (ProfileScope(profileId, ProfileLogCategory.ManualStop, ProfileLogStage.Execution))
+                    await Task.Run(() => _mountStopRunner(profile, cancellationToken), cancellationToken);
 
                 if (!await Task.Run(() => _mountedProbe(profile, cancellationToken), cancellationToken))
                 {
@@ -747,31 +763,28 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             var profile = SelectedProfile;
             var profileId = profile.Id;
-            AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Initialization, $"Testing connection for '{profile.Name}'...");
-
-            void LogLine(string line)
-            {
-                AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Execution, line);
-                TestDialogLines.Add(line);
-            }
+            using (ProfileScope(profileId, ProfileLogCategory.General, ProfileLogStage.Initialization))
+                _logger.LogInformation("Testing connection...");
 
             if (_testConnectionRunner is not null)
             {
-                await _testConnectionRunner(profile, LogLine, CancellationToken.None);
+                using (ProfileScope(profileId, ProfileLogCategory.General, ProfileLogStage.Execution))
+                    await _testConnectionRunner(profile, CancellationToken.None);
             }
             else if (profile.IsRemoteDefinition && SelectedBackend is not null)
             {
                 var binary = profile.RcloneBinaryPath ?? "rclone";
-                await _mountManagerService.TestBackendConnectionAsync(
-                    binary,
-                    SelectedBackend.Name,
-                    BackendOptionInputs.Concat(AdvancedBackendOptionInputs),
-                    LogLine,
-                    CancellationToken.None);
+                using (ProfileScope(profileId, ProfileLogCategory.General, ProfileLogStage.Execution))
+                    await _mountManagerService.TestBackendConnectionAsync(
+                        binary,
+                        SelectedBackend.Name,
+                        BackendOptionInputs.Concat(AdvancedBackendOptionInputs),
+                        CancellationToken.None);
             }
             else
             {
-                await _mountManagerService.TestConnectionAsync(profile, LogLine, CancellationToken.None);
+                using (ProfileScope(profileId, ProfileLogCategory.General, ProfileLogStage.Execution))
+                    await _mountManagerService.TestConnectionAsync(profile, CancellationToken.None);
             }
 
             TestDialogSuccess = true;
@@ -784,7 +797,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             TestDialogSuccess = false;
             TestDialogTitle = "Connection test failed";
             StatusText = "Connectivity test failed.";
-            AppendLog(ProfileLogCategory.General, ProfileLogStage.Execution, ex.Message, ProfileLogSeverity.Error, ex.Message);
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Execution))
+                    _logger.LogError(ex, "{ErrorMessage}", ex.Message);
         }
     }
 
@@ -794,7 +809,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SyncMountOptionsToProfile();
         GeneratedScript = _mountManagerService.GenerateScript(SelectedProfile);
         _profileScripts[SelectedProfile.Id] = GeneratedScript;
-        AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, "Generated shell script preview.");
+        using (ProfileScope(SelectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Completion))
+            _logger.LogInformation("Generated shell script preview.");
     }
 
     [RelayCommand]
@@ -828,7 +844,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedReliabilityPresetId = preset.Id;
 
         StatusText = $"Applied reliability preset: {preset.DisplayName}.";
-        AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Applied reliability preset '{preset.DisplayName}' to profile '{profile.Name}'.");
+        using (ProfileScope(profile.Id, ProfileLogCategory.General, ProfileLogStage.Completion))
+            _logger.LogInformation("Applied reliability preset '{PresetDisplayName}'.", preset.DisplayName);
         MarkDirty();
     }
 
@@ -852,7 +869,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
         }
 
-        AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, $"Script saved to: {scriptPath}");
+        using (ProfileScope(SelectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Completion))
+            _logger.LogInformation("Script saved to: {ScriptPath}", scriptPath);
     }
 
     [RelayCommand]
@@ -888,12 +906,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
             if (profile.StartAtLogin)
             {
-                await _startupDisableRunner(profile, line => AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution, line), cancellationToken);
+                using (ProfileScope(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution))
+                    await _startupDisableRunner(profile, cancellationToken);
                 profile.StartAtLogin = false;
                 SaveProfiles();
                 HasPendingChanges = false;
                 completionStatus = "Start at login disabled and saved.";
-                AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Completion, "Persisted startup preference after disable.");
+                using (ProfileScope(profileId, ProfileLogCategory.Startup, ProfileLogStage.Completion))
+                    _logger.LogInformation("Persisted startup preference after disable.");
             }
             else
             {
@@ -904,7 +924,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if (!report.CriticalChecksPassed)
                 {
                     completionStatus = "Start at login blocked: startup preflight failed.";
-                    AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Verification, "Startup enable blocked by critical preflight failures.", ProfileLogSeverity.Warning);
+                    using (ProfileScope(profileId, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                        _logger.LogWarning("Startup enable blocked by critical preflight failures.");
                     return;
                 }
 
@@ -912,16 +933,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if (!string.Equals(profile.RcloneBinaryPath, resolved, StringComparison.Ordinal))
                 {
                     profile.RcloneBinaryPath = resolved;
-                    AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution, $"Resolved rclone binary path to '{resolved}'.");
+                    using (ProfileScope(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution))
+                        _logger.LogInformation("Resolved rclone binary path to '{ResolvedBinaryPath}'.", resolved);
                 }
 
                 var script = _mountManagerService.GenerateScript(profile);
-                await _startupEnableRunner(profile, script, line => AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution, line), cancellationToken);
+                using (ProfileScope(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution))
+                    await _startupEnableRunner(profile, script, cancellationToken);
                 profile.StartAtLogin = true;
                 SaveProfiles();
                 HasPendingChanges = false;
                 completionStatus = "Start at login enabled and saved.";
-                AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Completion, "Persisted startup preference after enable.");
+                using (ProfileScope(profileId, ProfileLogCategory.Startup, ProfileLogStage.Completion))
+                    _logger.LogInformation("Persisted startup preference after enable.");
             }
 
             OnPropertyChanged(nameof(StartupButtonText));
@@ -966,14 +990,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (HasAnyInvalidMountRemoteAssociations())
         {
             StatusText = "Assign a remote to each rclone mount before saving.";
-            AppendLog(ProfileLogCategory.General, ProfileLogStage.Verification, "Save blocked: one or more mounts have no associated remote.", ProfileLogSeverity.Warning);
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Verification))
+                    _logger.LogWarning("Save blocked: one or more mounts have no associated remote.");
             return;
         }
 
         SaveProfiles();
         HasPendingChanges = false;
         StatusText = "Profile changes saved.";
-        AppendLog(ProfileLogCategory.General, ProfileLogStage.Completion, "Saved profile changes.");
+        if (SelectedProfile is { } activeProfile)
+            using (ProfileScope(activeProfile.Id, ProfileLogCategory.General, ProfileLogStage.Completion))
+                _logger.LogInformation("Saved profile changes.");
         OnPropertyChanged(nameof(SaveChangesButtonText));
         NotifyCommandStateChanged();
     }
@@ -1039,7 +1067,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            AppendLog(ProfileLogCategory.RuntimeRefresh, ProfileLogStage.Execution, $"Runtime monitoring loop failed: {ex.Message}", ProfileLogSeverity.Error, ex.Message);
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.RuntimeRefresh, ProfileLogStage.Execution))
+                    _logger.LogError(ex, "Runtime monitoring loop failed: {ErrorMessage}", ex.Message);
         }
     }
 
@@ -1054,8 +1084,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        AppendLog(ProfileLogCategory.Startup, ProfileLogStage.Initialization,
-            $"Probing {mountProfiles.Count} mount profiles for running orphans...");
+        if (SelectedProfile is { } selectedProfile)
+            using (ProfileScope(selectedProfile.Id, ProfileLogCategory.Startup, ProfileLogStage.Initialization))
+                _logger.LogInformation("Probing {MountProfileCount} mount profiles for running orphans...", mountProfiles.Count);
 
         foreach (var profile in mountProfiles)
         {
@@ -1069,25 +1100,25 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 if (pid.HasValue && isMounted)
                 {
                     _mountManagerService.AdoptMount(profile.MountPoint, pid.Value, profile.RcPort);
-                    AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification,
-                        $"Adopted running mount (PID {pid.Value}, RC port {profile.RcPort}).");
+                    using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                        _logger.LogInformation("Adopted running mount (PID {Pid}, RC port {RcPort}).", pid.Value, profile.RcPort);
                 }
                 else if (pid.HasValue && !isMounted)
                 {
-                    AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification,
-                        $"Stale rclone on port {profile.RcPort} (PID {pid.Value}), sending quit.");
+                    using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                        _logger.LogWarning("Stale rclone on port {RcPort} (PID {Pid}), sending quit.", profile.RcPort, pid.Value);
                     await _mountManagerService.StopViaRcAsync(profile.RcPort, cancellationToken);
                 }
                 else if (!pid.HasValue && isMounted)
                 {
-                    AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification,
-                        "Mount point is active but no RC connection. Unmanaged external mount.");
+                    using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                        _logger.LogWarning("Mount point is active but no RC connection. Unmanaged external mount.");
                 }
             }
             catch (Exception ex)
             {
-                AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification,
-                    $"Failed to probe orphan mount: {ex.Message}", ProfileLogSeverity.Warning);
+                using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                    _logger.LogWarning(ex, "Failed to probe orphan mount: {ErrorMessage}", ex.Message);
             }
         }
     }
@@ -1100,13 +1131,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         if (startupProfiles.Count == 0)
         {
-            AppendLog(ProfileLogCategory.Startup, ProfileLogStage.Verification, "Startup runtime verification skipped: no start-at-login profiles.");
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                    _logger.LogInformation("Startup runtime verification skipped: no start-at-login profiles.");
             return;
         }
 
         foreach (var profile in startupProfiles)
         {
-            AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Initialization, "Startup monitor initialization started.");
+            using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Initialization))
+                _logger.LogInformation("Startup monitor initialization started.");
         }
 
         var states = await _runtimeStateBatchVerifier(startupProfiles, cancellationToken);
@@ -1118,7 +1152,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 var profile = startupProfiles[index];
                 var state = states[index];
                 ApplyRuntimeState(profile, state);
-                AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification, $"Startup verification: lifecycle={FormatLifecycle(state.Lifecycle)}, health={FormatHealth(state.Health)}");
+                using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                    _logger.LogInformation("Startup verification: lifecycle={Lifecycle}, health={Health}", FormatLifecycle(state.Lifecycle), FormatHealth(state.Health));
             }
         });
     }
@@ -1183,7 +1218,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             StatusText = "Operation failed.";
-            AppendLog(ProfileLogCategory.General, ProfileLogStage.Execution, ex.Message, ProfileLogSeverity.Error, ex.Message);
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Execution))
+                    _logger.LogError(ex, "{ErrorMessage}", ex.Message);
         }
         finally
         {
@@ -1202,7 +1239,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         var state = await _runtimeStateVerifier(profile, cancellationToken);
         ApplyRuntimeState(profile, state);
-        AppendLog(profile.Id, ProfileLogCategory.RuntimeRefresh, ProfileLogStage.Completion, $"Status for '{profile.Name}': {profile.LastStatus}");
+        using (ProfileScope(profile.Id, ProfileLogCategory.RuntimeRefresh, ProfileLogStage.Completion))
+            _logger.LogInformation("Status: {LastStatus}", profile.LastStatus);
     }
 
     private void ApplyRuntimeState(MountProfile profile, ProfileRuntimeState state)
@@ -1232,45 +1270,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private static string FormatHealth(MountHealthState health) => health.ToString().ToLowerInvariant();
 
-    private void AppendLog(ProfileLogCategory category, ProfileLogStage stage, string message, ProfileLogSeverity? severity = null, string? error = null)
+    private IDisposable ProfileScope(string profileId, ProfileLogCategory category, ProfileLogStage stage)
     {
-        var profileId = SelectedProfile?.Id;
-        if (string.IsNullOrWhiteSpace(profileId))
+        var profileName = Profiles.FirstOrDefault(p =>
+            string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase))?.Name ?? profileId;
+
+        return _logger.BeginScope(new Dictionary<string, object>
         {
-            return;
-        }
-
-        AppendLog(profileId, category, stage, message, severity, error);
-    }
-
-    private void AppendLog(string profileId, string message)
-    {
-        AppendLog(profileId, ProfileLogCategory.General, ProfileLogStage.Execution, message);
-    }
-
-    private void AppendLog(string profileId, ProfileLogCategory category, ProfileLogStage stage, string message, ProfileLogSeverity? severity = null, string? error = null)
-    {
-        var resolvedSeverity = severity ?? ResolveSeverity(message);
-        var profileName = Profiles.FirstOrDefault(p => string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase))?.Name ?? profileId;
-
-        using (LogContext.PushProperty("ProfileName", profileName))
-        using (LogContext.PushProperty("ProfileId", profileId))
-        using (LogContext.PushProperty("LogCategory", category.ToString()))
-        using (LogContext.PushProperty("LogStage", stage.ToString()))
-        {
-            if (resolvedSeverity is ProfileLogSeverity.Error)
-            {
-                Log.Error("[{ProfileName}] {Message}", profileName, message);
-            }
-            else if (resolvedSeverity is ProfileLogSeverity.Warning)
-            {
-                Log.Warning("[{ProfileName}] {Message}", profileName, message);
-            }
-            else
-            {
-                Log.Information("[{ProfileName}] {Message}", profileName, message);
-            }
-        }
+            ["ProfileId"] = profileId,
+            ["ProfileName"] = profileName,
+            ["LogCategory"] = category.ToString(),
+            ["LogStage"] = stage.ToString(),
+        })!;
     }
 
     private void OnSerilogEvent(LogEvent logEvent)
@@ -1318,22 +1329,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             Dispatcher.UIThread.Post(RefreshDiagnosticsTimeline);
         }
-    }
-
-    private static ProfileLogSeverity ResolveSeverity(string message)
-    {
-        if (message.StartsWith("ERR:", StringComparison.OrdinalIgnoreCase))
-        {
-            return ProfileLogSeverity.Error;
-        }
-
-        if (message.StartsWith("WARN:", StringComparison.OrdinalIgnoreCase) ||
-            message.Contains("WARNING", StringComparison.OrdinalIgnoreCase))
-        {
-            return ProfileLogSeverity.Warning;
-        }
-
-        return ProfileLogSeverity.Information;
     }
 
     private static T? ExtractEnumProperty<T>(LogEvent logEvent, string propertyName) where T : struct, Enum
@@ -1540,7 +1535,30 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 _ => ProfileLogSeverity.Error,
             };
 
-            AppendLog(profileId, ProfileLogCategory.Startup, ProfileLogStage.Verification, $"Startup preflight {check.Severity.ToString().ToLowerInvariant()}: [{check.CheckKey}] {check.Message}", severity);
+            using (ProfileScope(profileId, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+            {
+                if (severity is ProfileLogSeverity.Error)
+                {
+                    _logger.LogError("Startup preflight {CheckSeverity}: [{CheckKey}] {CheckMessage}",
+                        check.Severity.ToString().ToLowerInvariant(),
+                        check.CheckKey,
+                        check.Message);
+                }
+                else if (severity is ProfileLogSeverity.Warning)
+                {
+                    _logger.LogWarning("Startup preflight {CheckSeverity}: [{CheckKey}] {CheckMessage}",
+                        check.Severity.ToString().ToLowerInvariant(),
+                        check.CheckKey,
+                        check.Message);
+                }
+                else
+                {
+                    _logger.LogInformation("Startup preflight {CheckSeverity}: [{CheckKey}] {CheckMessage}",
+                        check.Severity.ToString().ToLowerInvariant(),
+                        check.CheckKey,
+                        check.Message);
+                }
+            }
         }
     }
 
@@ -2155,7 +2173,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            AppendLog(ProfileLogCategory.General, ProfileLogStage.Initialization, $"Could not load profiles: {ex.Message}", ProfileLogSeverity.Error, ex.Message);
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Initialization))
+                    _logger.LogError(ex, "Could not load profiles: {ErrorMessage}", ex.Message);
         }
         finally
         {
@@ -2212,7 +2232,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
         catch (Exception ex)
         {
-            AppendLog(ProfileLogCategory.General, ProfileLogStage.Execution, $"Could not save profiles: {ex.Message}", ProfileLogSeverity.Error, ex.Message);
+            if (SelectedProfile is { } selectedProfile)
+                using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Execution))
+                    _logger.LogError(ex, "Could not save profiles: {ErrorMessage}", ex.Message);
         }
     }
 

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.Core.Services;
 
@@ -5,7 +7,7 @@ namespace RcloneMountManager.Tests.Services;
 
 public class MountManagerServiceTests
 {
-    private readonly MountManagerService _service = new();
+    private readonly MountManagerService _service = new(NullLogger<MountManagerService>.Instance);
 
     [Fact]
     public void GenerateScript_IncludesMountOptions_BoolTrue()

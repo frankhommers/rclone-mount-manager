@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.Core.Services;
 using System;
@@ -10,7 +12,7 @@ namespace RcloneMountManager.Tests.Services;
 
 public sealed class StartupPreflightServiceTests : IDisposable
 {
-    private readonly StartupPreflightService _service = new();
+    private readonly StartupPreflightService _service = new(NullLogger<StartupPreflightService>.Instance);
     private readonly string _tempRoot = Path.Combine(Path.GetTempPath(), $"startup-preflight-tests-{Guid.NewGuid():N}");
 
     public StartupPreflightServiceTests()

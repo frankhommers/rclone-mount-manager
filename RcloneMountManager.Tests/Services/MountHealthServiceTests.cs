@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.Core.Services;
 using System;
@@ -162,6 +164,7 @@ public sealed class MountHealthServiceTests
         TimeSpan? mountProbeTimeout = null)
     {
         return new MountHealthService(
+            NullLogger<MountHealthService>.Instance,
             isMountedProbe: isMountedProbe,
             isRunningProbe: isRunningProbe,
             isMountUsableProbe: isMountUsableProbe,
