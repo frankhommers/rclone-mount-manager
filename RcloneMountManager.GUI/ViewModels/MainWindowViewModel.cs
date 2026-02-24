@@ -1012,6 +1012,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         try
         {
+            await AdoptOrphanMountsAsync(cancellationToken);
             await VerifyStartupProfilesAsync(cancellationToken);
 
             while (await _runtimeRefreshWaiter(RuntimeRefreshCadence, cancellationToken))
@@ -1025,6 +1026,55 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             AppendLog(ProfileLogCategory.RuntimeRefresh, ProfileLogStage.Execution, $"Runtime monitoring loop failed: {ex.Message}", ProfileLogSeverity.Error, ex.Message);
+        }
+    }
+
+    private async Task AdoptOrphanMountsAsync(CancellationToken cancellationToken)
+    {
+        var mountProfiles = Profiles
+            .Where(p => !p.IsRemoteDefinition && p.EnableRemoteControl && p.RcPort > 0)
+            .ToList();
+
+        if (mountProfiles.Count == 0)
+        {
+            return;
+        }
+
+        AppendLog(ProfileLogCategory.Startup, ProfileLogStage.Initialization,
+            $"Probing {mountProfiles.Count} mount profiles for running orphans...");
+
+        foreach (var profile in mountProfiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                var pid = await _mountManagerService.ProbeRcPidAsync(profile.RcPort, cancellationToken);
+                var isMounted = await _mountManagerService.IsMountedAsync(profile.MountPoint, cancellationToken);
+
+                if (pid.HasValue && isMounted)
+                {
+                    _mountManagerService.AdoptMount(profile.MountPoint, pid.Value, profile.RcPort);
+                    AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification,
+                        $"Adopted running mount (PID {pid.Value}, RC port {profile.RcPort}).");
+                }
+                else if (pid.HasValue && !isMounted)
+                {
+                    AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification,
+                        $"Stale rclone on port {profile.RcPort} (PID {pid.Value}), sending quit.");
+                    await _mountManagerService.StopViaRcAsync(profile.RcPort, cancellationToken);
+                }
+                else if (!pid.HasValue && isMounted)
+                {
+                    AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification,
+                        "Mount point is active but no RC connection. Unmanaged external mount.");
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification,
+                    $"Failed to probe orphan mount: {ex.Message}", ProfileLogSeverity.Warning);
+            }
         }
     }
 

@@ -81,6 +81,23 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
     }
 
     [Fact]
+    public async Task InitializeRuntimeMonitoring_ProbesRcEnabledProfilesForOrphanAdoption()
+    {
+        var viewModel = CreateViewModel(runtimeRefreshWaiter: (_, _) => Task.FromResult(false));
+
+        var profile = viewModel.SelectedProfile;
+        profile.StartAtLogin = false;
+        profile.EnableRemoteControl = true;
+        profile.RcPort = 1;
+
+        viewModel.InitializeRuntimeMonitoring();
+
+        await WaitUntilAsync(() => viewModel.Logs.Any(entry => entry.Contains("Probing 1 mount profiles for running orphans...", StringComparison.Ordinal)));
+
+        viewModel.StopRuntimeMonitoring();
+    }
+
+    [Fact]
     public async Task InitializeRuntimeMonitoring_VerifiesOnlyStartAtLoginProfiles()
     {
         var verifiedProfileIds = new ConcurrentBag<string>();
