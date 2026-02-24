@@ -321,6 +321,17 @@ public sealed class MountManagerService
                 }
             }
 
+            if (profile.EnableRemoteControl && profile.RcPort > 0)
+            {
+                var hasRcAddr = profile.MountOptions.ContainsKey("rc_addr") ||
+                                profile.ExtraOptions.Contains("--rc-addr", StringComparison.OrdinalIgnoreCase);
+                if (!hasRcAddr)
+                {
+                    builder.Append(" --rc --rc-no-auth --rc-addr ");
+                    builder.Append(EscapeArgument($"localhost:{profile.RcPort}"));
+                }
+            }
+
             builder.AppendLine();
         }
         else

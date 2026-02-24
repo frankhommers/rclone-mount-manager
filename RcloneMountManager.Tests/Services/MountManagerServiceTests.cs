@@ -128,6 +128,32 @@ public class MountManagerServiceTests
         Assert.Contains("$MOUNT_POINT", script);
     }
 
+    [Fact]
+    public void GenerateScript_IncludesRcFlags_WhenRemoteControlEnabledAndRcAddrMissing()
+    {
+        var profile = CreateProfile();
+        profile.EnableRemoteControl = true;
+        profile.RcPort = 5572;
+
+        var script = _service.GenerateScript(profile);
+
+        Assert.Contains("--rc --rc-no-auth --rc-addr", script);
+        Assert.Contains("'localhost:5572'", script);
+    }
+
+    [Fact]
+    public void GenerateScript_SkipsRcAddrInjection_WhenRcAddrProvidedInExtraOptions()
+    {
+        var profile = CreateProfile();
+        profile.EnableRemoteControl = true;
+        profile.RcPort = 5572;
+        profile.ExtraOptions = "--rc-addr localhost:60000";
+
+        var script = _service.GenerateScript(profile);
+
+        Assert.DoesNotContain("--rc --rc-no-auth --rc-addr", script);
+    }
+
     private static MountProfile CreateProfile()
     {
         return new MountProfile

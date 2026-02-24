@@ -2045,6 +2045,22 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     profile.RcPort = MountManagerService.AssignRcPort(profile.Id);
                 }
 
+                if (!profile.IsRemoteDefinition && profile.MountOptions.TryGetValue("rc_addr", out var rcAddrValue))
+                {
+                    if (rcAddrValue.Contains(':'))
+                    {
+                        var portStr = rcAddrValue.Split(':').Last();
+                        if (int.TryParse(portStr, out var port) && port > 0)
+                        {
+                            profile.RcPort = port;
+                        }
+                    }
+
+                    profile.MountOptions.Remove("rc");
+                    profile.MountOptions.Remove("rc_addr");
+                    profile.MountOptions.Remove("rc_no_auth");
+                }
+
                 Profiles.Add(profile);
                 _profileLogs[profile.Id] = new List<ProfileLogEvent>();
                 _profileScripts[profile.Id] = string.Empty;
