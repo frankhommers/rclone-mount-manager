@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using RcloneMountManager.Core.Models;
 using System;
 using System.Collections.Generic;
@@ -16,6 +17,13 @@ public sealed class StartupPreflightService
     public const string MountPathCheckKey = "mount-path";
     public const string CachePathCheckKey = "cache-path";
     public const string CredentialsCheckKey = "credentials";
+
+    private readonly ILogger<StartupPreflightService> _logger;
+
+    public StartupPreflightService(ILogger<StartupPreflightService> logger)
+    {
+        _logger = logger;
+    }
 
     public Task<StartupPreflightReport> RunAsync(MountProfile profile, CancellationToken cancellationToken)
     {

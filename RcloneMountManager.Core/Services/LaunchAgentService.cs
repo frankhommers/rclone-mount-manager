@@ -1,5 +1,6 @@
 using CliWrap;
 using CliWrap.Buffered;
+using Microsoft.Extensions.Logging;
 using RcloneMountManager.Core.Models;
 using System;
 using System.IO;
@@ -14,6 +15,7 @@ namespace RcloneMountManager.Core.Services;
 public sealed class LaunchAgentService
 {
     private readonly string _appDataDirectory;
+    private readonly ILogger<LaunchAgentService> _logger;
     private readonly string _userProfileDirectory;
     private readonly Func<string, string[], CancellationToken, Task<CommandExecutionResult>> _commandRunner;
     private readonly Func<uint> _uidProvider;
@@ -24,11 +26,15 @@ public sealed class LaunchAgentService
     public readonly record struct CommandExecutionResult(int ExitCode, string StandardOutput, string StandardError);
 
     public LaunchAgentService(
+        ILogger<LaunchAgentService> logger,
         string? appDataDirectory = null,
         string? userProfileDirectory = null,
         Func<string, string[], CancellationToken, Task<CommandExecutionResult>>? commandRunner = null,
         Func<uint>? uidProvider = null)
     {
+        ArgumentNullException.ThrowIfNull(logger);
+
+        _logger = logger;
         _appDataDirectory = appDataDirectory ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "RcloneMountManager");
@@ -56,7 +62,7 @@ public sealed class LaunchAgentService
         return Path.Combine(launchAgentsDirectory, $"{BuildLabel(profile)}.plist");
     }
 
-    public async Task EnableAsync(MountProfile profile, string scriptContent, Action<string> log, CancellationToken cancellationToken)
+    public async Task EnableAsync(MountProfile profile, string scriptContent, CancellationToken cancellationToken)
     {
         if (!IsSupported)
         {
@@ -85,16 +91,16 @@ public sealed class LaunchAgentService
         var bootoutResult = await _commandRunner("launchctl", ["bootout", BuildServiceTarget(profile)], cancellationToken);
         if (bootoutResult.ExitCode == 0)
         {
-            log("Removed stale LaunchAgent before re-registering.");
+            _logger.LogInformation("Removed stale LaunchAgent before re-registering.");
         }
 
         await RunLaunchCtlAsync(["bootstrap", BuildGuiDomain(), plistPath], cancellationToken);
 
-        log($"Enabled start at login for '{profile.Name}'.");
-        log($"LaunchAgent: {plistPath}");
+        _logger.LogInformation("Enabled start at login for {ProfileName}.", profile.Name);
+        _logger.LogInformation("LaunchAgent: {PlistPath}", plistPath);
     }
 
-    public async Task DisableAsync(MountProfile profile, Action<string> log, CancellationToken cancellationToken)
+    public async Task DisableAsync(MountProfile profile, CancellationToken cancellationToken)
     {
         if (!IsSupported)
         {
@@ -107,13 +113,13 @@ public sealed class LaunchAgentService
             var result = await _commandRunner("launchctl", ["bootout", BuildServiceTarget(profile)], cancellationToken);
             if (result.ExitCode != 0)
             {
-                log($"launchctl bootout exited with code {result.ExitCode} (service may already be unloaded).");
+                _logger.LogWarning("launchctl bootout exited with code {ExitCode} (service may already be unloaded).", result.ExitCode);
             }
 
             File.Delete(plistPath);
         }
 
-        log($"Disabled start at login for '{profile.Name}'.");
+        _logger.LogInformation("Disabled start at login for {ProfileName}.", profile.Name);
     }
 
     public bool IsEnabled(MountProfile profile)

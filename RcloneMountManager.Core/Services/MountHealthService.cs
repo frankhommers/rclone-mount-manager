@@ -13,6 +13,7 @@ public sealed class MountHealthService
 {
     private static readonly TimeSpan DefaultProbeTimeout = TimeSpan.FromSeconds(2);
 
+    private readonly ILogger<MountHealthService> _logger;
     private readonly Func<string, CancellationToken, Task<bool>> _isMountedProbe;
     private readonly Func<string, bool> _isRunningProbe;
     private readonly Func<string, CancellationToken, Task<bool>> _isMountUsableProbe;
@@ -20,12 +21,14 @@ public sealed class MountHealthService
     private readonly TimeSpan _mountProbeTimeout;
 
     public MountHealthService(
+        ILogger<MountHealthService> logger,
         Func<string, CancellationToken, Task<bool>>? isMountedProbe = null,
         Func<string, bool>? isRunningProbe = null,
         Func<string, CancellationToken, Task<bool>>? isMountUsableProbe = null,
         TimeSpan? mountProbeTimeout = null,
         Func<DateTimeOffset>? clock = null)
     {
+        _logger = logger;
         var mountManagerService = new MountManagerService(NullLogger<MountManagerService>.Instance);
         _isMountedProbe = isMountedProbe ?? mountManagerService.IsMountedAsync;
         _isRunningProbe = isRunningProbe ?? mountManagerService.IsRunning;

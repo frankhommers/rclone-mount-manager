@@ -1,5 +1,6 @@
 using CliWrap;
 using CliWrap.Buffered;
+using Microsoft.Extensions.Logging;
 using RcloneMountManager.Core.Models;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,13 @@ namespace RcloneMountManager.Core.Services;
 
 public sealed class RcloneBackendService
 {
+    private readonly ILogger<RcloneBackendService> _logger;
+
+    public RcloneBackendService(ILogger<RcloneBackendService> logger)
+    {
+        _logger = logger;
+    }
+
     public async Task<IReadOnlyList<RcloneBackendInfo>> GetBackendsAsync(string rcloneBinaryPath, CancellationToken cancellationToken)
     {
         var binary = string.IsNullOrWhiteSpace(rcloneBinaryPath) ? "rclone" : rcloneBinaryPath;
