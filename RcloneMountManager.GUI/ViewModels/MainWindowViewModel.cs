@@ -377,8 +377,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void AddMount()
     {
+        var id = Guid.NewGuid().ToString("N");
         var profile = new MountProfile
         {
+            Id = id,
             Name = $"Mount {MountProfiles.Count + 1}",
             Type = MountType.RcloneAuto,
             Source = string.Empty,
@@ -387,6 +389,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             MountOptions = GetDefaultMountOptions(MountType.RcloneAuto),
             QuickConnectMode = QuickConnectMode.None,
             IsRemoteDefinition = false,
+            RcPort = MountManagerService.AssignRcPort(id),
         };
 
         Profiles.Add(profile);
@@ -1909,6 +1912,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             or nameof(MountProfile.QuickConnectUsername)
             or nameof(MountProfile.QuickConnectPassword)
             or nameof(MountProfile.AllowInsecurePasswordsInScript)
+            or nameof(MountProfile.RcPort)
+            or nameof(MountProfile.EnableRemoteControl)
             or nameof(MountProfile.SelectedReliabilityPresetId)
             or nameof(MountProfile.StartAtLogin)
             or nameof(MountProfile.IsRemoteDefinition))
@@ -1981,7 +1986,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     IsRemoteDefinition = saved.IsRemoteDefinition,
                     BackendName = saved.BackendName,
                     BackendOptions = saved.BackendOptions ?? new Dictionary<string, string>(),
+                    RcPort = saved.RcPort,
+                    EnableRemoteControl = saved.EnableRemoteControl,
                 };
+
+                if (profile.RcPort == 0 && !profile.IsRemoteDefinition)
+                {
+                    profile.RcPort = MountManagerService.AssignRcPort(profile.Id);
+                }
 
                 Profiles.Add(profile);
                 _profileLogs[profile.Id] = new List<ProfileLogEvent>();
@@ -2033,6 +2045,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                     IsRemoteDefinition = profile.IsRemoteDefinition,
                     BackendName = profile.BackendName,
                     BackendOptions = profile.BackendOptions,
+                    RcPort = profile.RcPort,
+                    EnableRemoteControl = profile.EnableRemoteControl,
                 })
                 .ToList();
 
@@ -2063,8 +2077,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private static MountProfile CreateDefaultProfile()
     {
+        var id = Guid.NewGuid().ToString("N");
         return new MountProfile
         {
+            Id = id,
             Name = "Media remote",
             Type = MountType.RcloneAuto,
             Source = "remote:media",
@@ -2072,6 +2088,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ExtraOptions = "--vfs-cache-mode full --dir-cache-time 15m",
             MountOptions = GetDefaultMountOptions(MountType.RcloneAuto),
             QuickConnectMode = QuickConnectMode.None,
+            RcPort = MountManagerService.AssignRcPort(id),
         };
     }
 
@@ -2436,5 +2453,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         public bool IsRemoteDefinition { get; set; }
         public string BackendName { get; set; } = string.Empty;
         public Dictionary<string, string> BackendOptions { get; set; } = new();
+        public int RcPort { get; set; }
+        public bool EnableRemoteControl { get; set; } = true;
     }
 }
