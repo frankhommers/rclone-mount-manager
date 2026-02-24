@@ -103,6 +103,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private string? _selectedDiagnosticsProfileId;
 
     [ObservableProperty]
+    private DiagnosticsProfileFilterOption? _selectedDiagnosticsProfileFilterOption;
+
+    [ObservableProperty]
     private bool _startupTimelineOnly;
 
     [ObservableProperty]
@@ -1288,6 +1291,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
         var profileId = DiagnosticsSink.ExtractProfileId(logEvent);
         var message = DiagnosticsSink.RenderMessage(logEvent);
+
         var severity = logEvent.Level switch
         {
             LogEventLevel.Error or LogEventLevel.Fatal => ProfileLogSeverity.Error,
@@ -1361,6 +1365,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         RefreshDiagnosticsTimeline();
     }
 
+    partial void OnSelectedDiagnosticsProfileFilterOptionChanged(DiagnosticsProfileFilterOption? value)
+    {
+        SelectedDiagnosticsProfileId = string.IsNullOrEmpty(value?.ProfileId) ? null : value.ProfileId;
+    }
+
     partial void OnStartupTimelineOnlyChanged(bool value)
     {
         RefreshDiagnosticsTimeline();
@@ -1409,9 +1418,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void SyncDiagnosticsFilters()
     {
         DiagnosticsProfileFilters.Clear();
+        DiagnosticsProfileFilters.Add(new DiagnosticsProfileFilterOption(string.Empty, "All"));
         foreach (var profile in Profiles)
         {
             DiagnosticsProfileFilters.Add(new DiagnosticsProfileFilterOption(profile.Id, profile.Name));
+        }
+
+        if (SelectedDiagnosticsProfileFilterOption is null ||
+            !DiagnosticsProfileFilters.Contains(SelectedDiagnosticsProfileFilterOption))
+        {
+            SelectedDiagnosticsProfileFilterOption = DiagnosticsProfileFilters[0];
         }
 
         EnsureDiagnosticsFilterSelection(SelectedProfile?.Id);
@@ -1420,30 +1436,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void EnsureDiagnosticsFilterSelection(string? preferredProfileId)
     {
-        if (Profiles.Count == 0)
+        // Profile filter dropdown is independent of sidebar selection.
+        // Only reset if current selection refers to a deleted profile.
+        if (SelectedDiagnosticsProfileFilterOption is null)
         {
-            if (SelectedDiagnosticsProfileId is not null)
-            {
-                SelectedDiagnosticsProfileId = null;
-            }
-
+            SelectedDiagnosticsProfileFilterOption = DiagnosticsProfileFilters.FirstOrDefault();
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(SelectedDiagnosticsProfileId) &&
-            Profiles.Any(profile => string.Equals(profile.Id, SelectedDiagnosticsProfileId, StringComparison.OrdinalIgnoreCase)))
+        var currentId = SelectedDiagnosticsProfileFilterOption.ProfileId;
+        if (!string.IsNullOrEmpty(currentId) &&
+            !Profiles.Any(p => string.Equals(p.Id, currentId, StringComparison.OrdinalIgnoreCase)))
         {
-            return;
-        }
-
-        var fallbackProfileId = !string.IsNullOrWhiteSpace(preferredProfileId) &&
-            Profiles.Any(profile => string.Equals(profile.Id, preferredProfileId, StringComparison.OrdinalIgnoreCase))
-                ? preferredProfileId
-                : Profiles[0].Id;
-
-        if (!string.Equals(SelectedDiagnosticsProfileId, fallbackProfileId, StringComparison.OrdinalIgnoreCase))
-        {
-            SelectedDiagnosticsProfileId = fallbackProfileId;
+            SelectedDiagnosticsProfileFilterOption = DiagnosticsProfileFilters.FirstOrDefault();
         }
     }
 

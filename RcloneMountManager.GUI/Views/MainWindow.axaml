@@ -455,7 +455,7 @@
                                         BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
                                         CornerRadius="10"
                                         Padding="14">
-                                    <Grid ColumnDefinitions="Auto,160,20,Auto,*" RowDefinitions="Auto" ColumnSpacing="0">
+                                    <Grid ColumnDefinitions="Auto,160,20,Auto,160,20,Auto,*" RowDefinitions="Auto" ColumnSpacing="0">
                                         <TextBlock Grid.Column="0"
                                                    Text="Show"
                                                    VerticalAlignment="Center"
@@ -465,10 +465,24 @@
                                                   SelectedItem="{Binding SelectedDiagnosticsCategoryFilter}"
                                                   HorizontalAlignment="Stretch"/>
                                         <TextBlock Grid.Column="3"
+                                                   Text="Profile"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,8,0"/>
+                                        <ComboBox Grid.Column="4"
+                                                  ItemsSource="{Binding DiagnosticsProfileFilters}"
+                                                  SelectedItem="{Binding SelectedDiagnosticsProfileFilterOption}"
+                                                  HorizontalAlignment="Stretch">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding DisplayName}"/>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                        <TextBlock Grid.Column="6"
                                                    Text="Search"
                                                    VerticalAlignment="Center"
                                                    Margin="0,0,8,0"/>
-                                        <TextBox Grid.Column="4"
+                                        <TextBox Grid.Column="7"
                                                  Text="{Binding DiagnosticsSearchText}"
                                                  Watermark="Filter log messages..."
                                                  HorizontalAlignment="Stretch"/>
