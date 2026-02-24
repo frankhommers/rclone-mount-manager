@@ -1,6 +1,7 @@
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using RcloneMountManager.Core.Services;
 using RcloneMountManager.Services;
 using RcloneMountManager.ViewModels;
@@ -41,6 +42,7 @@ sealed class Program
         services.AddSingleton<MountHealthService>();
         services.AddSingleton<MainWindowViewModel>(sp =>
           new MainWindowViewModel(
+            logger: sp.GetRequiredService<ILogger<MainWindowViewModel>>(),
             mountManagerService: sp.GetRequiredService<MountManagerService>(),
             launchAgentService: sp.GetRequiredService<LaunchAgentService>(),
             rcloneBackendService: sp.GetRequiredService<RcloneBackendService>(),
