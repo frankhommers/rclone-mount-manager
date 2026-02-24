@@ -455,14 +455,39 @@ public sealed class MountManagerService
                 }
             }
 
-            if (pid.HasValue)
+            if (!pid.HasValue)
+            {
+                log($"WARN: rclone launched but RC not responding on port {profile.RcPort}. Check log: {logFile}");
+                return;
+            }
+
+            log($"rclone process started (PID {pid.Value}, RC port {profile.RcPort}). Waiting for mount...");
+
+            bool mounted = false;
+            for (int attempt = 0; attempt < 20; attempt++)
+            {
+                await Task.Delay(500, cancellationToken);
+                if (await IsMountedAsync(mountPoint, cancellationToken))
+                {
+                    mounted = true;
+                    break;
+                }
+
+                if (!await rcClient.IsAliveAsync(profile.RcPort, cancellationToken))
+                {
+                    log($"ERR: rclone process died before mount appeared. Check log: {logFile}");
+                    return;
+                }
+            }
+
+            if (mounted)
             {
                 _runningMounts.TryAdd(mountPoint, new RunningMount(pid.Value, profile.RcPort));
-                log($"rclone {mountCommand} started (PID {pid.Value}, RC port {profile.RcPort}).");
+                log($"rclone {mountCommand} started and mounted (PID {pid.Value}, RC port {profile.RcPort}).");
             }
             else
             {
-                log($"WARN: rclone launched but RC not responding on port {profile.RcPort}. Check log: {logFile}");
+                log($"WARN: rclone running (PID {pid.Value}) but mount not appearing. Check log: {logFile}");
             }
         }
         else
