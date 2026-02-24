@@ -67,6 +67,12 @@ public partial class MountProfile : ObservableObject
     private Dictionary<string, string> _backendOptions = new();
 
     [ObservableProperty]
+    private int _rcPort;
+
+    [ObservableProperty]
+    private bool _enableRemoteControl = true;
+
+    [ObservableProperty]
     private bool _isMounted;
 
     [ObservableProperty]

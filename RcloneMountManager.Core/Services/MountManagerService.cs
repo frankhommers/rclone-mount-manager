@@ -949,5 +949,11 @@ public sealed class MountManagerService
         return line;
     }
 
+    public static int AssignRcPort(string profileId)
+    {
+        var hash = profileId.GetHashCode(StringComparison.OrdinalIgnoreCase);
+        return 50000 + (Math.Abs(hash) % 10000);
+    }
+
     private sealed record RunningMount(CancellationTokenSource Cancellation, Task Execution);
 }
