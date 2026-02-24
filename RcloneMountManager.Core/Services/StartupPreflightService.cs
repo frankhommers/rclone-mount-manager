@@ -70,6 +70,19 @@ public sealed class StartupPreflightService
             return;
         }
 
+        var parentDir = Path.GetDirectoryName(mountPath);
+        if (!string.IsNullOrWhiteSpace(parentDir) && !Directory.Exists(parentDir))
+        {
+            report.AddCritical(MountPathCheckKey, $"Parent directory '{parentDir}' does not exist.");
+            return;
+        }
+
+        if (Directory.Exists(mountPath))
+        {
+            report.AddPass(MountPathCheckKey, $"Mount path exists: '{mountPath}'.");
+            return;
+        }
+
         if (!TryEnsureWritableDirectory(mountPath, out var error))
         {
             report.AddCritical(MountPathCheckKey, $"Mount path '{profile.MountPoint}' is not writable: {error}");

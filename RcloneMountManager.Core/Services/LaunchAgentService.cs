@@ -81,6 +81,13 @@ public sealed class LaunchAgentService
         await File.WriteAllTextAsync(plistPath, plistContent, cancellationToken);
 
         await RunPlutilLintAsync(plistPath, cancellationToken);
+
+        var bootoutResult = await _commandRunner("launchctl", ["bootout", BuildServiceTarget(profile)], cancellationToken);
+        if (bootoutResult.ExitCode == 0)
+        {
+            log("Removed stale LaunchAgent before re-registering.");
+        }
+
         await RunLaunchCtlAsync(["bootstrap", BuildGuiDomain(), plistPath], cancellationToken);
 
         log($"Enabled start at login for '{profile.Name}'.");
@@ -97,7 +104,12 @@ public sealed class LaunchAgentService
         var plistPath = GetLaunchAgentPlistPath(profile);
         if (File.Exists(plistPath))
         {
-            await RunLaunchCtlAsync(["bootout", BuildServiceTarget(profile)], cancellationToken);
+            var result = await _commandRunner("launchctl", ["bootout", BuildServiceTarget(profile)], cancellationToken);
+            if (result.ExitCode != 0)
+            {
+                log($"launchctl bootout exited with code {result.ExitCode} (service may already be unloaded).");
+            }
+
             File.Delete(plistPath);
         }
 

@@ -253,6 +253,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         Profiles.CollectionChanged += OnProfilesCollectionChanged;
         DiagnosticsRows.CollectionChanged += OnDiagnosticsRowsCollectionChanged;
+        _profileLogs.TryAdd(DiagnosticsSink.SystemProfileId, new List<ProfileLogEvent>());
+        DiagnosticsSink.Instance.RegisterHandler(OnSerilogEvent);
         LoadProfiles();
         LoadBackendsSync(loadStartupData);
 
@@ -687,7 +689,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
             try
             {
-                await _mountStartRunner(profile, line => AppendLog(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Execution, line), cancellationToken);
+                await Task.Run(() => _mountStartRunner(profile, line => AppendLog(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Execution, line), cancellationToken), cancellationToken);
                 await RefreshRuntimeStateInternalAsync(profile, cancellationToken);
             }
             catch (Exception ex)
@@ -709,9 +711,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
             try
             {
-                await _mountStopRunner(profile, line => AppendLog(profileId, ProfileLogCategory.ManualStop, ProfileLogStage.Execution, line), cancellationToken);
+                await Task.Run(() => _mountStopRunner(profile, line => AppendLog(profileId, ProfileLogCategory.ManualStop, ProfileLogStage.Execution, line), cancellationToken), cancellationToken);
 
-                if (!await _mountedProbe(profile, cancellationToken))
+                if (!await Task.Run(() => _mountedProbe(profile, cancellationToken), cancellationToken))
                 {
                     ApplyRuntimeState(profile, new ProfileRuntimeState(MountLifecycleState.Idle, MountHealthState.Unknown, DateTimeOffset.UtcNow, null));
                     return;
@@ -895,7 +897,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                var report = await _startupPreflightRunner(profile, cancellationToken);
+                var report = await Task.Run(() => _startupPreflightRunner(profile, cancellationToken), cancellationToken);
                 RecordStartupPreflightReport(profileId, report);
                 AppendStartupPreflightChecksToLog(profileId, report);
 
@@ -943,7 +945,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             var profile = SelectedProfile;
             var profileId = profile.Id;
-            var report = await _startupPreflightRunner(profile, cancellationToken);
+            var report = await Task.Run(() => _startupPreflightRunner(profile, cancellationToken), cancellationToken);
             RecordStartupPreflightReport(profileId, report);
             AppendStartupPreflightChecksToLog(profileId, report);
 
@@ -985,8 +987,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            _profileLogs.TryAdd(DiagnosticsSink.SystemProfileId, new List<ProfileLogEvent>());
-            DiagnosticsSink.Instance.RegisterHandler(OnSerilogEvent);
 
             _runtimeMonitoringCts = new CancellationTokenSource();
             _runtimeMonitoringTask = Task.Run(() => RunRuntimeMonitoringLoopAsync(_runtimeMonitoringCts.Token));
@@ -1018,6 +1018,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         StopRuntimeMonitoring();
+        DiagnosticsSink.Instance.UnregisterHandler(OnSerilogEvent);
         GC.SuppressFinalize(this);
     }
 
@@ -1250,14 +1251,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private void AppendLog(string profileId, ProfileLogCategory category, ProfileLogStage stage, string message, ProfileLogSeverity? severity = null, string? error = null)
     {
         var resolvedSeverity = severity ?? ResolveSeverity(message);
-        var resolvedError = string.IsNullOrWhiteSpace(error) && resolvedSeverity is ProfileLogSeverity.Error
-            ? message
-            : error;
-
         var profileName = Profiles.FirstOrDefault(p => string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase))?.Name ?? profileId;
+
         using (LogContext.PushProperty("ProfileName", profileName))
         using (LogContext.PushProperty("ProfileId", profileId))
-        using (LogContext.PushProperty("FromAppendLog", true))
+        using (LogContext.PushProperty("LogCategory", category.ToString()))
+        using (LogContext.PushProperty("LogStage", stage.ToString()))
         {
             if (resolvedSeverity is ProfileLogSeverity.Error)
             {
@@ -1272,32 +1271,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 Log.Information("[{ProfileName}] {Message}", profileName, message);
             }
         }
-
-        var entry = new ProfileLogEvent(profileId, DateTimeOffset.UtcNow, category, stage, resolvedSeverity, message, resolvedError);
-
-        if (!_profileLogs.TryGetValue(profileId, out var logEntries))
-        {
-            logEntries = new List<ProfileLogEvent>();
-            _profileLogs[profileId] = logEntries;
-        }
-
-        logEntries.Add(entry);
-        while (logEntries.Count > MaxProfileLogEntries)
-        {
-            logEntries.RemoveAt(0);
-        }
-
-        RefreshDiagnosticsTimeline();
     }
 
     private void OnSerilogEvent(LogEvent logEvent)
     {
-        if (logEvent.Properties.TryGetValue("FromAppendLog", out LogEventPropertyValue? flag)
-            && flag is ScalarValue { Value: true })
-        {
-            return;
-        }
-
         var profileId = DiagnosticsSink.ExtractProfileId(logEvent);
         var message = DiagnosticsSink.RenderMessage(logEvent);
         var severity = logEvent.Level switch
@@ -1313,21 +1290,27 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             errorText = message;
         }
 
-        var entry = new ProfileLogEvent(profileId, DateTimeOffset.UtcNow, ProfileLogCategory.General, ProfileLogStage.Execution, severity, message, errorText);
+        var category = ExtractEnumProperty<ProfileLogCategory>(logEvent, "LogCategory") ?? ProfileLogCategory.General;
+        var stage = ExtractEnumProperty<ProfileLogStage>(logEvent, "LogStage") ?? ProfileLogStage.Execution;
 
-        if (!_profileLogs.TryGetValue(profileId, out var logEntries))
+        var entry = new ProfileLogEvent(profileId, DateTimeOffset.UtcNow, category, stage, severity, message, errorText);
+
+        lock (_profileLogs)
         {
-            logEntries = new List<ProfileLogEvent>();
-            _profileLogs[profileId] = logEntries;
+            if (!_profileLogs.TryGetValue(profileId, out var logEntries))
+            {
+                logEntries = new List<ProfileLogEvent>();
+                _profileLogs[profileId] = logEntries;
+            }
+
+            logEntries.Add(entry);
+            while (logEntries.Count > MaxProfileLogEntries)
+            {
+                logEntries.RemoveAt(0);
+            }
         }
 
-        logEntries.Add(entry);
-        while (logEntries.Count > MaxProfileLogEntries)
-        {
-            logEntries.RemoveAt(0);
-        }
-
-        if (Dispatcher.UIThread.CheckAccess())
+        if (Application.Current is null || Dispatcher.UIThread.CheckAccess())
         {
             RefreshDiagnosticsTimeline();
         }
@@ -1351,6 +1334,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         return ProfileLogSeverity.Information;
+    }
+
+    private static T? ExtractEnumProperty<T>(LogEvent logEvent, string propertyName) where T : struct, Enum
+    {
+        if (logEvent.Properties.TryGetValue(propertyName, out LogEventPropertyValue? value)
+            && value is ScalarValue { Value: string text }
+            && Enum.TryParse<T>(text, ignoreCase: true, out T parsed))
+        {
+            return parsed;
+        }
+
+        return null;
     }
 
     private DiagnosticsTimelineRow ToDiagnosticsRow(ProfileLogEvent entry)
@@ -1459,7 +1454,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void RefreshDiagnosticsTimeline()
     {
-        IEnumerable<ProfileLogEvent> events = _profileLogs.Values.SelectMany(entries => entries);
+        List<ProfileLogEvent> snapshot;
+        lock (_profileLogs)
+        {
+            snapshot = _profileLogs.Values.SelectMany(entries => entries.ToList()).ToList();
+        }
+
+        IEnumerable<ProfileLogEvent> events = snapshot;
 
         if (string.Equals(SelectedDiagnosticsCategoryFilter, "Remotes", StringComparison.OrdinalIgnoreCase))
         {

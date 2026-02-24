@@ -25,11 +25,13 @@ public sealed class LaunchAgentServiceTests : IDisposable
         await service.EnableAsync(profile, "#!/bin/bash\nexit 0\n", _ => { }, CancellationToken.None);
 
         var plistPath = service.GetLaunchAgentPlistPath(profile);
-        Assert.Equal(2, calls.Count);
+        Assert.Equal(3, calls.Count);
         Assert.Equal("plutil", calls[0].Command);
         Assert.Equal(["-lint", plistPath], calls[0].Args);
         Assert.Equal("launchctl", calls[1].Command);
-        Assert.Equal(["bootstrap", "gui/501", plistPath], calls[1].Args);
+        Assert.Equal(["bootout", "gui/501/com.rclonemountmanager.profile.profile-123"], calls[1].Args);
+        Assert.Equal("launchctl", calls[2].Command);
+        Assert.Equal(["bootstrap", "gui/501", plistPath], calls[2].Args);
     }
 
     [Fact]
@@ -67,20 +69,19 @@ public sealed class LaunchAgentServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task DisableAsync_ThrowsExplicitContextWhenBootoutFails()
+    public async Task DisableAsync_ToleratesBootoutFailure_StillDeletesPlist()
     {
-        var service = CreateServiceForFailure("launchctl", 5, "", "permission denied");
+        var logMessages = new List<string>();
+        var service = CreateServiceForFailure("launchctl", 3, "", "No such process");
         var profile = CreateProfile();
         var plistPath = service.GetLaunchAgentPlistPath(profile);
         Directory.CreateDirectory(Path.GetDirectoryName(plistPath)!);
         await File.WriteAllTextAsync(plistPath, "plist");
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            service.DisableAsync(profile, _ => { }, CancellationToken.None));
+        await service.DisableAsync(profile, logMessages.Add, CancellationToken.None);
 
-        Assert.Contains("launchctl bootout", ex.Message);
-        Assert.Contains("exit code 5", ex.Message);
-        Assert.Contains("stderr: permission denied", ex.Message);
+        Assert.False(File.Exists(plistPath));
+        Assert.Contains(logMessages, m => m.Contains("exited with code 3"));
     }
 
     [Fact]

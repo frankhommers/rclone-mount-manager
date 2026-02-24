@@ -2,6 +2,7 @@ using Serilog.Core;
 using Serilog.Events;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace RcloneMountManager.Services;
 
@@ -12,11 +13,15 @@ public sealed class DiagnosticsSink : ILogEventSink
   public static DiagnosticsSink Instance { get; } = new();
 
   private readonly ConcurrentQueue<LogEvent> _pending = new();
-  private Action<LogEvent>? _handler;
+  private readonly List<Action<LogEvent>> _handlers = new();
+  private readonly object _handlersLock = new();
 
   public void RegisterHandler(Action<LogEvent> handler)
   {
-    _handler = handler;
+    lock (_handlersLock)
+    {
+      _handlers.Add(handler);
+    }
 
     while (_pending.TryDequeue(out var buffered))
     {
@@ -24,15 +29,31 @@ public sealed class DiagnosticsSink : ILogEventSink
     }
   }
 
+  public void UnregisterHandler(Action<LogEvent> handler)
+  {
+    lock (_handlersLock)
+    {
+      _handlers.Remove(handler);
+    }
+  }
+
   public void Emit(LogEvent logEvent)
   {
-    if (_handler is { } handler)
+    Action<LogEvent>[] snapshot;
+    lock (_handlersLock)
+    {
+      if (_handlers.Count == 0)
+      {
+        _pending.Enqueue(logEvent);
+        return;
+      }
+
+      snapshot = _handlers.ToArray();
+    }
+
+    foreach (var handler in snapshot)
     {
       handler(logEvent);
-    }
-    else
-    {
-      _pending.Enqueue(logEvent);
     }
   }
 
