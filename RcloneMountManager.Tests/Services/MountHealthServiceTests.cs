@@ -62,7 +62,7 @@ public sealed class MountHealthServiceTests
     }
 
     [Fact]
-    public async Task VerifyAsync_NotMounted_ReturnsFailed()
+    public async Task VerifyAsync_NotMountedNotRunning_ReturnsIdle()
     {
         var profile = CreateProfile();
         var service = CreateService(
@@ -72,8 +72,25 @@ public sealed class MountHealthServiceTests
 
         var result = await service.VerifyAsync(profile, CancellationToken.None);
 
-        Assert.Equal(MountHealthState.Failed, result.Health);
-        Assert.Contains("not present", result.ErrorText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(MountLifecycleState.Idle, result.Lifecycle);
+        Assert.Equal(MountHealthState.Unknown, result.Health);
+        Assert.Null(result.ErrorText);
+    }
+
+    [Fact]
+    public async Task VerifyAsync_NotMountedButRunning_ReturnsMounting()
+    {
+        var profile = CreateProfile();
+        var service = CreateService(
+            isMountedProbe: (_, _) => Task.FromResult(false),
+            isRunningProbe: _ => true,
+            isMountUsableProbe: (_, _) => Task.FromResult(true));
+
+        var result = await service.VerifyAsync(profile, CancellationToken.None);
+
+        Assert.Equal(MountLifecycleState.Mounting, result.Lifecycle);
+        Assert.Equal(MountHealthState.Unknown, result.Health);
+        Assert.Contains("not present yet", result.ErrorText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -124,7 +141,7 @@ public sealed class MountHealthServiceTests
         Assert.Collection(
             states,
             first => Assert.Equal(MountHealthState.Healthy, first.Health),
-            second => Assert.Equal(MountHealthState.Failed, second.Health));
+            second => Assert.Equal(MountHealthState.Unknown, second.Health));
     }
 
     private static MountProfile CreateProfile(string mountPoint = "/tmp/test-mount")

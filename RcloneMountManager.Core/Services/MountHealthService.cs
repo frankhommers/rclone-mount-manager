@@ -57,10 +57,16 @@ public sealed class MountHealthService
 
         if (!isMounted)
         {
-            var lifecycle = isRunning ? MountLifecycleState.Mounting : MountLifecycleState.Failed;
+            if (isRunning)
+            {
+                return UpdateRuntimeState(
+                    profile,
+                    new ProfileRuntimeState(MountLifecycleState.Mounting, MountHealthState.Unknown, _clock(), "Mount is not present yet."));
+            }
+
             return UpdateRuntimeState(
                 profile,
-                new ProfileRuntimeState(lifecycle, MountHealthState.Failed, _clock(), "Mount is not present."));
+                new ProfileRuntimeState(MountLifecycleState.Idle, MountHealthState.Unknown, _clock(), null));
         }
 
         try
