@@ -1,11 +1,12 @@
 using CliWrap;
 using CliWrap.Buffered;
-using CliWrap.EventStream;
 using RcloneMountManager.Core.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -70,19 +71,49 @@ public sealed class MountManagerService
 
         if (IsRcloneMountType(profile.Type) && _runningMounts.TryRemove(mountPoint, out var runningMount))
         {
-            runningMount.Cancellation.Cancel();
+            if (runningMount.RcPort > 0)
+            {
+                log("Sending quit via RC...");
+                var rcClient = new RcloneRcClient(new HttpClient());
+                await rcClient.QuitAsync(runningMount.RcPort, cancellationToken);
 
-            try
-            {
-                await runningMount.Execution;
+                for (int attempt = 0; attempt < 10; attempt++)
+                {
+                    await Task.Delay(500, cancellationToken);
+                    if (!await IsMountedAsync(mountPoint, cancellationToken))
+                    {
+                        log("rclone stopped via RC.");
+                        return;
+                    }
+                }
+
+                log("RC quit timed out, falling back to umount.");
             }
-            catch (OperationCanceledException)
+            else
             {
-                log("rclone process cancelled.");
+                log("No RC port, falling back to umount.");
             }
         }
         else if (IsRcloneMountType(profile.Type))
         {
+            if (profile.EnableRemoteControl && profile.RcPort > 0)
+            {
+                log("No tracked process; trying RC quit for orphan...");
+                var rcClient = new RcloneRcClient(new HttpClient());
+                if (await rcClient.QuitAsync(profile.RcPort, cancellationToken))
+                {
+                    for (int attempt = 0; attempt < 10; attempt++)
+                    {
+                        await Task.Delay(500, cancellationToken);
+                        if (!await IsMountedAsync(mountPoint, cancellationToken))
+                        {
+                            log("Orphan rclone stopped via RC.");
+                            return;
+                        }
+                    }
+                }
+            }
+
             log("No tracked rclone process found; attempting unmount of orphan mount.");
         }
 
@@ -319,6 +350,12 @@ public sealed class MountManagerService
 
         if (await IsMountedAsync(mountPoint, cancellationToken))
         {
+            if (_runningMounts.ContainsKey(mountPoint))
+            {
+                log("Mount point is already active and tracked.");
+                return;
+            }
+
             throw new InvalidOperationException(
                 $"Mount point '{mountPoint}' is already in use (possibly from a previous session). Stop the existing mount first.");
         }
@@ -349,47 +386,77 @@ public sealed class MountManagerService
             }
         }
 
-        var command = Cli.Wrap(binary)
-            .WithArguments(arguments)
-            .WithValidation(CommandResultValidation.None);
-
-        var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var runTask = Task.Run(async () =>
+        var rcEnabled = profile.EnableRemoteControl && profile.RcPort > 0;
+        if (rcEnabled)
         {
-            try
+            var hasRcAddr = arguments.Any(a => a.StartsWith("--rc-addr", StringComparison.OrdinalIgnoreCase));
+            if (!hasRcAddr)
             {
-                await foreach (var cmdEvent in command.ListenAsync(linkedCancellation.Token))
-                {
-                    switch (cmdEvent)
-                    {
-                        case StartedCommandEvent started:
-                            log($"rclone {mountCommand} started (PID {started.ProcessId}).");
-                            break;
-                        case StandardOutputCommandEvent stdout when !string.IsNullOrWhiteSpace(stdout.Text):
-                            log(stdout.Text);
-                            break;
-                        case StandardErrorCommandEvent stderr when !string.IsNullOrWhiteSpace(stderr.Text):
-                            log(ClassifyRcloneStderrLine(stderr.Text));
-                            break;
-                        case ExitedCommandEvent exited:
-                            log($"rclone {mountCommand} exited with code {exited.ExitCode}.");
-                            break;
-                    }
-                }
+                arguments.Add("--rc");
+                arguments.Add("--rc-no-auth");
+                arguments.Add("--rc-addr");
+                arguments.Add($"localhost:{profile.RcPort}");
             }
-            finally
-            {
-                _runningMounts.TryRemove(mountPoint, out _);
-            }
-        }, CancellationToken.None);
-
-        if (!_runningMounts.TryAdd(mountPoint, new RunningMount(linkedCancellation, runTask)))
-        {
-            linkedCancellation.Cancel();
-            throw new InvalidOperationException("Could not track running mount process.");
         }
 
-        await Task.Delay(250, cancellationToken);
+        var logDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "RcloneMountManager", "logs");
+        Directory.CreateDirectory(logDir);
+        var logFile = Path.Combine(logDir, $"{profile.Id}.log");
+
+        var rcloneArgs = string.Join(" ", arguments.Select(EscapeArgument));
+        var shellCommand = $"nohup \"{EscapeForBash(binary)}\" {rcloneArgs} >> \"{EscapeForBash(logFile)}\" 2>&1 &";
+
+        log($"Launching detached: {binary} {mountCommand} {source} {mountPoint}");
+
+        var result = await Cli.Wrap("/bin/sh")
+            .WithArguments(["-c", shellCommand])
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        if (result.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"Failed to launch rclone: {result.StandardError}");
+        }
+
+        if (rcEnabled)
+        {
+            var rcClient = new RcloneRcClient(new HttpClient());
+            int? pid = null;
+            for (int attempt = 0; attempt < 10; attempt++)
+            {
+                await Task.Delay(500, cancellationToken);
+                pid = await rcClient.GetPidAsync(profile.RcPort, cancellationToken);
+                if (pid.HasValue)
+                {
+                    break;
+                }
+            }
+
+            if (pid.HasValue)
+            {
+                _runningMounts.TryAdd(mountPoint, new RunningMount(pid.Value, profile.RcPort));
+                log($"rclone {mountCommand} started (PID {pid.Value}, RC port {profile.RcPort}).");
+            }
+            else
+            {
+                log($"WARN: rclone launched but RC not responding on port {profile.RcPort}. Check log: {logFile}");
+            }
+        }
+        else
+        {
+            await Task.Delay(2000, cancellationToken);
+            if (await IsMountedAsync(mountPoint, cancellationToken))
+            {
+                log($"rclone {mountCommand} started (no RC, mount point verified).");
+                _runningMounts.TryAdd(mountPoint, new RunningMount(0, 0));
+            }
+            else
+            {
+                throw new InvalidOperationException($"Mount did not appear after launch. Check the log file: {logFile}");
+            }
+        }
     }
 
     private async Task StartNfsAsync(MountProfile profile, string mountPoint, Action<string> log, CancellationToken cancellationToken)
@@ -955,5 +1022,24 @@ public sealed class MountManagerService
         return 50000 + (Math.Abs(hash) % 10000);
     }
 
-    private sealed record RunningMount(CancellationTokenSource Cancellation, Task Execution);
+    public void AdoptMount(string mountPoint, int pid, int rcPort)
+    {
+        var resolved = ResolveMountPoint(mountPoint);
+        _runningMounts.TryAdd(resolved, new RunningMount(pid, rcPort));
+    }
+
+    public async Task StopViaRcAsync(int rcPort, CancellationToken cancellationToken)
+    {
+        var rcClient = new RcloneRcClient(new HttpClient());
+        await rcClient.QuitAsync(rcPort, cancellationToken);
+    }
+
+    public async Task<int?> ProbeRcPidAsync(int rcPort, CancellationToken cancellationToken)
+    {
+        if (rcPort <= 0) return null;
+        var rcClient = new RcloneRcClient(new HttpClient());
+        return await rcClient.GetPidAsync(rcPort, cancellationToken);
+    }
+
+    private sealed record RunningMount(int Pid, int RcPort);
 }
