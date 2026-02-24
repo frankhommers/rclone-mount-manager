@@ -149,10 +149,7 @@ public sealed class MountManagerService
                 var trimmed = line.Trim();
                 if (string.IsNullOrWhiteSpace(trimmed))
                     continue;
-                if (trimmed.Contains("ERROR", StringComparison.OrdinalIgnoreCase))
-                    log($"ERR: {trimmed}");
-                else
-                    log(trimmed);
+                log(ClassifyRcloneStderrLine(trimmed));
             }
         }
 
@@ -230,10 +227,7 @@ public sealed class MountManagerService
                 if (string.IsNullOrWhiteSpace(trimmed))
                     continue;
                 var redacted = RedactSecrets(trimmed, secretValues);
-                if (redacted.Contains("ERROR", StringComparison.OrdinalIgnoreCase))
-                    log($"ERR: {redacted}");
-                else
-                    log(redacted);
+                log(ClassifyRcloneStderrLine(redacted));
             }
         }
 
@@ -375,7 +369,7 @@ public sealed class MountManagerService
                             log(stdout.Text);
                             break;
                         case StandardErrorCommandEvent stderr when !string.IsNullOrWhiteSpace(stderr.Text):
-                            log($"ERR: {stderr.Text}");
+                            log(ClassifyRcloneStderrLine(stderr.Text));
                             break;
                         case ExitedCommandEvent exited:
                             log($"rclone {mountCommand} exited with code {exited.ExitCode}.");
@@ -932,6 +926,27 @@ public sealed class MountManagerService
         }
 
         return string.Empty;
+    }
+
+    /// <summary>
+    /// Classifies an rclone stderr line by its log level prefix and returns an
+    /// appropriately tagged string for downstream severity resolution.
+    /// rclone writes NOTICE, WARNING, ERROR, and CRITICAL to stderr.
+    /// </summary>
+    internal static string ClassifyRcloneStderrLine(string line)
+    {
+        if (line.Contains("ERROR", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("CRITICAL", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"ERR: {line}";
+        }
+
+        if (line.Contains("WARNING", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"WARN: {line}";
+        }
+
+        return line;
     }
 
     private sealed record RunningMount(CancellationTokenSource Cancellation, Task Execution);

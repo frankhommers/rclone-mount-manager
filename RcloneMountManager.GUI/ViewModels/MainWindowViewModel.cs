@@ -1225,7 +1225,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             return ProfileLogSeverity.Error;
         }
 
-        if (message.Contains("warn", StringComparison.OrdinalIgnoreCase))
+        if (message.StartsWith("WARN:", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("WARNING", StringComparison.OrdinalIgnoreCase))
         {
             return ProfileLogSeverity.Warning;
         }
