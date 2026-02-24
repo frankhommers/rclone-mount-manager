@@ -1,5 +1,6 @@
 using CliWrap;
 using CliWrap.Buffered;
+using Microsoft.Extensions.Logging;
 using RcloneMountManager.Core.Models;
 using System;
 using System.Collections.Concurrent;
@@ -16,10 +17,16 @@ namespace RcloneMountManager.Core.Services;
 
 public sealed class MountManagerService
 {
+    private readonly ILogger<MountManagerService> _logger;
     private readonly ConcurrentDictionary<string, RunningMount> _runningMounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, string> _rcloneMountCommandCache = new(StringComparer.OrdinalIgnoreCase);
 
-    public async Task StartAsync(MountProfile profile, Action<string> log, CancellationToken cancellationToken)
+    public MountManagerService(ILogger<MountManagerService> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task StartAsync(MountProfile profile, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -51,19 +58,19 @@ public sealed class MountManagerService
 
         if (!string.Equals(profile.MountPoint, mountPoint, StringComparison.Ordinal))
         {
-            log($"Resolved mount path '{profile.MountPoint}' -> '{mountPoint}'.");
+            _logger.LogInformation("Resolved mount path '{OriginalPath}' -> '{ResolvedPath}'", profile.MountPoint, mountPoint);
         }
 
         if (IsRcloneMountType(profile.Type))
         {
-            await StartRcloneAsync(profile, mountPoint, log, cancellationToken);
+            await StartRcloneAsync(profile, mountPoint, cancellationToken);
             return;
         }
 
-        await StartNfsAsync(profile, mountPoint, log, cancellationToken);
+        await StartNfsAsync(profile, mountPoint, cancellationToken);
     }
 
-    public async Task StopAsync(MountProfile profile, Action<string> log, CancellationToken cancellationToken)
+    public async Task StopAsync(MountProfile profile, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -73,7 +80,7 @@ public sealed class MountManagerService
         {
             if (runningMount.RcPort > 0)
             {
-                log("Sending quit via RC...");
+                _logger.LogInformation("Sending quit via RC...");
                 var rcClient = new RcloneRcClient(new HttpClient());
                 await rcClient.QuitAsync(runningMount.RcPort, cancellationToken);
 
@@ -82,23 +89,23 @@ public sealed class MountManagerService
                     await Task.Delay(500, cancellationToken);
                     if (!await IsMountedAsync(mountPoint, cancellationToken))
                     {
-                        log("rclone stopped via RC.");
+                        _logger.LogInformation("rclone stopped via RC");
                         return;
                     }
                 }
 
-                log("RC quit timed out, falling back to umount.");
+                _logger.LogWarning("RC quit timed out, falling back to umount");
             }
             else
             {
-                log("No RC port, falling back to umount.");
+                _logger.LogInformation("No RC port, falling back to umount");
             }
         }
         else if (IsRcloneMountType(profile.Type))
         {
             if (profile.EnableRemoteControl && profile.RcPort > 0)
             {
-                log("No tracked process; trying RC quit for orphan...");
+                _logger.LogInformation("No tracked process; trying RC quit for orphan...");
                 var rcClient = new RcloneRcClient(new HttpClient());
                 if (await rcClient.QuitAsync(profile.RcPort, cancellationToken))
                 {
@@ -107,17 +114,17 @@ public sealed class MountManagerService
                         await Task.Delay(500, cancellationToken);
                         if (!await IsMountedAsync(mountPoint, cancellationToken))
                         {
-                            log("Orphan rclone stopped via RC.");
+                            _logger.LogInformation("Orphan rclone stopped via RC");
                             return;
                         }
                     }
                 }
             }
 
-            log("No tracked rclone process found; attempting unmount of orphan mount.");
+            _logger.LogInformation("No tracked rclone process found; attempting unmount of orphan mount");
         }
 
-        await UnmountAsync(mountPoint, log, cancellationToken);
+        await UnmountAsync(mountPoint, cancellationToken);
     }
 
     public async Task<bool> IsMountedAsync(string mountPoint, CancellationToken cancellationToken)
@@ -139,7 +146,7 @@ public sealed class MountManagerService
 
     public bool IsRunning(string mountPoint) => _runningMounts.ContainsKey(ResolveMountPoint(mountPoint));
 
-    public async Task TestConnectionAsync(MountProfile profile, Action<string> log, CancellationToken cancellationToken)
+    public async Task TestConnectionAsync(MountProfile profile, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -170,7 +177,7 @@ public sealed class MountManagerService
 
         if (!string.IsNullOrWhiteSpace(result.StandardOutput))
         {
-            log(result.StandardOutput.Trim());
+            _logger.LogInformation("{Output}", result.StandardOutput.Trim());
         }
 
         if (!string.IsNullOrWhiteSpace(result.StandardError))
@@ -180,7 +187,7 @@ public sealed class MountManagerService
                 var trimmed = line.Trim();
                 if (string.IsNullOrWhiteSpace(trimmed))
                     continue;
-                log(ClassifyRcloneStderrLine(trimmed));
+                LogClassifiedStderrLine(trimmed);
             }
         }
 
@@ -189,14 +196,13 @@ public sealed class MountManagerService
             throw new InvalidOperationException($"Connectivity test failed with exit code {result.ExitCode}.");
         }
 
-        log("Connectivity test succeeded.");
+        _logger.LogInformation("Connectivity test succeeded");
     }
 
     public async Task TestBackendConnectionAsync(
         string rcloneBinaryPath,
         string backendName,
         IEnumerable<RcloneBackendOptionInput> options,
-        Action<string> log,
         CancellationToken cancellationToken)
     {
         var binary = string.IsNullOrWhiteSpace(rcloneBinaryPath) ? "rclone" : rcloneBinaryPath;
@@ -240,7 +246,7 @@ public sealed class MountManagerService
 
         var secretValues = CollectSecretValues(arguments, secretFlags);
 
-        log($"$ {binary} {FormatCommandLine(arguments, secretFlags)}");
+        _logger.LogInformation("$ {Binary} {CommandLine}", binary, FormatCommandLine(arguments, secretFlags));
 
         var result = await Cli.Wrap(binary)
             .WithArguments(arguments)
@@ -248,7 +254,7 @@ public sealed class MountManagerService
             .ExecuteBufferedAsync(cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(result.StandardOutput))
-            log(RedactSecrets(result.StandardOutput.Trim(), secretValues));
+            _logger.LogInformation("{Output}", RedactSecrets(result.StandardOutput.Trim(), secretValues));
 
         if (!string.IsNullOrWhiteSpace(result.StandardError))
         {
@@ -258,14 +264,14 @@ public sealed class MountManagerService
                 if (string.IsNullOrWhiteSpace(trimmed))
                     continue;
                 var redacted = RedactSecrets(trimmed, secretValues);
-                log(ClassifyRcloneStderrLine(redacted));
+                LogClassifiedStderrLine(redacted);
             }
         }
 
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"Connectivity test failed with exit code {result.ExitCode}.");
 
-        log("Connectivity test succeeded.");
+        _logger.LogInformation("Connectivity test succeeded");
     }
 
     public string GenerateScript(MountProfile profile)
@@ -352,7 +358,7 @@ public sealed class MountManagerService
         return builder.ToString();
     }
 
-    private async Task StartRcloneAsync(MountProfile profile, string mountPoint, Action<string> log, CancellationToken cancellationToken)
+    private async Task StartRcloneAsync(MountProfile profile, string mountPoint, CancellationToken cancellationToken)
     {
         if (_runningMounts.ContainsKey(mountPoint))
         {
@@ -363,7 +369,7 @@ public sealed class MountManagerService
         {
             if (_runningMounts.ContainsKey(mountPoint))
             {
-                log("Mount point is already active and tracked.");
+                _logger.LogInformation("Mount point is already active and tracked");
                 return;
             }
 
@@ -373,7 +379,7 @@ public sealed class MountManagerService
 
         var source = ResolveRcloneSource(profile);
         var binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
-        var mountCommand = await ResolveRcloneMountCommandAsync(binary, profile.Type, log, cancellationToken);
+        var mountCommand = await ResolveRcloneMountCommandAsync(binary, profile.Type, cancellationToken);
         var arguments = new List<string> { mountCommand, source, mountPoint };
         await AddQuickConnectArgumentsAsync(profile, arguments, cancellationToken);
 
@@ -416,7 +422,7 @@ public sealed class MountManagerService
         Directory.CreateDirectory(logDir);
         var logFile = Path.Combine(logDir, $"{profile.Id}.log");
 
-        log($"Launching detached: {binary} {mountCommand} {source} {mountPoint}");
+        _logger.LogInformation("Launching detached: {Binary} {MountCommand} {Source} {MountPoint}", binary, mountCommand, source, mountPoint);
 
         var logStream = new FileStream(logFile, FileMode.Append, FileAccess.Write, FileShare.Read);
         var command = Cli.Wrap(binary)
@@ -457,11 +463,11 @@ public sealed class MountManagerService
 
             if (!pid.HasValue)
             {
-                log($"WARN: rclone launched but RC not responding on port {profile.RcPort}. Check log: {logFile}");
+                _logger.LogWarning("rclone launched but RC not responding on port {RcPort}. Check log: {LogFile}", profile.RcPort, logFile);
                 return;
             }
 
-            log($"rclone process started (PID {pid.Value}, RC port {profile.RcPort}). Waiting for mount...");
+            _logger.LogInformation("rclone process started (PID {Pid}, RC port {RcPort}). Waiting for mount...", pid.Value, profile.RcPort);
 
             bool mounted = false;
             for (int attempt = 0; attempt < 20; attempt++)
@@ -475,7 +481,7 @@ public sealed class MountManagerService
 
                 if (!await rcClient.IsAliveAsync(profile.RcPort, cancellationToken))
                 {
-                    log($"ERR: rclone process died before mount appeared. Check log: {logFile}");
+                    _logger.LogError("rclone process died before mount appeared. Check log: {LogFile}", logFile);
                     return;
                 }
             }
@@ -483,11 +489,11 @@ public sealed class MountManagerService
             if (mounted)
             {
                 _runningMounts.TryAdd(mountPoint, new RunningMount(pid.Value, profile.RcPort));
-                log($"rclone {mountCommand} started and mounted (PID {pid.Value}, RC port {profile.RcPort}).");
+                _logger.LogInformation("rclone {MountCommand} started and mounted (PID {Pid}, RC port {RcPort})", mountCommand, pid.Value, profile.RcPort);
             }
             else
             {
-                log($"WARN: rclone running (PID {pid.Value}) but mount not appearing. Check log: {logFile}");
+                _logger.LogWarning("rclone running (PID {Pid}) but mount not appearing. Check log: {LogFile}", pid.Value, logFile);
             }
         }
         else
@@ -495,7 +501,7 @@ public sealed class MountManagerService
             await Task.Delay(2000, cancellationToken);
             if (await IsMountedAsync(mountPoint, cancellationToken))
             {
-                log($"rclone {mountCommand} started (no RC, mount point verified).");
+                _logger.LogInformation("rclone {MountCommand} started (no RC, mount point verified)", mountCommand);
                 _runningMounts.TryAdd(mountPoint, new RunningMount(0, 0));
             }
             else
@@ -505,7 +511,7 @@ public sealed class MountManagerService
         }
     }
 
-    private async Task StartNfsAsync(MountProfile profile, string mountPoint, Action<string> log, CancellationToken cancellationToken)
+    private async Task StartNfsAsync(MountProfile profile, string mountPoint, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(profile.ExtraOptions) && profile.ExtraOptions.Contains("--", StringComparison.Ordinal))
         {
@@ -530,12 +536,12 @@ public sealed class MountManagerService
 
         if (!string.IsNullOrWhiteSpace(result.StandardOutput))
         {
-            log(result.StandardOutput.Trim());
+            _logger.LogInformation("{Output}", result.StandardOutput.Trim());
         }
 
         if (!string.IsNullOrWhiteSpace(result.StandardError))
         {
-            log($"ERR: {result.StandardError.Trim()}");
+            _logger.LogError("{Output}", result.StandardError.Trim());
         }
 
         if (result.ExitCode != 0)
@@ -544,11 +550,11 @@ public sealed class MountManagerService
         }
     }
 
-    private async Task UnmountAsync(string mountPoint, Action<string> log, CancellationToken cancellationToken)
+    private async Task UnmountAsync(string mountPoint, CancellationToken cancellationToken)
     {
         if (!await IsMountedAsync(mountPoint, cancellationToken))
         {
-            log("Mount point is not mounted.");
+            _logger.LogInformation("Mount point is not mounted");
             return;
         }
 
@@ -572,7 +578,7 @@ public sealed class MountManagerService
 
             if (result.ExitCode == 0)
             {
-                log($"Unmounted {mountPoint} via {candidate.Binary}.");
+                _logger.LogInformation("Unmounted {MountPoint} via {Binary}", mountPoint, candidate.Binary);
                 return;
             }
         }
@@ -936,17 +942,17 @@ public sealed class MountManagerService
     private static bool IsRcloneMountType(MountType mountType) =>
         mountType is MountType.RcloneAuto or MountType.RcloneFuse or MountType.RcloneNfs;
 
-    private async Task<string> ResolveRcloneMountCommandAsync(string binary, MountType mountType, Action<string> log, CancellationToken cancellationToken)
+    private async Task<string> ResolveRcloneMountCommandAsync(string binary, MountType mountType, CancellationToken cancellationToken)
     {
         if (mountType is MountType.RcloneFuse)
         {
-            log("User forced FUSE mount.");
+            _logger.LogInformation("User forced FUSE mount");
             return "mount";
         }
 
         if (mountType is MountType.RcloneNfs)
         {
-            log("User forced NFS mount via rclone.");
+            _logger.LogInformation("User forced NFS mount via rclone");
             return "nfsmount";
         }
 
@@ -977,11 +983,11 @@ public sealed class MountManagerService
                     : "mount";
 
             var tagText = string.IsNullOrWhiteSpace(tags) ? "none" : tags;
-            log($"Detected rclone tags '{tagText}', using '{selected}'.");
+            _logger.LogInformation("Detected rclone tags '{Tags}', using '{MountCommand}'", tagText, selected);
         }
         else
         {
-            log($"Using rclone command '{selected}'.");
+            _logger.LogInformation("Using rclone command '{MountCommand}'", selected);
         }
 
         _rcloneMountCommandCache[binary] = selected;
@@ -1060,6 +1066,23 @@ public sealed class MountManagerService
         }
 
         return line;
+    }
+
+    private void LogClassifiedStderrLine(string line)
+    {
+        if (line.Contains("ERROR", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("CRITICAL", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogError("{Line}", line);
+        }
+        else if (line.Contains("WARNING", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("{Line}", line);
+        }
+        else
+        {
+            _logger.LogInformation("{Line}", line);
+        }
     }
 
     public static int AssignRcPort(string profileId)

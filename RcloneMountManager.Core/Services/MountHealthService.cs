@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using RcloneMountManager.Core.Models;
 using System;
 using System.Collections.Generic;
@@ -24,7 +26,7 @@ public sealed class MountHealthService
         TimeSpan? mountProbeTimeout = null,
         Func<DateTimeOffset>? clock = null)
     {
-        var mountManagerService = new MountManagerService();
+        var mountManagerService = new MountManagerService(NullLogger<MountManagerService>.Instance);
         _isMountedProbe = isMountedProbe ?? mountManagerService.IsMountedAsync;
         _isRunningProbe = isRunningProbe ?? mountManagerService.IsRunning;
         _isMountUsableProbe = isMountUsableProbe ?? ProbeMountPathUsabilityAsync;
