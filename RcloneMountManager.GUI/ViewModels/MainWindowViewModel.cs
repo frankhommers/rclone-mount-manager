@@ -1761,8 +1761,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         foreach (var option in backend.Options
                      .Where(o => o.Required || !o.Advanced)
-                     .OrderByDescending(o => o.Required)
-                     .ThenBy(o => o.Name, StringComparer.OrdinalIgnoreCase))
+                     .OrderByDescending(o => o.Required))
         {
             BackendOptionInputs.Add(new RcloneBackendOptionInput(option));
         }
@@ -1770,8 +1769,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         if (ShowAdvancedBackendOptions)
         {
             foreach (var option in backend.Options
-                         .Where(o => o.Advanced && !o.Required)
-                         .OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase))
+                         .Where(o => o.Advanced && !o.Required))
             {
                 AdvancedBackendOptionInputs.Add(new RcloneBackendOptionInput(option));
             }
