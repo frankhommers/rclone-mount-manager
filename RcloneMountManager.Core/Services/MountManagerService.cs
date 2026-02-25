@@ -566,7 +566,10 @@ public sealed class MountManagerService
             }
             : new[]
             {
+                (Binary: "diskutil", Args: new[] { "unmount", mountPoint }),
                 (Binary: "umount", Args: new[] { mountPoint }),
+                (Binary: "diskutil", Args: new[] { "unmount", "force", mountPoint }),
+                (Binary: "umount", Args: new[] { "-f", mountPoint }),
             };
 
         foreach (var candidate in unmountCandidates)
@@ -578,9 +581,14 @@ public sealed class MountManagerService
 
             if (result.ExitCode == 0)
             {
-                _logger.LogInformation("Unmounted {MountPoint} via {Binary}", mountPoint, candidate.Binary);
+                _logger.LogInformation("Unmounted {MountPoint} via {Binary} {Args}",
+                    mountPoint, candidate.Binary, string.Join(" ", candidate.Args));
                 return;
             }
+
+            _logger.LogDebug("Unmount attempt failed: {Binary} {Args} (exit {ExitCode}): {Error}",
+                candidate.Binary, string.Join(" ", candidate.Args),
+                result.ExitCode, result.StandardError.Trim());
         }
 
         throw new InvalidOperationException($"Could not unmount {mountPoint}. Try unmounting manually.");

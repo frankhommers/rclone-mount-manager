@@ -57,6 +57,21 @@ sealed class Program
     {
       Log.Information("Starting Rclone Mount Manager");
       host.Start();
+
+      Console.CancelKeyPress += (_, e) =>
+      {
+        e.Cancel = true;
+        Log.Information("Ctrl+C received, shutting down");
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+          if (Avalonia.Application.Current?.ApplicationLifetime
+              is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+          {
+            desktop.Shutdown();
+          }
+        });
+      };
+
       BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
     catch (Exception ex)

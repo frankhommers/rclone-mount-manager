@@ -148,7 +148,7 @@ public sealed class LaunchAgentService
         builder.AppendLine("  <key>RunAtLoad</key>");
         builder.AppendLine("  <true/>");
         builder.AppendLine("  <key>KeepAlive</key>");
-        builder.AppendLine("  <false/>");
+        builder.AppendLine("  <true/>");
         builder.AppendLine("</dict>");
         builder.AppendLine("</plist>");
         return builder.ToString();

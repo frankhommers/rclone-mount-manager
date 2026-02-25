@@ -40,6 +40,18 @@
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource SystemControlForegroundBaseHighBrush}"/>
         </Style>
+        <Style Selector="Button.sidebar-nav">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.sidebar-nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListLowBrush}"/>
+        </Style>
+        <Style Selector="Button.sidebar-nav.sidebar-active">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}"/>
+        </Style>
+        <Style Selector="Button.sidebar-nav.sidebar-active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource SystemControlHighlightListAccentLowBrush}"/>
+        </Style>
     </Window.Styles>
 
     <Border Margin="14"
@@ -76,7 +88,7 @@
                                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,2,4,0">
                                     <PathIcon Data="{StaticResource MdiCloudOutline}"
                                               Foreground="#4CAF50"
-                                              Width="14" Height="14"
+                                              Width="18" Height="18"
                                               VerticalAlignment="Center"
                                               Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1" Text="REMOTES" FontSize="11" FontWeight="SemiBold" Opacity="0.75" VerticalAlignment="Center"/>
@@ -91,7 +103,7 @@
                                 </Grid>
                                 <ListBox ItemsSource="{Binding RemoteProfiles}"
                                          SelectedItem="{Binding SidebarSelectedRemoteProfile}"
-                                         Classes.sidebar-inactive="{Binding !ShowRemoteEditor}"
+                                         Classes.sidebar-inactive="{Binding !IsRemoteListActive}"
                                          IsVisible="{Binding HasRemoteProfiles}"
                                          Background="Transparent"
                                          BorderThickness="0"
@@ -101,10 +113,14 @@
                                         <DataTemplate>
                                             <StackPanel Margin="20,4,4,6" Spacing="2">
                                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding RemoteSidebarBackend}"
+                                                           IsVisible="{Binding HasRemoteSidebarBackend}"
+                                                           FontSize="11"
+                                                           Opacity="0.75"/>
                                                 <TextBlock Text="{Binding RemoteSidebarSubtitle}"
                                                            IsVisible="{Binding HasRemoteSidebarSubtitle}"
                                                            FontSize="11"
-                                                           Opacity="0.75"
+                                                           Opacity="0.65"
                                                            TextTrimming="CharacterEllipsis"/>
                                             </StackPanel>
                                         </DataTemplate>
@@ -120,7 +136,7 @@
                                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,8,4,0">
                                     <PathIcon Data="{StaticResource MdiFolderOutline}"
                                               Foreground="#2196F3"
-                                              Width="14" Height="14"
+                                              Width="18" Height="18"
                                               VerticalAlignment="Center"
                                               Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1" Text="MOUNTS" FontSize="11" FontWeight="SemiBold" Opacity="0.75" VerticalAlignment="Center"/>
@@ -135,7 +151,7 @@
                                 </Grid>
                                 <ListBox ItemsSource="{Binding MountProfiles}"
                                          SelectedItem="{Binding SidebarSelectedMountProfile}"
-                                         Classes.sidebar-inactive="{Binding ShowRemoteEditor}"
+                                         Classes.sidebar-inactive="{Binding !IsMountListActive}"
                                          IsVisible="{Binding HasMountProfiles}"
                                          Background="Transparent"
                                          BorderThickness="0"
@@ -150,7 +166,7 @@
                                                          Margin="0,0,8,0"/>
                                                 <StackPanel Grid.Column="1" Spacing="2">
                                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
-                                                    <TextBlock Text="{Binding Type}" FontSize="11" Opacity="0.75"/>
+                                                    <TextBlock Text="{Binding Type, Converter={StaticResource EnumDescriptionConverter}}" FontSize="11" Opacity="0.75"/>
                                                     <TextBlock Text="{Binding MountPoint}" FontSize="11" Opacity="0.65" TextTrimming="CharacterEllipsis"/>
                                                 </StackPanel>
                                             </Grid>
@@ -166,21 +182,45 @@
                                 <Grid ColumnDefinitions="Auto,*" Margin="4,8,4,0">
                                     <PathIcon Data="{StaticResource MdiGauge}"
                                               Foreground="#9E9E9E"
-                                              Width="14" Height="14"
+                                              Width="18" Height="18"
                                               VerticalAlignment="Center"
                                               Margin="0,0,6,0"/>
                                     <TextBlock Grid.Column="1" Text="DIAGNOSTICS" FontSize="11" FontWeight="SemiBold" Opacity="0.75" VerticalAlignment="Center"/>
                                 </Grid>
                                 <Button Command="{Binding SelectDiagnosticsCommand}"
-                                         Background="Transparent"
+                                         Classes="sidebar-nav"
+                                         Classes.sidebar-active="{Binding ShowDiagnosticsView}"
                                          BorderThickness="0"
                                          HorizontalAlignment="Stretch"
                                          HorizontalContentAlignment="Left"
-                                         Padding="20,8,10,8"
+                                         Padding="32,8,10,8"
                                          CornerRadius="8">
                                     <StackPanel Spacing="2">
                                         <TextBlock Text="Logs" FontWeight="SemiBold"/>
                                         <TextBlock Text="View all log entries"
+                                                   FontSize="11"
+                                                   Opacity="0.75"/>
+                                    </StackPanel>
+                                </Button>
+                                <Grid ColumnDefinitions="Auto,*" Margin="4,8,4,0">
+                                    <PathIcon Data="{StaticResource MdiCogOutline}"
+                                              Foreground="#9E9E9E"
+                                              Width="18" Height="18"
+                                              VerticalAlignment="Center"
+                                              Margin="0,0,6,0"/>
+                                    <TextBlock Grid.Column="1" Text="SETTINGS" FontSize="11" FontWeight="SemiBold" Opacity="0.75" VerticalAlignment="Center"/>
+                                </Grid>
+                                <Button Command="{Binding SelectSettingsCommand}"
+                                         Classes="sidebar-nav"
+                                         Classes.sidebar-active="{Binding ShowSettingsView}"
+                                         BorderThickness="0"
+                                         HorizontalAlignment="Stretch"
+                                         HorizontalContentAlignment="Left"
+                                         Padding="32,8,10,8"
+                                         CornerRadius="8">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Preferences" FontWeight="SemiBold"/>
+                                        <TextBlock Text="Theme and app settings"
                                                    FontSize="11"
                                                    Opacity="0.75"/>
                                     </StackPanel>
@@ -215,21 +255,186 @@
                             CornerRadius="0,20,0,0"
                             BorderThickness="0,0,0,1"
                             BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel>
-                                <TextBlock Text="{Binding WorkspaceTitle}" FontSize="20" FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding WorkspaceSubtitle}"
-                                           FontSize="12"
-                                           Opacity="0.75"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <TextBlock Text="Theme" VerticalAlignment="Center"/>
-                                <ComboBox Width="140" ItemsSource="{Binding ThemeModes}" SelectedItem="{Binding SelectedThemeMode}"/>
-                            </StackPanel>
-                        </Grid>
+                        <StackPanel>
+                            <TextBlock Text="{Binding WorkspaceTitle}" FontSize="20" FontWeight="SemiBold"/>
+                            <TextBlock Text="{Binding WorkspaceSubtitle}"
+                                       FontSize="12"
+                                       Opacity="0.75"/>
+                        </StackPanel>
                     </Border>
 
-                    <ScrollViewer Grid.Row="1" IsVisible="{Binding HasProfiles}">
+                    <!-- Diagnostics view (outside ScrollViewer so ListBox fills space) -->
+                    <DockPanel Grid.Row="1"
+                               IsVisible="{Binding ShowDiagnosticsView}"
+                               Margin="20,14">
+                        <StackPanel DockPanel.Dock="Top" Spacing="14">
+                            <!-- Filter bar -->
+                            <Border BorderThickness="1"
+                                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                    CornerRadius="10"
+                                    Padding="14">
+                                <Grid ColumnDefinitions="Auto,160,20,Auto,160,20,Auto,*" RowDefinitions="Auto" ColumnSpacing="0">
+                                    <TextBlock Grid.Column="0"
+                                               Text="Show"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"/>
+                                    <ComboBox Grid.Column="1"
+                                              ItemsSource="{Binding DiagnosticsCategoryFilters}"
+                                              SelectedItem="{Binding SelectedDiagnosticsCategoryFilter}"
+                                              HorizontalAlignment="Stretch"/>
+                                    <TextBlock Grid.Column="3"
+                                               Text="Profile"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"/>
+                                    <ComboBox Grid.Column="4"
+                                               ItemsSource="{Binding DiagnosticsProfileFilters}"
+                                               SelectedItem="{Binding SelectedDiagnosticsProfileFilterOption}"
+                                               HorizontalAlignment="Stretch">
+                                         <ComboBox.ItemTemplate>
+                                             <DataTemplate>
+                                                 <StackPanel Orientation="Horizontal" Spacing="6">
+                                                     <PathIcon Data="{Binding TypeIconData}"
+                                                               Foreground="{Binding TypeIconBrush}"
+                                                               Width="14" Height="14"
+                                                               VerticalAlignment="Center"
+                                                               IsVisible="{Binding HasTypeIcon}"/>
+                                                     <TextBlock Text="{Binding DisplayName}"
+                                                                VerticalAlignment="Center"/>
+                                                 </StackPanel>
+                                             </DataTemplate>
+                                         </ComboBox.ItemTemplate>
+                                     </ComboBox>
+                                    <TextBlock Grid.Column="6"
+                                               Text="Search"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,8,0"/>
+                                    <TextBox Grid.Column="7"
+                                             Text="{Binding DiagnosticsSearchText}"
+                                             Watermark="Filter log messages..."
+                                             HorizontalAlignment="Stretch"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Summary counters -->
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                <Border Grid.Column="0"
+                                        BorderThickness="1"
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        CornerRadius="10"
+                                        Padding="14,10">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding DiagnosticsInfoCount}"
+                                                   FontSize="22"
+                                                   FontWeight="Bold"/>
+                                        <TextBlock Text="Info"
+                                                   FontSize="11"
+                                                   Opacity="0.6"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1"
+                                        BorderThickness="1"
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        CornerRadius="10"
+                                        Padding="14,10">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding DiagnosticsWarningCount}"
+                                                   FontSize="22"
+                                                   FontWeight="Bold"
+                                                   Foreground="#E0A000"/>
+                                        <TextBlock Text="Warnings"
+                                                   FontSize="11"
+                                                   Opacity="0.6"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2"
+                                        BorderThickness="1"
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        CornerRadius="10"
+                                        Padding="14,10">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding DiagnosticsErrorCount}"
+                                                   FontSize="22"
+                                                   FontWeight="Bold"
+                                                   Foreground="#D04040"/>
+                                        <TextBlock Text="Errors"
+                                                   FontSize="11"
+                                                   Opacity="0.6"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- Copy button -->
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasDiagnosticsRows}">
+                                <Button Content="Copy all to clipboard"
+                                        Command="{Binding CopyDiagnosticsCommand}"/>
+                                <Button Content="Copy selected to clipboard"
+                                        Command="{Binding CopySelectedDiagnosticsCommand}"
+                                        CommandParameter="{Binding #DiagnosticsListBox.SelectedItems}"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Log table (fills remaining space) -->
+                        <ListBox Name="DiagnosticsListBox"
+                                 ItemsSource="{Binding DiagnosticsRows}"
+                                 IsVisible="{Binding HasDiagnosticsRows}"
+                                 SelectionMode="Multiple"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                 Margin="0,14,0,0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="24,150,100,90,160,*" ColumnSpacing="10">
+                                        <PathIcon Grid.Column="0"
+                                                  Data="{Binding TypeIconData}"
+                                                  Foreground="{Binding TypeIconBrush}"
+                                                  Width="14"
+                                                  Height="14"
+                                                  VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding TimestampText}"
+                                                   FontFamily="Cascadia Mono, Consolas, Menlo"
+                                                   FontSize="12"/>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding ProfileName}"
+                                                   FontFamily="Cascadia Mono, Consolas, Menlo"
+                                                   FontSize="12"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Grid.Column="3"
+                                                   Text="{Binding SeverityText}"
+                                                   FontFamily="Cascadia Mono, Consolas, Menlo"
+                                                   FontSize="12"/>
+                                        <TextBlock Grid.Column="4"
+                                                   Text="{Binding StageText}"
+                                                   FontFamily="Cascadia Mono, Consolas, Menlo"
+                                                   FontSize="12"/>
+                                        <SelectableTextBlock Grid.Column="5"
+                                                   Text="{Binding MessageText}"
+                                                   FontFamily="Cascadia Mono, Consolas, Menlo"
+                                                   FontSize="12"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Border IsVisible="{Binding !HasDiagnosticsRows}"
+                                BorderThickness="1"
+                                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                CornerRadius="10"
+                                Padding="20"
+                                Margin="0,14,0,0"
+                                MinHeight="100">
+                            <StackPanel VerticalAlignment="Center" Spacing="4">
+                                <TextBlock Text="No log entries"
+                                           FontWeight="SemiBold"
+                                           FontSize="14"
+                                           Opacity="0.75"/>
+                                <TextBlock Text="{Binding DiagnosticsEmptyStateText}"
+                                           FontSize="12"
+                                           Opacity="0.6"/>
+                            </StackPanel>
+                        </Border>
+                    </DockPanel>
+
+                    <ScrollViewer Grid.Row="1" IsVisible="{Binding ShowEditorScrollViewer}">
                         <StackPanel Margin="20,14" Spacing="10">
 
                             <StackPanel IsVisible="{Binding ShowRemoteEditorContent}" Spacing="10">
@@ -328,7 +533,11 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
                             </Grid>
-                            <Grid ColumnDefinitions="200,*">
+                            <Grid ColumnDefinitions="200,*" IsVisible="{Binding HasSelectedMountRemote}">
+                                <TextBlock Text="{Binding SourceLabel}" VerticalAlignment="Center"/>
+                                <TextBox Grid.Column="1" Text="{Binding MountRemotePath, Mode=TwoWay}" Watermark="{Binding SourceHint}" HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="200,*" IsVisible="{Binding !HasSelectedMountRemote}">
                                 <TextBlock Text="{Binding SourceLabel}" VerticalAlignment="Center"/>
                                 <TextBox Grid.Column="1" Text="{Binding SelectedProfile.Source}" Watermark="{Binding SourceHint}" HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
                             </Grid>
@@ -463,162 +672,14 @@
 
                             </StackPanel>
 
-                            <StackPanel IsVisible="{Binding ShowDiagnosticsView}" Spacing="14">
-
-                                <!-- Filter bar -->
-                                <Border BorderThickness="1"
-                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                        CornerRadius="10"
-                                        Padding="14">
-                                    <Grid ColumnDefinitions="Auto,160,20,Auto,160,20,Auto,*" RowDefinitions="Auto" ColumnSpacing="0">
-                                        <TextBlock Grid.Column="0"
-                                                   Text="Show"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,8,0"/>
-                                        <ComboBox Grid.Column="1"
-                                                  ItemsSource="{Binding DiagnosticsCategoryFilters}"
-                                                  SelectedItem="{Binding SelectedDiagnosticsCategoryFilter}"
-                                                  HorizontalAlignment="Stretch"/>
-                                        <TextBlock Grid.Column="3"
-                                                   Text="Profile"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,8,0"/>
-                                        <ComboBox Grid.Column="4"
-                                                   ItemsSource="{Binding DiagnosticsProfileFilters}"
-                                                   SelectedItem="{Binding SelectedDiagnosticsProfileFilterOption}"
-                                                   HorizontalAlignment="Stretch">
-                                             <ComboBox.ItemTemplate>
-                                                 <DataTemplate>
-                                                     <StackPanel Orientation="Horizontal" Spacing="6">
-                                                         <PathIcon Data="{Binding TypeIconData}"
-                                                                   Foreground="{Binding TypeIconBrush}"
-                                                                   Width="14" Height="14"
-                                                                   VerticalAlignment="Center"
-                                                                   IsVisible="{Binding HasTypeIcon}"/>
-                                                         <TextBlock Text="{Binding DisplayName}"
-                                                                    VerticalAlignment="Center"/>
-                                                     </StackPanel>
-                                                 </DataTemplate>
-                                             </ComboBox.ItemTemplate>
-                                         </ComboBox>
-                                        <TextBlock Grid.Column="6"
-                                                   Text="Search"
-                                                   VerticalAlignment="Center"
-                                                   Margin="0,0,8,0"/>
-                                        <TextBox Grid.Column="7"
-                                                 Text="{Binding DiagnosticsSearchText}"
-                                                 Watermark="Filter log messages..."
-                                                 HorizontalAlignment="Stretch"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Summary counters -->
-                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
-                                    <Border Grid.Column="0"
-                                            BorderThickness="1"
-                                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                            CornerRadius="10"
-                                            Padding="14,10">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding DiagnosticsInfoCount}"
-                                                       FontSize="22"
-                                                       FontWeight="Bold"/>
-                                            <TextBlock Text="Info"
-                                                       FontSize="11"
-                                                       Opacity="0.6"/>
-                                        </StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="1"
-                                            BorderThickness="1"
-                                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                            CornerRadius="10"
-                                            Padding="14,10">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding DiagnosticsWarningCount}"
-                                                       FontSize="22"
-                                                       FontWeight="Bold"
-                                                       Foreground="#E0A000"/>
-                                            <TextBlock Text="Warnings"
-                                                       FontSize="11"
-                                                       Opacity="0.6"/>
-                                        </StackPanel>
-                                    </Border>
-                                    <Border Grid.Column="2"
-                                            BorderThickness="1"
-                                            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                            CornerRadius="10"
-                                            Padding="14,10">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding DiagnosticsErrorCount}"
-                                                       FontSize="22"
-                                                       FontWeight="Bold"
-                                                       Foreground="#D04040"/>
-                                            <TextBlock Text="Errors"
-                                                       FontSize="11"
-                                                       Opacity="0.6"/>
-                                        </StackPanel>
-                                    </Border>
+                            <StackPanel IsVisible="{Binding ShowSettingsContent}" Spacing="14">
+                                <TextBlock Text="Appearance" FontWeight="SemiBold" FontSize="14"/>
+                                <Grid ColumnDefinitions="200,*">
+                                    <TextBlock Text="Theme" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" Width="200" ItemsSource="{Binding ThemeModes}" SelectedItem="{Binding SelectedThemeMode}" HorizontalAlignment="Left" Margin="8,0,0,0"/>
                                 </Grid>
-
-                                <!-- Log table -->
-                                <ListBox ItemsSource="{Binding DiagnosticsRows}"
-                                         IsVisible="{Binding HasDiagnosticsRows}"
-                                         ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                          MinHeight="400"
-                                          MaxHeight="2000">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid ColumnDefinitions="24,150,100,90,160,*" ColumnSpacing="10">
-                                                <PathIcon Grid.Column="0"
-                                                          Data="{Binding TypeIconData}"
-                                                          Foreground="{Binding TypeIconBrush}"
-                                                          Width="14"
-                                                          Height="14"
-                                                          VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="1"
-                                                           Text="{Binding TimestampText}"
-                                                           FontFamily="Cascadia Mono, Consolas, Menlo"
-                                                           FontSize="12"/>
-                                                <TextBlock Grid.Column="2"
-                                                           Text="{Binding ProfileName}"
-                                                           FontFamily="Cascadia Mono, Consolas, Menlo"
-                                                           FontSize="12"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <TextBlock Grid.Column="3"
-                                                           Text="{Binding SeverityText}"
-                                                           FontFamily="Cascadia Mono, Consolas, Menlo"
-                                                           FontSize="12"/>
-                                                <TextBlock Grid.Column="4"
-                                                           Text="{Binding StageText}"
-                                                           FontFamily="Cascadia Mono, Consolas, Menlo"
-                                                           FontSize="12"/>
-                                                <SelectableTextBlock Grid.Column="5"
-                                                           Text="{Binding MessageText}"
-                                                           FontFamily="Cascadia Mono, Consolas, Menlo"
-                                                           FontSize="12"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                                <Border IsVisible="{Binding !HasDiagnosticsRows}"
-                                        BorderThickness="1"
-                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                        CornerRadius="10"
-                                        Padding="20"
-                                        MinHeight="100">
-                                    <StackPanel VerticalAlignment="Center" Spacing="4">
-                                        <TextBlock Text="No log entries"
-                                                   FontWeight="SemiBold"
-                                                   FontSize="14"
-                                                   Opacity="0.75"/>
-                                        <TextBlock Text="{Binding DiagnosticsEmptyStateText}"
-                                                   FontSize="12"
-                                                   Opacity="0.6"/>
-                                    </StackPanel>
-                                </Border>
-
                             </StackPanel>
+
                         </StackPanel>
                     </ScrollViewer>
 

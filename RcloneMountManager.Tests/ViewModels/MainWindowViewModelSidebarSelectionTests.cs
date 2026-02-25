@@ -238,7 +238,7 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
     }
 
     [Fact]
-    public void RemoteSidebarSubtitle_HidesAliasRootPlaceholder_AndShowsMeaningfulTarget()
+    public void RemoteSidebarSubtitle_ShowsQuickConnectEndpoint()
     {
         var viewModel = CreateViewModel();
         var remote = viewModel.RemoteProfiles.First();
@@ -246,10 +246,22 @@ public sealed class MainWindowViewModelSidebarSelectionTests : IDisposable
         Assert.False(remote.HasRemoteSidebarSubtitle);
         Assert.Equal(string.Empty, remote.RemoteSidebarSubtitle);
 
-        remote.Source = "archive:photos";
+        remote.QuickConnectEndpoint = "sftp.example.com";
 
         Assert.True(remote.HasRemoteSidebarSubtitle);
-        Assert.Equal("Path: photos", remote.RemoteSidebarSubtitle);
+        Assert.Equal("sftp.example.com", remote.RemoteSidebarSubtitle);
+    }
+
+    [Fact]
+    public void RemoteSidebarSubtitle_FallsBackToBackendOptionUrl()
+    {
+        var viewModel = CreateViewModel();
+        var remote = viewModel.RemoteProfiles.First();
+
+        remote.BackendOptions = new Dictionary<string, string> { ["url"] = "https://cloud.example.com" };
+
+        Assert.True(remote.HasRemoteSidebarSubtitle);
+        Assert.Equal("https://cloud.example.com", remote.RemoteSidebarSubtitle);
     }
 
     [Fact]

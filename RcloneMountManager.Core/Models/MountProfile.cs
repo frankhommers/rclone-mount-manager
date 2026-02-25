@@ -86,28 +86,36 @@ public partial class MountProfile : ObservableObject
 
     public string DisplayName => $"{Name} ({Type})";
 
+    public string RemoteSidebarBackend =>
+        !string.IsNullOrWhiteSpace(BackendName) ? BackendName : string.Empty;
+
+    public bool HasRemoteSidebarBackend => !string.IsNullOrWhiteSpace(RemoteSidebarBackend);
+
     public string RemoteSidebarSubtitle
     {
         get
         {
-            if (!IsRemoteDefinition || string.IsNullOrWhiteSpace(Source))
+            if (!IsRemoteDefinition)
             {
                 return string.Empty;
             }
 
-            var separatorIndex = Source.IndexOf(':');
-            if (separatorIndex <= 0 || separatorIndex >= Source.Length - 1)
+            if (!string.IsNullOrWhiteSpace(QuickConnectEndpoint))
             {
-                return string.Empty;
+                return QuickConnectEndpoint;
             }
 
-            var target = Source[(separatorIndex + 1)..].Trim();
-            if (string.IsNullOrWhiteSpace(target) || string.Equals(target, "/", StringComparison.Ordinal))
+            string[] hostKeys = ["url", "host", "endpoint", "server"];
+            foreach (string key in hostKeys)
             {
-                return string.Empty;
+                if (BackendOptions.TryGetValue(key, out string? value)
+                    && !string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
             }
 
-            return $"Path: {target}";
+            return string.Empty;
         }
     }
 
@@ -123,6 +131,24 @@ public partial class MountProfile : ObservableObject
     }
 
     partial void OnSourceChanged(string value)
+    {
+        OnPropertyChanged(nameof(RemoteSidebarSubtitle));
+        OnPropertyChanged(nameof(HasRemoteSidebarSubtitle));
+    }
+
+    partial void OnBackendNameChanged(string value)
+    {
+        OnPropertyChanged(nameof(RemoteSidebarBackend));
+        OnPropertyChanged(nameof(HasRemoteSidebarBackend));
+    }
+
+    partial void OnQuickConnectEndpointChanged(string value)
+    {
+        OnPropertyChanged(nameof(RemoteSidebarSubtitle));
+        OnPropertyChanged(nameof(HasRemoteSidebarSubtitle));
+    }
+
+    partial void OnBackendOptionsChanged(Dictionary<string, string> value)
     {
         OnPropertyChanged(nameof(RemoteSidebarSubtitle));
         OnPropertyChanged(nameof(HasRemoteSidebarSubtitle));

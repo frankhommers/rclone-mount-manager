@@ -39,7 +39,7 @@ public sealed class MainWindowViewModelTestDialogTests : IDisposable
         Assert.True(vm.TestDialogSuccess);
         Assert.True(vm.IsTestDialogVisible);
         Assert.Equal("Connection test passed", vm.TestDialogTitle);
-        Assert.Empty(vm.TestDialogLines);
+        Assert.Contains(vm.TestDialogLines, l => l.Contains("Testing connection"));
     }
 
     [Fact]

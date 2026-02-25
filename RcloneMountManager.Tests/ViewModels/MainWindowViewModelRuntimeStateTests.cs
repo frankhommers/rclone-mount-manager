@@ -104,7 +104,7 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
     }
 
     [Fact]
-    public async Task InitializeRuntimeMonitoring_VerifiesOnlyStartAtLoginProfiles()
+    public async Task InitializeRuntimeMonitoring_VerifiesAllMountProfiles()
     {
         var verifiedProfileIds = new ConcurrentBag<string>();
         var viewModel = CreateViewModel(
@@ -124,10 +124,12 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
 
         viewModel.InitializeRuntimeMonitoring();
 
-        await WaitUntilAsync(() => startupProfile.RuntimeState.Health is MountHealthState.Healthy);
+        await WaitUntilAsync(() =>
+            startupProfile.RuntimeState.Health is MountHealthState.Healthy &&
+            nonStartupProfile.RuntimeState.Health is MountHealthState.Healthy);
 
         Assert.Contains(startupProfile.Id, verifiedProfileIds);
-        Assert.DoesNotContain(nonStartupProfile.Id, verifiedProfileIds);
+        Assert.Contains(nonStartupProfile.Id, verifiedProfileIds);
         viewModel.StopRuntimeMonitoring();
     }
 
@@ -145,12 +147,12 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
         var failedProfile = viewModel.SelectedProfile;
         failedProfile.StartAtLogin = true;
         viewModel.AddProfileCommand.Execute(null);
-        var skippedProfile = viewModel.SelectedProfile;
-        skippedProfile.StartAtLogin = false;
+        var idleProfile = viewModel.SelectedProfile;
+        idleProfile.StartAtLogin = false;
 
         startupStates[degradedProfile.Id] = CreateState(MountLifecycleState.Mounted, MountHealthState.Degraded, "probe timeout");
         startupStates[failedProfile.Id] = CreateState(MountLifecycleState.Failed, MountHealthState.Failed, "mount missing");
-        startupStates[skippedProfile.Id] = CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy);
+        startupStates[idleProfile.Id] = CreateState(MountLifecycleState.Idle, MountHealthState.Unknown);
 
         viewModel.InitializeRuntimeMonitoring();
 
@@ -162,7 +164,7 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
         Assert.Equal(MountLifecycleState.Mounted, degradedProfile.RuntimeState.Lifecycle);
         Assert.Equal(MountHealthState.Failed, failedProfile.RuntimeState.Health);
         Assert.Equal(MountLifecycleState.Failed, failedProfile.RuntimeState.Lifecycle);
-        Assert.Equal(MountHealthState.Unknown, skippedProfile.RuntimeState.Health);
+        Assert.Equal(MountHealthState.Unknown, idleProfile.RuntimeState.Health);
         viewModel.StopRuntimeMonitoring();
     }
 

@@ -114,6 +114,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _showDiagnosticsView;
 
     [ObservableProperty]
+    private bool _showSettingsView;
+
+    [ObservableProperty]
     private string _selectedDiagnosticsCategoryFilter = "All";
 
     [ObservableProperty]
@@ -146,6 +149,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private bool? _testDialogSuccess;
 
+    private string? _testDialogProfileId;
+
     [ObservableProperty]
     private MountProfile? _selectedMountRemoteProfile;
 
@@ -167,7 +172,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public bool HasProfiles => Profiles.Count > 0;
     public MountProfile? SidebarSelectedRemoteProfile
     {
-        get => ShowRemoteEditor ? SelectedRemoteProfile : null;
+        get => IsRemoteListActive ? SelectedRemoteProfile : null;
         set
         {
             if (value is null)
@@ -181,7 +186,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     public MountProfile? SidebarSelectedMountProfile
     {
-        get => ShowRemoteEditor ? null : SelectedMountProfile;
+        get => IsMountListActive ? SelectedMountProfile : null;
         set
         {
             if (value is null)
@@ -200,16 +205,24 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public bool HasRemoteProfiles => RemoteProfiles.Count > 0;
     public bool HasMountProfiles => MountProfiles.Count > 0;
     public string DiagnosticsEmptyStateText => "No diagnostics for current filter.";
-    public string WorkspaceTitle => ShowDiagnosticsView
+    public string WorkspaceTitle => ShowSettingsView
+        ? "Settings"
+        : ShowDiagnosticsView
         ? "Diagnostics"
         : ShowRemoteEditor ? "Remote Assistant" : "Mount Assistant";
-    public string WorkspaceSubtitle => ShowDiagnosticsView
+    public string WorkspaceSubtitle => ShowSettingsView
+        ? "Application preferences"
+        : ShowDiagnosticsView
         ? "View log entries across all profiles"
         : ShowRemoteEditor
             ? "Choose backend -> set options -> create remote"
             : "Preset -> credentials -> mount path -> Start mount";
-    public bool ShowRemoteEditorContent => ShowRemoteEditor && !ShowDiagnosticsView;
-    public bool ShowMountEditorContent => !ShowRemoteEditor && !ShowDiagnosticsView;
+    public bool ShowRemoteEditorContent => ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
+    public bool ShowMountEditorContent => !ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
+    public bool ShowSettingsContent => ShowSettingsView;
+    public bool ShowEditorScrollViewer => !ShowDiagnosticsView;
+    public bool IsRemoteListActive => ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
+    public bool IsMountListActive => !ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
     public string DiagnosticsInfoCount => DiagnosticsRows.Count(r => string.Equals(r.SeverityText, "information", StringComparison.OrdinalIgnoreCase)).ToString();
     public string DiagnosticsWarningCount => DiagnosticsRows.Count(r => string.Equals(r.SeverityText, "warning", StringComparison.OrdinalIgnoreCase)).ToString();
     public string DiagnosticsErrorCount => DiagnosticsRows.Count(r => string.Equals(r.SeverityText, "error", StringComparison.OrdinalIgnoreCase)).ToString();
@@ -330,15 +343,51 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         });
     }
 
+    public bool HasSelectedMountRemote => SelectedMountRemoteProfile is not null
+        && SelectedProfile is { IsRemoteDefinition: false, Type: not MountType.MacOsNfs };
+
+    public string MountRemotePath
+    {
+        get
+        {
+            if (SelectedProfile is null)
+                return string.Empty;
+            if (!TryGetRemoteAliasFromSource(SelectedProfile.Source, out _, out string suffix))
+                return SelectedProfile.Source;
+            return suffix;
+        }
+        set
+        {
+            if (SelectedProfile is null)
+                return;
+            var remoteAlias = SelectedMountRemoteProfile is not null
+                ? GetRemoteAlias(SelectedMountRemoteProfile) : null;
+            if (!string.IsNullOrWhiteSpace(remoteAlias))
+            {
+                var path = string.IsNullOrWhiteSpace(value) ? "/" : value;
+                SelectedProfile.Source = $"{remoteAlias}:{path}";
+            }
+            else
+            {
+                SelectedProfile.Source = value;
+            }
+            OnPropertyChanged();
+        }
+    }
+
     public string SourceLabel => SelectedProfile?.Type switch
     {
         MountType.MacOsNfs => "NFS export",
+        _ when HasSelectedMountRemote => "Remote path",
         _ => "Source",
     };
 
-    public string SourceHint => SelectedProfile?.Type is MountType.MacOsNfs
-        ? "Example: 192.168.1.10:/volume1/media"
-        : "Example: remote:media";
+    public string SourceHint => SelectedProfile?.Type switch
+    {
+        MountType.MacOsNfs => "Example: 192.168.1.10:/volume1/media",
+        _ when HasSelectedMountRemote => "/ (root of remote)",
+        _ => "Example: remote:media",
+    };
 
     public string MountPointHint => $"Example: {DefaultMountPoint("media")}";
 
@@ -346,9 +395,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ? "Example: nfsvers=4,resvport"
         : "Example: --vfs-cache-mode full --dir-cache-time 15m";
 
-    public string SourceFormatHelp => SelectedProfile?.Type is MountType.MacOsNfs
-        ? "NFS uses host + export path directly."
-        : "For rclone use remote:path (create remote first or use the backend builder).";
+    public string SourceFormatHelp => SelectedProfile?.Type switch
+    {
+        MountType.MacOsNfs => "NFS uses host + export path directly.",
+        _ when HasSelectedMountRemote => "Path on the remote to mount (use / for root).",
+        _ => "For rclone use remote:path (create remote first or use the backend builder).",
+    };
 
     public bool CanUseQuickConnect => SelectedProfile?.Type is MountType.RcloneAuto;
 
@@ -444,8 +496,54 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void SelectDiagnostics()
     {
+        ShowSettingsView = false;
         ShowDiagnosticsView = true;
         RefreshDiagnosticsTimeline();
+    }
+
+    [RelayCommand]
+    private void SelectSettings()
+    {
+        ShowDiagnosticsView = false;
+        ShowSettingsView = true;
+    }
+
+    [RelayCommand]
+    private async Task CopyDiagnosticsAsync()
+    {
+        var rows = DiagnosticsRows.ToList();
+        if (rows.Count == 0) return;
+
+        var text = string.Join(Environment.NewLine,
+            rows.Select(r => $"{r.TimestampText}\t{r.ProfileName}\t{r.SeverityText}\t{r.StageText}\t{r.MessageText}"));
+
+        if (Avalonia.Application.Current?.ApplicationLifetime
+            is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow?.Clipboard is { } clipboard)
+        {
+            await clipboard.SetTextAsync(text);
+            StatusText = $"Copied {rows.Count} log entries to clipboard.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task CopySelectedDiagnosticsAsync(object? selectedItems)
+    {
+        if (selectedItems is not System.Collections.IList items || items.Count == 0) return;
+
+        var rows = items.OfType<DiagnosticsTimelineRow>().ToList();
+        if (rows.Count == 0) return;
+
+        var text = string.Join(Environment.NewLine,
+            rows.Select(r => $"{r.TimestampText}\t{r.ProfileName}\t{r.SeverityText}\t{r.StageText}\t{r.MessageText}"));
+
+        if (Avalonia.Application.Current?.ApplicationLifetime
+            is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow?.Clipboard is { } clipboard)
+        {
+            await clipboard.SetTextAsync(text);
+            StatusText = $"Copied {rows.Count} selected log entries to clipboard.";
+        }
     }
 
     private void LoadBackendsSync(bool enabled)
@@ -768,6 +866,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             var profile = SelectedProfile;
             var profileId = profile.Id;
+            _testDialogProfileId = profileId;
             using (ProfileScope(profileId, ProfileLogCategory.General, ProfileLogStage.Initialization))
                 _logger.LogInformation("Testing connection...");
 
@@ -805,6 +904,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             if (SelectedProfile is { } selectedProfile)
                 using (ProfileScope(selectedProfile.Id, ProfileLogCategory.General, ProfileLogStage.Execution))
                     _logger.LogError(ex, "{ErrorMessage}", ex.Message);
+        }
+        finally
+        {
+            _testDialogProfileId = null;
         }
     }
 
@@ -1061,6 +1164,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             await AdoptOrphanMountsAsync(cancellationToken);
             await VerifyStartupProfilesAsync(cancellationToken);
+            await RefreshAllRuntimeStatesAsync(cancellationToken);
 
             while (await _runtimeRefreshWaiter(RuntimeRefreshCadence, cancellationToken))
             {
@@ -1099,8 +1203,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
             try
             {
+                using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                    _logger.LogInformation("Probing orphan: {ProfileName} (RC port {RcPort}, mount {MountPoint})",
+                        profile.Name, profile.RcPort, profile.MountPoint);
+
                 var pid = await _mountManagerService.ProbeRcPidAsync(profile.RcPort, cancellationToken);
+
+                using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                    _logger.LogInformation("RC probe result for {ProfileName}: PID={Pid}", profile.Name, pid?.ToString() ?? "null");
+
                 var isMounted = await _mountManagerService.IsMountedAsync(profile.MountPoint, cancellationToken);
+
+                using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                    _logger.LogInformation("IsMounted result for {ProfileName}: {IsMounted}", profile.Name, isMounted);
 
                 if (pid.HasValue && isMounted)
                 {
@@ -1118,6 +1233,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 {
                     using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
                         _logger.LogWarning("Mount point is active but no RC connection. Unmanaged external mount.");
+                }
+                else
+                {
+                    using (ProfileScope(profile.Id, ProfileLogCategory.Startup, ProfileLogStage.Verification))
+                        _logger.LogInformation("No orphan found for {ProfileName}: not mounted, no RC.", profile.Name);
                 }
             }
             catch (Exception ex)
@@ -1327,6 +1447,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
         }
 
+        if (_testDialogProfileId is not null
+            && string.Equals(profileId, _testDialogProfileId, StringComparison.Ordinal))
+        {
+            void AddLine() => TestDialogLines.Add(message);
+            if (Application.Current is null || Dispatcher.UIThread.CheckAccess())
+                AddLine();
+            else
+                Dispatcher.UIThread.Post(AddLine);
+        }
+
         if (Application.Current is null || Dispatcher.UIThread.CheckAccess())
         {
             RefreshDiagnosticsTimeline();
@@ -1396,6 +1526,24 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(WorkspaceSubtitle));
         OnPropertyChanged(nameof(ShowRemoteEditorContent));
         OnPropertyChanged(nameof(ShowMountEditorContent));
+        OnPropertyChanged(nameof(ShowSettingsContent));
+        OnPropertyChanged(nameof(ShowEditorScrollViewer));
+        OnPropertyChanged(nameof(IsRemoteListActive));
+        OnPropertyChanged(nameof(IsMountListActive));
+        EnsureSingleActiveSidebarSelection();
+    }
+
+    partial void OnShowSettingsViewChanged(bool value)
+    {
+        OnPropertyChanged(nameof(WorkspaceTitle));
+        OnPropertyChanged(nameof(WorkspaceSubtitle));
+        OnPropertyChanged(nameof(ShowRemoteEditorContent));
+        OnPropertyChanged(nameof(ShowMountEditorContent));
+        OnPropertyChanged(nameof(ShowSettingsContent));
+        OnPropertyChanged(nameof(ShowEditorScrollViewer));
+        OnPropertyChanged(nameof(IsRemoteListActive));
+        OnPropertyChanged(nameof(IsMountListActive));
+        EnsureSingleActiveSidebarSelection();
     }
 
     partial void OnSelectedDiagnosticsCategoryFilterChanged(string value)
@@ -1831,6 +1979,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ShowDiagnosticsView = false;
         }
 
+        if (ShowSettingsView)
+        {
+            ShowSettingsView = false;
+        }
+
         if (_observedProfile is not null)
         {
             _observedProfile.PropertyChanged -= OnObservedProfileChanged;
@@ -1927,6 +2080,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         ShowRemoteEditor = true;
+        ShowDiagnosticsView = false;
+        ShowSettingsView = false;
         if (!ReferenceEquals(SelectedProfile, value))
         {
             SelectedProfile = value;
@@ -1948,6 +2103,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         ShowRemoteEditor = false;
+        ShowDiagnosticsView = false;
+        ShowSettingsView = false;
         if (!ReferenceEquals(SelectedProfile, value))
         {
             SelectedProfile = value;
@@ -1982,6 +2139,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         mountProfile.Source = $"{remoteAlias}:{suffix}";
+        OnPropertyChanged(nameof(HasSelectedMountRemote));
+        OnPropertyChanged(nameof(MountRemotePath));
+        OnPropertyChanged(nameof(SourceLabel));
+        OnPropertyChanged(nameof(SourceHint));
+        OnPropertyChanged(nameof(SourceFormatHelp));
         NotifyCommandStateChanged();
     }
 
@@ -2317,6 +2479,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void NotifyLabelsChanged()
     {
+        OnPropertyChanged(nameof(HasSelectedMountRemote));
+        OnPropertyChanged(nameof(MountRemotePath));
         OnPropertyChanged(nameof(SourceLabel));
         OnPropertyChanged(nameof(SourceHint));
         OnPropertyChanged(nameof(MountPointHint));
@@ -2424,6 +2588,23 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
+            if (ShowDiagnosticsView || ShowSettingsView)
+            {
+                if (SelectedRemoteProfile is not null)
+                {
+                    _rememberedRemoteProfile = SelectedRemoteProfile;
+                    SelectedRemoteProfile = null;
+                }
+
+                if (SelectedMountProfile is not null)
+                {
+                    _rememberedMountProfile = SelectedMountProfile;
+                    SelectedMountProfile = null;
+                }
+
+                return;
+            }
+
             if (ShowRemoteEditor)
             {
                 if (SelectedMountProfile is not null)

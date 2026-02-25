@@ -113,13 +113,16 @@ public sealed class MountHealthService
     {
         ArgumentNullException.ThrowIfNull(profiles);
 
-        var states = new List<ProfileRuntimeState>();
-        foreach (var profile in profiles)
+        var profileList = profiles as IList<MountProfile> ?? new List<MountProfile>(profiles);
+        var tasks = new Task<ProfileRuntimeState>[profileList.Count];
+
+        for (int index = 0; index < profileList.Count; index++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            states.Add(await VerifyAsync(profile, cancellationToken));
+            var profile = profileList[index];
+            tasks[index] = VerifyAsync(profile, cancellationToken);
         }
 
+        var states = await Task.WhenAll(tasks);
         return states;
     }
 
