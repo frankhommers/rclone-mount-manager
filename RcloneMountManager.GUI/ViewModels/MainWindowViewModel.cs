@@ -672,11 +672,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 ? $"{SelectedBackend.Name}-remote"
                 : NewRemoteName;
 
-            var step = await _rcloneConfigWizardService.StartAsync(binary, remoteName, SelectedBackend.Name, cancellationToken);
+            try
+            {
+                var step = await _rcloneConfigWizardService.StartAsync(binary, remoteName, SelectedBackend.Name, cancellationToken);
 
-            IsWizardActive = true;
-            WizardStepNumber = 1;
-            await HandleWizardStepAsync(step, binary, remoteName, cancellationToken);
+                IsWizardActive = true;
+                WizardStepNumber = 1;
+                await HandleWizardStepAsync(step, binary, remoteName, cancellationToken);
+            }
+            catch
+            {
+                ResetWizardState();
+                throw;
+            }
         });
     }
 
@@ -698,11 +706,19 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             var binary = SelectedProfile.RcloneBinaryPath ?? "rclone";
             var remoteName = NewRemoteName;
 
-            WizardStepNumber++;
-            var step = await _rcloneConfigWizardService.ContinueAsync(
-                binary, remoteName, _wizardState, WizardAnswer, cancellationToken);
+            try
+            {
+                WizardStepNumber++;
+                var step = await _rcloneConfigWizardService.ContinueAsync(
+                    binary, remoteName, _wizardState, WizardAnswer, cancellationToken);
 
-            await HandleWizardStepAsync(step, binary, remoteName, cancellationToken);
+                await HandleWizardStepAsync(step, binary, remoteName, cancellationToken);
+            }
+            catch
+            {
+                ResetWizardState();
+                throw;
+            }
         });
     }
 
