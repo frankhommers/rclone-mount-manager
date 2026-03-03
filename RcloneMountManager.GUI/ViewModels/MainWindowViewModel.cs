@@ -1763,6 +1763,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(ShowStandardRemoteForm));
     }
 
+    partial void OnCurrentWizardStepChanged(ConfigWizardStep? value)
+    {
+        OnPropertyChanged(nameof(WizardStepTitle));
+        OnPropertyChanged(nameof(WizardStepHelp));
+        OnPropertyChanged(nameof(WizardHasExamples));
+    }
+
+    partial void OnIsWizardWaitingForOAuthChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowWizardOAuthSpinner));
+    }
+
     partial void OnSelectedDiagnosticsCategoryFilterChanged(string value)
     {
         RefreshDiagnosticsTimeline();
@@ -2192,6 +2204,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     partial void OnSelectedProfileChanged(MountProfile value)
     {
+        if (IsWizardActive)
+        {
+            ResetWizardState();
+        }
+
         if (ShowDiagnosticsView)
         {
             ShowDiagnosticsView = false;
