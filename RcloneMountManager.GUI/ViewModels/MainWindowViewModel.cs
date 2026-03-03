@@ -97,6 +97,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private string _wizardAnswer = string.Empty;
 
     [ObservableProperty]
+    private WizardStepOptionInput? _wizardStepInput;
+
+    [ObservableProperty]
     private bool _isWizardWaitingForOAuth;
 
     [ObservableProperty]
@@ -709,8 +712,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             try
             {
                 WizardStepNumber++;
+                var answer = WizardStepInput?.Value ?? WizardAnswer;
                 var step = await _rcloneConfigWizardService.ContinueAsync(
-                    binary, remoteName, _wizardState, WizardAnswer, cancellationToken);
+                    binary, remoteName, _wizardState, answer, cancellationToken);
 
                 await HandleWizardStepAsync(step, binary, remoteName, cancellationToken);
             }
@@ -787,6 +791,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         CurrentWizardStep = step;
         _wizardState = step.State;
+        WizardStepInput = new WizardStepOptionInput(step);
         WizardAnswer = step.DefaultValue;
     }
 
@@ -828,6 +833,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         IsWizardActive = false;
         IsWizardWaitingForOAuth = false;
         CurrentWizardStep = null;
+        WizardStepInput = null;
         WizardAnswer = string.Empty;
         WizardOAuthUrl = string.Empty;
         WizardStepNumber = 0;

@@ -1,4 +1,4 @@
 {
-  "enabled": true,
-  "aggressive": true
+  "enabled": false,
+  "aggressive": false
 }

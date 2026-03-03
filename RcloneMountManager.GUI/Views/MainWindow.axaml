@@ -550,24 +550,11 @@
                                                IsVisible="{Binding CurrentWizardStep.Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                Foreground="#D04040" TextWrapping="Wrap"/>
 
-                                    <!-- Available values for exclusive options -->
-                                    <ItemsControl IsVisible="{Binding WizardHasExamples}"
-                                                  ItemsSource="{Binding CurrentWizardStep.Examples}">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
-                                                    <TextBlock Text="{Binding Value}" FontWeight="SemiBold" FontSize="12"/>
-                                                    <TextBlock Text="{Binding Help}" FontSize="11" Opacity="0.6"/>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-
-                                    <!-- Answer input -->
-                                    <TextBox Text="{Binding WizardAnswer}"
-                                             Watermark="{Binding CurrentWizardStep.DefaultValue}"
-                                             HorizontalAlignment="Stretch"
-                                             MaxWidth="400"/>
+                                    <!-- Typed control for wizard step -->
+                                    <ContentControl Content="{Binding WizardStepInput}"
+                                                    ContentTemplate="{DynamicResource BackendOptionTemplateSelector}"
+                                                    IsVisible="{Binding WizardStepInput, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                    HorizontalAlignment="Stretch"/>
 
                                     <!-- Next button -->
                                     <Button Content="Next"
