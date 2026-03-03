@@ -38,6 +38,7 @@ sealed class Program
         services.AddSingleton<MountManagerService>();
         services.AddSingleton<LaunchAgentService>();
         services.AddSingleton<RcloneBackendService>();
+        services.AddSingleton<RcloneConfigWizardService>();
         services.AddSingleton<StartupPreflightService>();
         services.AddSingleton<MountHealthService>();
         services.AddSingleton<MainWindowViewModel>(sp =>
@@ -46,6 +47,7 @@ sealed class Program
             mountManagerService: sp.GetRequiredService<MountManagerService>(),
             launchAgentService: sp.GetRequiredService<LaunchAgentService>(),
             rcloneBackendService: sp.GetRequiredService<RcloneBackendService>(),
+            rcloneConfigWizardService: sp.GetRequiredService<RcloneConfigWizardService>(),
             startupPreflightService: sp.GetRequiredService<StartupPreflightService>(),
             mountHealthService: sp.GetRequiredService<MountHealthService>()));
       })

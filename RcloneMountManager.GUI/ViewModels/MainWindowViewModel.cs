@@ -33,6 +33,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly MountManagerService _mountManagerService;
     private readonly LaunchAgentService _launchAgentService;
     private readonly RcloneBackendService _rcloneBackendService;
+    private readonly RcloneConfigWizardService _rcloneConfigWizardService;
     private readonly StartupPreflightService _startupPreflightService;
     private readonly MountHealthService _mountHealthService;
     private readonly ILogger<MainWindowViewModel> _logger;
@@ -85,6 +86,24 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private string _newRemoteName = string.Empty;
+
+    [ObservableProperty]
+    private bool _isWizardActive;
+
+    [ObservableProperty]
+    private ConfigWizardStep? _currentWizardStep;
+
+    [ObservableProperty]
+    private string _wizardAnswer = string.Empty;
+
+    [ObservableProperty]
+    private bool _isWizardWaitingForOAuth;
+
+    [ObservableProperty]
+    private string _wizardOAuthUrl = string.Empty;
+
+    [ObservableProperty]
+    private int _wizardStepNumber;
 
     [ObservableProperty]
     private bool _showAdvancedBackendOptions;
@@ -150,6 +169,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool? _testDialogSuccess;
 
     private string? _testDialogProfileId;
+    private string? _wizardState;
 
     [ObservableProperty]
     private MountProfile? _selectedMountRemoteProfile;
@@ -218,6 +238,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             ? "Choose backend -> set options -> create remote"
             : "Preset -> credentials -> mount path -> Start mount";
     public bool ShowRemoteEditorContent => ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
+    public bool ShowWizardContent => IsWizardActive && ShowRemoteEditorContent;
+    public bool ShowStandardRemoteForm => !IsWizardActive && ShowRemoteEditorContent;
+    public bool ShowWizardOAuthSpinner => IsWizardWaitingForOAuth;
+    public string WizardStepTitle => CurrentWizardStep?.Name ?? string.Empty;
+    public string WizardStepHelp => CurrentWizardStep?.Help?.Replace("\n", " ").Trim() ?? string.Empty;
+    public bool WizardHasExamples => CurrentWizardStep is { Examples.Count: > 0, Exclusive: true };
     public bool ShowMountEditorContent => !ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
     public bool ShowSettingsContent => ShowSettingsView;
     public bool ShowEditorScrollViewer => !ShowDiagnosticsView;
@@ -232,6 +258,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         MountManagerService? mountManagerService = null,
         LaunchAgentService? launchAgentService = null,
         RcloneBackendService? rcloneBackendService = null,
+        RcloneConfigWizardService? rcloneConfigWizardService = null,
         StartupPreflightService? startupPreflightService = null,
         MountHealthService? mountHealthService = null,
         Func<MountProfile, CancellationToken, Task>? mountStartRunner = null,
@@ -251,6 +278,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _mountManagerService = mountManagerService ?? new MountManagerService(NullLogger<MountManagerService>.Instance);
         _launchAgentService = launchAgentService ?? new LaunchAgentService(NullLogger<LaunchAgentService>.Instance);
         _rcloneBackendService = rcloneBackendService ?? new RcloneBackendService(NullLogger<RcloneBackendService>.Instance);
+        _rcloneConfigWizardService = rcloneConfigWizardService ?? new RcloneConfigWizardService(NullLogger<RcloneConfigWizardService>.Instance);
         _startupPreflightService = startupPreflightService ?? new StartupPreflightService(NullLogger<StartupPreflightService>.Instance);
         _mountHealthService = mountHealthService ?? new MountHealthService(NullLogger<MountHealthService>.Instance);
         _logger = logger ?? NullLogger<MainWindowViewModel>.Instance;
@@ -630,6 +658,185 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             HasPendingChanges = false;
             StatusText = $"Remote '{NewRemoteName}' saved.";
         });
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStartWizard))]
+    private async Task StartWizardAsync()
+    {
+        await RunBusyActionAsync(async cancellationToken =>
+        {
+            if (SelectedBackend is null || SelectedProfile is null) return;
+
+            var binary = SelectedProfile.RcloneBinaryPath ?? "rclone";
+            var remoteName = string.IsNullOrWhiteSpace(NewRemoteName)
+                ? $"{SelectedBackend.Name}-remote"
+                : NewRemoteName;
+
+            var step = await _rcloneConfigWizardService.StartAsync(binary, remoteName, SelectedBackend.Name, cancellationToken);
+
+            IsWizardActive = true;
+            WizardStepNumber = 1;
+            await HandleWizardStepAsync(step, binary, remoteName, cancellationToken);
+        });
+    }
+
+    private bool CanStartWizard() =>
+        !IsBusy &&
+        HasProfiles &&
+        SelectedBackend is not null &&
+        !string.IsNullOrWhiteSpace(NewRemoteName) &&
+        SelectedProfile is not null &&
+        SelectedProfile.IsRemoteDefinition;
+
+    [RelayCommand]
+    private async Task SubmitWizardAnswerAsync()
+    {
+        await RunBusyActionAsync(async cancellationToken =>
+        {
+            if (_wizardState is null || SelectedProfile is null || SelectedBackend is null) return;
+
+            var binary = SelectedProfile.RcloneBinaryPath ?? "rclone";
+            var remoteName = NewRemoteName;
+
+            WizardStepNumber++;
+            var step = await _rcloneConfigWizardService.ContinueAsync(
+                binary, remoteName, _wizardState, WizardAnswer, cancellationToken);
+
+            await HandleWizardStepAsync(step, binary, remoteName, cancellationToken);
+        });
+    }
+
+    [RelayCommand]
+    private async Task CancelWizardAsync()
+    {
+        if (SelectedProfile is not null && !string.IsNullOrWhiteSpace(NewRemoteName))
+        {
+            try
+            {
+                var binary = SelectedProfile.RcloneBinaryPath ?? "rclone";
+                await _rcloneConfigWizardService.DeleteRemoteAsync(binary, NewRemoteName, CancellationToken.None);
+            }
+            catch
+            {
+                // Best-effort cleanup
+            }
+        }
+
+        ResetWizardState();
+    }
+
+    private async Task HandleWizardStepAsync(ConfigWizardStep step, string binary, string remoteName, CancellationToken cancellationToken)
+    {
+        if (step.IsComplete)
+        {
+            await ReadBackWizardConfigAsync(binary, remoteName, cancellationToken);
+            ResetWizardState();
+            StatusText = $"Remote '{remoteName}' configured successfully.";
+            return;
+        }
+
+        if (step.IsOAuthBrowserPrompt)
+        {
+            IsWizardWaitingForOAuth = true;
+            WizardStepNumber++;
+            try
+            {
+                var nextStep = await _rcloneConfigWizardService.ContinueOAuthAsync(
+                    binary, remoteName, step.State,
+                    url =>
+                    {
+                        WizardOAuthUrl = url;
+                        _ = OpenBrowserAsync(url);
+                    },
+                    cancellationToken);
+                IsWizardWaitingForOAuth = false;
+                await HandleWizardStepAsync(nextStep, binary, remoteName, cancellationToken);
+            }
+            catch
+            {
+                IsWizardWaitingForOAuth = false;
+                throw;
+            }
+            return;
+        }
+
+        if (step.IsAdvancedPrompt)
+        {
+            WizardStepNumber++;
+            var nextStep = await _rcloneConfigWizardService.ContinueAsync(
+                binary, remoteName, step.State, "false", cancellationToken);
+            await HandleWizardStepAsync(nextStep, binary, remoteName, cancellationToken);
+            return;
+        }
+
+        CurrentWizardStep = step;
+        _wizardState = step.State;
+        WizardAnswer = step.DefaultValue;
+    }
+
+    private async Task ReadBackWizardConfigAsync(string binary, string remoteName, CancellationToken cancellationToken)
+    {
+        var config = await _rcloneConfigWizardService.ReadRemoteConfigAsync(binary, remoteName, cancellationToken);
+
+        if (SelectedProfile is not null)
+        {
+            SelectedProfile.Name = remoteName;
+            SelectedProfile.Source = $"{remoteName}:";
+            if (SelectedBackend is not null)
+            {
+                SelectedProfile.BackendName = SelectedBackend.Name;
+            }
+
+            var backendOptions = new Dictionary<string, string>();
+            foreach (var kvp in config)
+            {
+                if (string.Equals(kvp.Key, "type", StringComparison.OrdinalIgnoreCase)) continue;
+                backendOptions[kvp.Key] = kvp.Value;
+            }
+            SelectedProfile.BackendOptions = backendOptions;
+
+            foreach (var input in BackendOptionInputs.Concat(AdvancedBackendOptionInputs))
+            {
+                if (config.TryGetValue(input.Name, out string? value))
+                {
+                    input.Value = value;
+                }
+            }
+
+            SaveProfiles();
+        }
+    }
+
+    private void ResetWizardState()
+    {
+        IsWizardActive = false;
+        IsWizardWaitingForOAuth = false;
+        CurrentWizardStep = null;
+        WizardAnswer = string.Empty;
+        WizardOAuthUrl = string.Empty;
+        WizardStepNumber = 0;
+        _wizardState = null;
+    }
+
+    private static async Task OpenBrowserAsync(string url)
+    {
+        try
+        {
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                && desktop.MainWindow is { } window)
+            {
+                var topLevel = Avalonia.Controls.TopLevel.GetTopLevel(window);
+                if (topLevel?.Launcher is { } launcher)
+                {
+                    await launcher.LaunchUriAsync(new Uri(url));
+                }
+            }
+        }
+        catch
+        {
+            // Browser launch failed - user can manually copy the URL
+        }
     }
 
     [RelayCommand]
@@ -1525,6 +1732,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(WorkspaceTitle));
         OnPropertyChanged(nameof(WorkspaceSubtitle));
         OnPropertyChanged(nameof(ShowRemoteEditorContent));
+        OnPropertyChanged(nameof(ShowWizardContent));
+        OnPropertyChanged(nameof(ShowStandardRemoteForm));
         OnPropertyChanged(nameof(ShowMountEditorContent));
         OnPropertyChanged(nameof(ShowSettingsContent));
         OnPropertyChanged(nameof(ShowEditorScrollViewer));
@@ -1538,12 +1747,20 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(WorkspaceTitle));
         OnPropertyChanged(nameof(WorkspaceSubtitle));
         OnPropertyChanged(nameof(ShowRemoteEditorContent));
+        OnPropertyChanged(nameof(ShowWizardContent));
+        OnPropertyChanged(nameof(ShowStandardRemoteForm));
         OnPropertyChanged(nameof(ShowMountEditorContent));
         OnPropertyChanged(nameof(ShowSettingsContent));
         OnPropertyChanged(nameof(ShowEditorScrollViewer));
         OnPropertyChanged(nameof(IsRemoteListActive));
         OnPropertyChanged(nameof(IsMountListActive));
         EnsureSingleActiveSidebarSelection();
+    }
+
+    partial void OnIsWizardActiveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowWizardContent));
+        OnPropertyChanged(nameof(ShowStandardRemoteForm));
     }
 
     partial void OnSelectedDiagnosticsCategoryFilterChanged(string value)
@@ -1742,6 +1959,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SaveScriptCommand.NotifyCanExecuteChanged();
         ToggleStartupCommand.NotifyCanExecuteChanged();
         CreateRemoteCommand.NotifyCanExecuteChanged();
+        StartWizardCommand.NotifyCanExecuteChanged();
         SaveChangesCommand.NotifyCanExecuteChanged();
         RunStartupPreflightCommand.NotifyCanExecuteChanged();
         AddMountCommand.NotifyCanExecuteChanged();
@@ -2152,6 +2370,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(WorkspaceTitle));
         OnPropertyChanged(nameof(WorkspaceSubtitle));
         OnPropertyChanged(nameof(ShowRemoteEditorContent));
+        OnPropertyChanged(nameof(ShowWizardContent));
+        OnPropertyChanged(nameof(ShowStandardRemoteForm));
         OnPropertyChanged(nameof(ShowMountEditorContent));
         OnPropertyChanged(nameof(SidebarSelectedRemoteProfile));
         OnPropertyChanged(nameof(SidebarSelectedMountProfile));
