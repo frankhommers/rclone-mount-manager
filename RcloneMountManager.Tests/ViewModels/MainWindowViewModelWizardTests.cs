@@ -1,4 +1,5 @@
 using RcloneMountManager.ViewModels;
+using RcloneMountManager.Core.Models;
 
 namespace RcloneMountManager.Tests.ViewModels;
 
@@ -50,9 +51,59 @@ public class MainWindowViewModelWizardTests
   }
 
   [Fact]
+  public void WizardStepHelp_ReplacesNewLinesWithSpaces()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.CurrentWizardStep = new ConfigWizardStep
+    {
+      Name = "provider",
+      Help = "line one\nline two",
+      State = "x",
+    };
+
+    Assert.Equal("line one line two", vm.WizardStepHelp);
+  }
+
+  [Fact]
   public void WizardHasExamples_FalseWhenNoStep()
   {
     var vm = new MainWindowViewModel(loadStartupData: false);
+    Assert.False(vm.WizardHasExamples);
+  }
+
+  [Fact]
+  public void WizardHasExamples_TrueWhenExclusiveAndExamplesExist()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.CurrentWizardStep = new ConfigWizardStep
+    {
+      Name = "provider",
+      State = "x",
+      Exclusive = true,
+      Examples =
+      [
+        new ConfigWizardExample { Value = "drive", Help = "Google Drive" },
+      ],
+    };
+
+    Assert.True(vm.WizardHasExamples);
+  }
+
+  [Fact]
+  public void WizardHasExamples_FalseWhenExamplesExistButNotExclusive()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.CurrentWizardStep = new ConfigWizardStep
+    {
+      Name = "provider",
+      State = "x",
+      Exclusive = false,
+      Examples =
+      [
+        new ConfigWizardExample { Value = "drive", Help = "Google Drive" },
+      ],
+    };
+
     Assert.False(vm.WizardHasExamples);
   }
 
