@@ -695,6 +695,7 @@
                                 <Button Content="Test connection" Command="{Binding TestConnectionCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Start mount" Command="{Binding StartMountCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Stop mount" Command="{Binding StopMountCommand}" Margin="0,0,8,8"/>
+                                <Button Content="{Binding RevealInFileManagerLabel}" Command="{Binding RevealInFileManagerCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Generate script" Command="{Binding GenerateScriptCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Save script" Command="{Binding SaveScriptCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Run startup preflight"

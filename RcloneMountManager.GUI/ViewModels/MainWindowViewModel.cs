@@ -248,6 +248,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public string WizardStepHelp => CurrentWizardStep?.Help?.Replace("\n", " ").Trim() ?? string.Empty;
     public bool WizardHasExamples => CurrentWizardStep is { Examples.Count: > 0, Exclusive: true };
     public bool ShowMountEditorContent => !ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
+
+    public static string RevealInFileManagerLabel => System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+        System.Runtime.InteropServices.OSPlatform.Windows) ? "Show in Explorer"
+        : System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+            System.Runtime.InteropServices.OSPlatform.OSX) ? "Show in Finder"
+        : "Open in Files";
     public bool ShowSettingsContent => ShowSettingsView;
     public bool ShowEditorScrollViewer => !ShowDiagnosticsView;
     public bool IsRemoteListActive => ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
@@ -1076,6 +1082,40 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             }
         });
     }
+
+    [RelayCommand(CanExecute = nameof(CanRevealInFileManager))]
+    private async Task RevealInFileManagerAsync()
+    {
+        var mountPoint = SelectedProfile?.MountPoint;
+        if (string.IsNullOrWhiteSpace(mountPoint) || !Directory.Exists(mountPoint)) return;
+
+        try
+        {
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                && desktop.MainWindow is { } window)
+            {
+                var topLevel = Avalonia.Controls.TopLevel.GetTopLevel(window);
+                if (topLevel?.Launcher is { } launcher)
+                {
+                    await launcher.LaunchUriAsync(new Uri($"file://{mountPoint}"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to open file manager for {MountPoint}", mountPoint);
+        }
+    }
+
+    private bool CanRevealInFileManager() =>
+        HasProfiles &&
+        !IsBusy &&
+        SelectedProfile is not null &&
+        !SelectedProfile.IsRemoteDefinition &&
+        !string.IsNullOrWhiteSpace(SelectedProfile.MountPoint) &&
+        SelectedProfile.RuntimeState.Lifecycle is MountLifecycleState.Mounted &&
+        SelectedProfile.RuntimeState.Health is MountHealthState.Healthy or MountHealthState.Degraded;
 
     [RelayCommand(CanExecute = nameof(CanRunActions))]
     private async Task RefreshStatusAsync()
@@ -1987,6 +2027,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         RemoveProfileCommand.NotifyCanExecuteChanged();
         StartMountCommand.NotifyCanExecuteChanged();
         StopMountCommand.NotifyCanExecuteChanged();
+        RevealInFileManagerCommand.NotifyCanExecuteChanged();
         RefreshStatusCommand.NotifyCanExecuteChanged();
         TestConnectionCommand.NotifyCanExecuteChanged();
         GenerateScriptCommand.NotifyCanExecuteChanged();
