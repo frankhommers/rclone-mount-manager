@@ -48,6 +48,8 @@ public sealed class RcloneBackendService
             {
                 Name = p.Name,
                 Description = p.Description,
+                RequiresOAuth = p.Options.Any(o =>
+                    string.Equals(o.Name, "token", StringComparison.OrdinalIgnoreCase)),
                 Options = p.Options
                     .Where(o => o is not null)
                     .Select(o => new RcloneBackendOption
