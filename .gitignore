@@ -493,3 +493,4 @@ nuget.config
 .opencode/
 .planning/
 docs/plans/
+opencode.json
