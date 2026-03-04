@@ -488,3 +488,8 @@ nuget.config
 
 # Local git worktrees
 .worktrees/
+
+# Local AI tooling and planning docs
+.opencode/
+.planning/
+docs/plans/

@@ -8,8 +8,10 @@ A cross-platform desktop application for managing filesystem mounts via [rclone]
 - **Typed mount parameters** - All rclone mount, VFS, NFS, filter, and general options with appropriate UI controls (toggles, dropdowns, text fields) auto-discovered from rclone
 - **Quick Connect** - Mount WebDAV, SFTP, FTP, and FTPS endpoints without pre-configuring rclone remotes
 - **Backend builder** - Discover and configure any of rclone's 60+ backend types directly from the app
+- **OAuth Setup Wizard** - Step-by-step guided setup for OAuth backends (OneDrive, Google Drive, Dropbox, etc.) with automatic browser authorization
 - **Script generation** - Generate and save bash mount scripts for any profile
 - **Start at login** - Enable automatic mounting via macOS LaunchAgents
+- **Diagnostics** - Per-profile log timeline with filtering and search
 - **Dark/Light theme** - Follow system theme or choose manually
 
 ## Tech Stack
@@ -30,8 +32,8 @@ A cross-platform desktop application for managing filesystem mounts via [rclone]
 ### Build
 
 ```bash
-git clone https://github.com/frankhommers/rclone-mount.git
-cd rclone-mount
+git clone https://github.com/frankhommers/rclone-mount-manager.git
+cd rclone-mount-manager
 dotnet restore RcloneMountManager.slnx
 dotnet build RcloneMountManager.slnx
 ```
@@ -62,7 +64,6 @@ RcloneMountManager.Core/     # Shared models and services
 RcloneMountManager.GUI/      # Avalonia UI application
 RcloneMountManager.Tests/    # Unit tests
 scripts/                     # Build and distribution scripts
-docs/                        # Design documents and plans
 ```
 
 ## How It Works
