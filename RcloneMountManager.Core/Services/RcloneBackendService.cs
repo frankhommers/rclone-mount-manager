@@ -122,6 +122,53 @@ public sealed class RcloneBackendService
         }
     }
 
+    public async Task UpdateRemoteAsync(
+        string rcloneBinaryPath,
+        string remoteName,
+        IEnumerable<RcloneBackendOptionInput> options,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(remoteName))
+        {
+            throw new InvalidOperationException("Remote name is required.");
+        }
+
+        var binary = string.IsNullOrWhiteSpace(rcloneBinaryPath) ? "rclone" : rcloneBinaryPath;
+
+        var optionList = options.ToList();
+        var args = new List<string> { "config", "update", remoteName.Trim() };
+        foreach (var option in optionList)
+        {
+            if (string.IsNullOrWhiteSpace(option.Name) || string.IsNullOrWhiteSpace(option.Value))
+            {
+                continue;
+            }
+
+            args.Add(option.Name);
+            args.Add(option.Value);
+        }
+
+        if (optionList.Any(o => o.IsPassword && !string.IsNullOrWhiteSpace(o.Value)))
+        {
+            args.Add("--obscure");
+        }
+
+        args.Add("--non-interactive");
+
+        var result = await Cli.Wrap(binary)
+            .WithArguments(args)
+            .WithValidation(CommandResultValidation.None)
+            .ExecuteBufferedAsync(cancellationToken);
+
+        if (result.ExitCode != 0)
+        {
+            var error = string.IsNullOrWhiteSpace(result.StandardError)
+                ? result.StandardOutput
+                : result.StandardError;
+            throw new InvalidOperationException($"Failed to update remote: {error.Trim()}");
+        }
+    }
+
     private sealed class ProviderDto
     {
         public string Name { get; set; } = string.Empty;

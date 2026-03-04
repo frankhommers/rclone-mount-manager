@@ -81,7 +81,8 @@
                         </Border>
 
                         <ScrollViewer Grid.Row="1"
-                                      Margin="8,0"
+                                      Margin="8,0,0,0"
+                                      Padding="0,0,12,0"
                                       VerticalScrollBarVisibility="Auto"
                                       HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Spacing="10">
@@ -234,6 +235,10 @@
                                 BorderThickness="0,1,0,0"
                                 BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
                             <StackPanel Spacing="6">
+                                <Button Content="{Binding RevealInFileManagerLabel}"
+                                        Command="{Binding RevealInFileManagerCommand}"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Center"/>
                                 <Button Content="Remove"
                                         Command="{Binding RemoveProfileCommand}"
                                         HorizontalAlignment="Stretch"
@@ -242,6 +247,19 @@
                                         Command="{Binding RefreshStatusCommand}"
                                         HorizontalAlignment="Stretch"
                                         HorizontalContentAlignment="Center"/>
+                                <Button Command="{Binding OpenSponsorLinkCommand}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        HorizontalAlignment="Center"
+                                        MinHeight="0"
+                                        Padding="4,1"
+                                        Cursor="Hand"
+                                        Margin="0,2,0,0">
+                                    <TextBlock Text="Support this project"
+                                               FontSize="9"
+                                               Opacity="0.4"
+                                               TextDecorations="Underline"/>
+                                </Button>
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -437,67 +455,98 @@
                     <ScrollViewer Grid.Row="1" IsVisible="{Binding ShowEditorScrollViewer}">
                         <StackPanel Margin="20,14" Spacing="10">
 
-                            <StackPanel IsVisible="{Binding ShowStandardRemoteForm}" Spacing="10">
+                            <!-- REMOTE CHOOSER: pick backend + name, then choose wizard or manual -->
+                            <StackPanel IsVisible="{Binding ShowRemoteChooser}" Spacing="10">
+                                <TextBlock Text="Remote Configuration" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Choose a backend type and remote name, then pick how you want to configure it."
+                                           FontSize="11" Opacity="0.6" Margin="0,-6,0,0"/>
 
-                            <!-- Backend Configuration -->
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBlock Text="Backend Configuration" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <Grid ColumnDefinitions="200,*">
+                                    <TextBlock Text="Backend type" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableBackends}" SelectedItem="{Binding SelectedBackend}" HorizontalAlignment="Stretch" Margin="8,0,0,0">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+                                <TextBlock Text="{Binding SelectedBackendDescription}" TextWrapping="Wrap" FontSize="11" Opacity="0.6" Margin="0,-6,0,0"/>
+                                <TextBlock IsVisible="{Binding SelectedBackend.RequiresOAuth}"
+                                           Text="This backend requires browser authorization. Use the Setup Wizard to configure it."
+                                           FontSize="11" Opacity="0.75" Foreground="#E0A000"
+                                           TextWrapping="Wrap" Margin="0,2,0,0"/>
+
+                                <Grid ColumnDefinitions="200,*">
+                                    <TextBlock Text="Remote name" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Text="{Binding NewRemoteName}" Watermark="example: my-webdav" HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
+                                </Grid>
+
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
                                     <Button Content="Setup Wizard"
                                             Command="{Binding StartWizardCommand}"
                                             HorizontalAlignment="Left"/>
-                                    <Button Content="Test connection"
-                                            Command="{Binding TestConnectionCommand}"
-                                            HorizontalAlignment="Left"/>
-                                    <Button Content="Save remote"
-                                            Command="{Binding CreateRemoteCommand}"
+                                    <Button Content="Configure manually"
+                                            Command="{Binding EnterManualModeCommand}"
                                             HorizontalAlignment="Left"/>
                                 </StackPanel>
-                            </Grid>
-                            <TextBlock Text="Build any rclone remote type directly from this app." FontSize="11" Opacity="0.6" Margin="0,-6,0,0"/>
+                            </StackPanel>
 
-                            <Grid ColumnDefinitions="200,*">
-                                <TextBlock Text="Backend type" VerticalAlignment="Center"/>
-                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableBackends}" SelectedItem="{Binding SelectedBackend}" HorizontalAlignment="Stretch" Margin="8,0,0,0">
-                                    <ComboBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
-                                        </DataTemplate>
-                                    </ComboBox.ItemTemplate>
-                                </ComboBox>
-                            </Grid>
-                            <TextBlock Text="{Binding SelectedBackendDescription}" TextWrapping="Wrap" FontSize="11" Opacity="0.6" Margin="0,-6,0,0"/>
-                            <TextBlock IsVisible="{Binding SelectedBackend.RequiresOAuth}"
-                                       Text="This backend requires browser authorization. Use the Setup Wizard to configure it."
-                                       FontSize="11" Opacity="0.75" Foreground="#E0A000"
-                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
+                            <!-- MANUAL FORM: full options editor with save/test/back -->
+                            <StackPanel IsVisible="{Binding ShowManualRemoteForm}" Spacing="10">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Backend Configuration" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <Button Content="Back"
+                                                Command="{Binding ExitManualModeCommand}"
+                                                HorizontalAlignment="Left"/>
+                                        <Button Content="Test connection"
+                                                Command="{Binding TestConnectionCommand}"
+                                                HorizontalAlignment="Left"/>
+                                        <Button Content="Save remote"
+                                                Command="{Binding CreateRemoteCommand}"
+                                                HorizontalAlignment="Left"/>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="Build any rclone remote type directly from this app." FontSize="11" Opacity="0.6" Margin="0,-6,0,0"/>
 
-                            <Grid ColumnDefinitions="200,*">
-                                <TextBlock Text="Remote name" VerticalAlignment="Center"/>
-                                <TextBox Grid.Column="1" Text="{Binding NewRemoteName}" Watermark="example: my-webdav" HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
-                            </Grid>
+                                <Grid ColumnDefinitions="200,*">
+                                    <TextBlock Text="Backend type" VerticalAlignment="Center"/>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableBackends}" SelectedItem="{Binding SelectedBackend}" HorizontalAlignment="Stretch" Margin="8,0,0,0">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis"/>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                </Grid>
+                                <TextBlock Text="{Binding SelectedBackendDescription}" TextWrapping="Wrap" FontSize="11" Opacity="0.6" Margin="0,-6,0,0"/>
 
-                            <ItemsControl ItemsSource="{Binding BackendOptionInputs}"
-                                          IsVisible="{Binding HasBackendOptions}"
-                                          ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
+                                <Grid ColumnDefinitions="200,*">
+                                    <TextBlock Text="Remote name" VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Text="{Binding NewRemoteName}" Watermark="example: my-webdav" HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
+                                </Grid>
 
-                            <TextBlock Text="No configurable options for this backend type."
-                                       FontSize="11" Opacity="0.6"
-                                       IsVisible="{Binding !HasBackendOptions}"/>
-
-                            <Expander IsVisible="{Binding HasAdvancedBackendOptions}"
-                                      IsExpanded="{Binding ShowAdvancedBackendOptions}"
-                                      HorizontalAlignment="Stretch"
-                                      HorizontalContentAlignment="Stretch"
-                                      Margin="0,4,0,0">
-                                <Expander.Header>
-                                    <TextBlock Text="Advanced options" FontWeight="SemiBold"/>
-                                </Expander.Header>
-                                <ItemsControl ItemsSource="{Binding AdvancedBackendOptionInputs}"
-                                              Margin="0,4,0,0"
+                                <ItemsControl ItemsSource="{Binding BackendOptionInputs}"
+                                              IsVisible="{Binding HasBackendOptions}"
                                               ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
-                            </Expander>
 
+                                <TextBlock Text="No configurable options for this backend type."
+                                           FontSize="11" Opacity="0.6"
+                                           IsVisible="{Binding !HasBackendOptions}"/>
+
+                                <Expander IsVisible="{Binding HasAdvancedBackendOptions}"
+                                          IsExpanded="{Binding ShowAdvancedBackendOptions}"
+                                          HorizontalAlignment="Stretch"
+                                          HorizontalContentAlignment="Stretch"
+                                          Margin="0,4,0,0">
+                                    <Expander.Header>
+                                        <TextBlock Text="Advanced options" FontWeight="SemiBold"/>
+                                    </Expander.Header>
+                                    <ItemsControl ItemsSource="{Binding AdvancedBackendOptionInputs}"
+                                                  Margin="0,4,0,0"
+                                                  ItemTemplate="{DynamicResource BackendOptionTemplateSelector}"/>
+                                </Expander>
                             </StackPanel>
 
                             <StackPanel IsVisible="{Binding ShowWizardContent}" Spacing="14">
@@ -550,11 +599,35 @@
                                                IsVisible="{Binding CurrentWizardStep.Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                Foreground="#D04040" TextWrapping="Wrap"/>
 
-                                    <!-- Typed control for wizard step -->
-                                    <ContentControl Content="{Binding WizardStepInput}"
-                                                    ContentTemplate="{DynamicResource BackendOptionTemplateSelector}"
-                                                    IsVisible="{Binding WizardStepInput, Converter={x:Static ObjectConverters.IsNotNull}}"
-                                                    HorizontalAlignment="Stretch"/>
+                                    <!-- Bool toggle -->
+                                    <ToggleSwitch IsVisible="{Binding WizardStepIsBool}"
+                                                  IsChecked="{Binding WizardStepBoolValue}"
+                                                  OnContent="Yes" OffContent="No"/>
+
+                                    <!-- ComboBox for exclusive options with examples -->
+                                    <ComboBox IsVisible="{Binding WizardStepIsComboBox}"
+                                              ItemsSource="{Binding CurrentWizardStep.Examples}"
+                                              SelectedItem="{Binding WizardSelectedExample}"
+                                              HorizontalAlignment="Stretch"
+                                              MaxWidth="500"
+                                              MaxDropDownHeight="300">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding Value}" FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding Help}" Opacity="0.6"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+
+                                    <!-- TextBox for free-form input -->
+                                    <TextBox IsVisible="{Binding WizardStepIsTextBox}"
+                                             Text="{Binding WizardAnswer}"
+                                             Watermark="{Binding CurrentWizardStep.DefaultValue}"
+                                             PasswordChar="{Binding WizardStepPasswordChar}"
+                                             HorizontalAlignment="Stretch"
+                                             MaxWidth="500"/>
 
                                     <!-- Next button -->
                                     <Button Content="Next"
@@ -695,7 +768,6 @@
                                 <Button Content="Test connection" Command="{Binding TestConnectionCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Start mount" Command="{Binding StartMountCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Stop mount" Command="{Binding StopMountCommand}" Margin="0,0,8,8"/>
-                                <Button Content="{Binding RevealInFileManagerLabel}" Command="{Binding RevealInFileManagerCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Generate script" Command="{Binding GenerateScriptCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Save script" Command="{Binding SaveScriptCommand}" Margin="0,0,8,8"/>
                                 <Button Content="Run startup preflight"

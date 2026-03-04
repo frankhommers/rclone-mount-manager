@@ -123,4 +123,88 @@ public class MainWindowViewModelWizardTests
     Assert.Empty(vm.WizardOAuthUrl);
     Assert.Equal(0, vm.WizardStepNumber);
   }
+
+  [Fact]
+  public void ShowRemoteChooser_TrueWhenRemoteEditorActiveAndNeitherWizardNorManual()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.ShowRemoteEditor = true;
+    Assert.True(vm.ShowRemoteChooser);
+  }
+
+  [Fact]
+  public void ShowRemoteChooser_FalseWhenWizardActive()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.ShowRemoteEditor = true;
+    vm.IsWizardActive = true;
+    Assert.False(vm.ShowRemoteChooser);
+  }
+
+  [Fact]
+  public void ShowRemoteChooser_FalseWhenManualMode()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.ShowRemoteEditor = true;
+    vm.IsManualMode = true;
+    Assert.False(vm.ShowRemoteChooser);
+  }
+
+  [Fact]
+  public void ShowManualRemoteForm_TrueWhenManualModeAndRemoteEditorActive()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.ShowRemoteEditor = true;
+    vm.IsManualMode = true;
+    Assert.True(vm.ShowManualRemoteForm);
+  }
+
+  [Fact]
+  public void ShowManualRemoteForm_FalseWhenNotManualMode()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.ShowRemoteEditor = true;
+    Assert.False(vm.ShowManualRemoteForm);
+  }
+
+  [Fact]
+  public void EnterManualMode_SetsIsManualModeTrue()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.ShowRemoteEditor = true;
+    vm.EnterManualModeCommand.Execute(null);
+    Assert.True(vm.IsManualMode);
+    Assert.True(vm.ShowManualRemoteForm);
+    Assert.False(vm.ShowRemoteChooser);
+  }
+
+  [Fact]
+  public void ExitManualMode_SetsIsManualModeFalse()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.ShowRemoteEditor = true;
+    vm.IsManualMode = true;
+    vm.ExitManualModeCommand.Execute(null);
+    Assert.False(vm.IsManualMode);
+    Assert.True(vm.ShowRemoteChooser);
+    Assert.False(vm.ShowManualRemoteForm);
+  }
+
+  [Fact]
+  public void SwitchingRemoteProfile_ResetsManualMode()
+  {
+    var vm = new MainWindowViewModel(loadStartupData: false);
+    vm.AddRemoteCommand.Execute(null);
+    vm.AddRemoteCommand.Execute(null);
+    vm.ShowRemoteEditor = true;
+
+    var remoteProfiles = vm.RemoteProfiles;
+    Assert.True(remoteProfiles.Count >= 2);
+
+    vm.SelectedRemoteProfile = remoteProfiles[0];
+    vm.IsManualMode = true;
+
+    vm.SelectedRemoteProfile = remoteProfiles[1];
+    Assert.False(vm.IsManualMode);
+  }
 }

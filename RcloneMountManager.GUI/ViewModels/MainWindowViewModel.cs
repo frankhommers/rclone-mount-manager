@@ -91,6 +91,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _isWizardActive;
 
     [ObservableProperty]
+    private bool _isManualMode;
+
+    [ObservableProperty]
     private ConfigWizardStep? _currentWizardStep;
 
     [ObservableProperty]
@@ -98,6 +101,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     private WizardStepOptionInput? _wizardStepInput;
+
+    [ObservableProperty]
+    private bool _wizardStepBoolValue;
+
+    [ObservableProperty]
+    private ConfigWizardExample? _wizardSelectedExample;
 
     [ObservableProperty]
     private bool _isWizardWaitingForOAuth;
@@ -242,11 +251,17 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             : "Preset -> credentials -> mount path -> Start mount";
     public bool ShowRemoteEditorContent => ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
     public bool ShowWizardContent => IsWizardActive && ShowRemoteEditorContent;
+    public bool ShowManualRemoteForm => IsManualMode && ShowRemoteEditorContent;
+    public bool ShowRemoteChooser => !IsWizardActive && !IsManualMode && ShowRemoteEditorContent;
     public bool ShowStandardRemoteForm => !IsWizardActive && ShowRemoteEditorContent;
     public bool ShowWizardOAuthSpinner => IsWizardWaitingForOAuth;
     public string WizardStepTitle => CurrentWizardStep?.Name ?? string.Empty;
     public string WizardStepHelp => CurrentWizardStep?.Help?.Replace("\n", " ").Trim() ?? string.Empty;
     public bool WizardHasExamples => CurrentWizardStep is { Examples.Count: > 0, Exclusive: true };
+    public bool WizardStepIsBool => CurrentWizardStep is { Type: "bool" };
+    public bool WizardStepIsComboBox => CurrentWizardStep is { Examples.Count: > 0 } && !WizardStepIsBool;
+    public bool WizardStepIsTextBox => !WizardStepIsBool && !WizardStepIsComboBox;
+    public string WizardStepPasswordChar => CurrentWizardStep is { IsPassword: true } ? "\u2022" : string.Empty;
     public bool ShowMountEditorContent => !ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView;
 
     public static string RevealInFileManagerLabel => System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
@@ -642,12 +657,26 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                 throw new InvalidOperationException("Create remote is only available for REMOTES entries.");
             }
 
-            await _rcloneBackendService.CreateRemoteAsync(
-                binary,
-                NewRemoteName,
-                SelectedBackend.Name,
-                BackendOptionInputs,
-                cancellationToken);
+            var remoteExistsInRclone = !string.IsNullOrWhiteSpace(activeProfile.Source)
+                && activeProfile.Source.StartsWith(NewRemoteName.Trim() + ":", StringComparison.Ordinal);
+
+            if (remoteExistsInRclone)
+            {
+                await _rcloneBackendService.UpdateRemoteAsync(
+                    binary,
+                    NewRemoteName,
+                    BackendOptionInputs,
+                    cancellationToken);
+            }
+            else
+            {
+                await _rcloneBackendService.CreateRemoteAsync(
+                    binary,
+                    NewRemoteName,
+                    SelectedBackend.Name,
+                    BackendOptionInputs,
+                    cancellationToken);
+            }
 
             activeProfile.Name = NewRemoteName.Trim();
             activeProfile.Source = $"{NewRemoteName.Trim()}:/";
@@ -718,7 +747,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
             try
             {
                 WizardStepNumber++;
-                var answer = WizardStepInput?.Value ?? WizardAnswer;
+                string answer;
+                if (WizardStepIsBool)
+                    answer = WizardStepBoolValue ? "true" : "false";
+                else if (WizardStepIsComboBox && WizardSelectedExample is not null)
+                    answer = WizardSelectedExample.Value;
+                else
+                    answer = WizardAnswer;
                 var step = await _rcloneConfigWizardService.ContinueAsync(
                     binary, remoteName, _wizardState, answer, cancellationToken);
 
@@ -799,6 +834,13 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         _wizardState = step.State;
         WizardStepInput = new WizardStepOptionInput(step);
         WizardAnswer = step.DefaultValue;
+        WizardStepBoolValue = string.Equals(step.DefaultValue, "true", StringComparison.OrdinalIgnoreCase);
+        WizardSelectedExample = step.Examples.FirstOrDefault(e =>
+            string.Equals(e.Value, step.DefaultValue, StringComparison.OrdinalIgnoreCase));
+        OnPropertyChanged(nameof(WizardStepIsBool));
+        OnPropertyChanged(nameof(WizardStepIsComboBox));
+        OnPropertyChanged(nameof(WizardStepIsTextBox));
+        OnPropertyChanged(nameof(WizardStepPasswordChar));
     }
 
     private async Task ReadBackWizardConfigAsync(string binary, string remoteName, CancellationToken cancellationToken)
@@ -834,6 +876,18 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    [RelayCommand]
+    private void EnterManualMode()
+    {
+        IsManualMode = true;
+    }
+
+    [RelayCommand]
+    private void ExitManualMode()
+    {
+        IsManualMode = false;
+    }
+
     private void ResetWizardState()
     {
         IsWizardActive = false;
@@ -841,6 +895,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         CurrentWizardStep = null;
         WizardStepInput = null;
         WizardAnswer = string.Empty;
+        WizardStepBoolValue = false;
+        WizardSelectedExample = null;
         WizardOAuthUrl = string.Empty;
         WizardStepNumber = 0;
         _wizardState = null;
@@ -865,6 +921,12 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         {
             // Browser launch failed - user can manually copy the URL
         }
+    }
+
+    [RelayCommand]
+    private async Task OpenSponsorLinkAsync()
+    {
+        await OpenBrowserAsync("https://ko-fi.com/frankhommers");
     }
 
     [RelayCommand]
@@ -1109,6 +1171,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     private bool CanRevealInFileManager() =>
+        IsMountListActive &&
         HasProfiles &&
         !IsBusy &&
         SelectedProfile is not null &&
@@ -1796,12 +1859,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(ShowRemoteEditorContent));
         OnPropertyChanged(nameof(ShowWizardContent));
         OnPropertyChanged(nameof(ShowStandardRemoteForm));
+        OnPropertyChanged(nameof(ShowManualRemoteForm));
+        OnPropertyChanged(nameof(ShowRemoteChooser));
         OnPropertyChanged(nameof(ShowMountEditorContent));
         OnPropertyChanged(nameof(ShowSettingsContent));
         OnPropertyChanged(nameof(ShowEditorScrollViewer));
         OnPropertyChanged(nameof(IsRemoteListActive));
         OnPropertyChanged(nameof(IsMountListActive));
         EnsureSingleActiveSidebarSelection();
+        NotifyCommandStateChanged();
     }
 
     partial void OnShowSettingsViewChanged(bool value)
@@ -1811,18 +1877,34 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(ShowRemoteEditorContent));
         OnPropertyChanged(nameof(ShowWizardContent));
         OnPropertyChanged(nameof(ShowStandardRemoteForm));
+        OnPropertyChanged(nameof(ShowManualRemoteForm));
+        OnPropertyChanged(nameof(ShowRemoteChooser));
         OnPropertyChanged(nameof(ShowMountEditorContent));
         OnPropertyChanged(nameof(ShowSettingsContent));
         OnPropertyChanged(nameof(ShowEditorScrollViewer));
         OnPropertyChanged(nameof(IsRemoteListActive));
         OnPropertyChanged(nameof(IsMountListActive));
         EnsureSingleActiveSidebarSelection();
+        NotifyCommandStateChanged();
     }
 
     partial void OnIsWizardActiveChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowWizardContent));
         OnPropertyChanged(nameof(ShowStandardRemoteForm));
+        OnPropertyChanged(nameof(ShowManualRemoteForm));
+        OnPropertyChanged(nameof(ShowRemoteChooser));
+        OnPropertyChanged(nameof(ShowManualRemoteForm));
+        OnPropertyChanged(nameof(ShowRemoteChooser));
+    }
+
+    partial void OnIsManualModeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowManualRemoteForm));
+        OnPropertyChanged(nameof(ShowRemoteChooser));
+        OnPropertyChanged(nameof(ShowStandardRemoteForm));
+        OnPropertyChanged(nameof(ShowManualRemoteForm));
+        OnPropertyChanged(nameof(ShowRemoteChooser));
     }
 
     partial void OnCurrentWizardStepChanged(ConfigWizardStep? value)
@@ -2380,6 +2462,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         ShowRemoteEditor = true;
         ShowDiagnosticsView = false;
         ShowSettingsView = false;
+        ResetWizardState();
+        IsManualMode = false;
         if (!ReferenceEquals(SelectedProfile, value))
         {
             SelectedProfile = value;
@@ -2452,11 +2536,14 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(ShowRemoteEditorContent));
         OnPropertyChanged(nameof(ShowWizardContent));
         OnPropertyChanged(nameof(ShowStandardRemoteForm));
+        OnPropertyChanged(nameof(ShowManualRemoteForm));
+        OnPropertyChanged(nameof(ShowRemoteChooser));
         OnPropertyChanged(nameof(ShowMountEditorContent));
         OnPropertyChanged(nameof(SidebarSelectedRemoteProfile));
         OnPropertyChanged(nameof(SidebarSelectedMountProfile));
 
         EnsureSingleActiveSidebarSelection();
+        NotifyCommandStateChanged();
     }
 
     private void OnObservedProfileChanged(object? sender, PropertyChangedEventArgs e)
