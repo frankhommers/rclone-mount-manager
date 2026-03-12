@@ -1,19 +1,19 @@
+using System;
+using System.IO;
+using System.IO.Pipes;
+using System.Threading;
 using Avalonia;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using RcloneMountManager.Core.Services;
-using RcloneMountManager.Services;
-using RcloneMountManager.ViewModels;
+using RcloneMountManager.GUI.Services;
 using Serilog;
-using System;
-using System.IO;
-using System.IO.Pipes;
-using System.Threading;
+using MainWindowViewModel = RcloneMountManager.GUI.ViewModels.MainWindowViewModel;
 
-namespace RcloneMountManager;
+namespace RcloneMountManager.GUI;
 
-sealed class Program
+internal sealed class Program
 {
   private const string MutexName = "RcloneMountManager_SingleInstance";
   private const string PipeName = "RcloneMountManager_Activate";
@@ -23,7 +23,7 @@ sealed class Program
   {
     ConfigureLogging();
 
-    using var mutex = new Mutex(true, MutexName, out bool createdNew);
+    using Mutex mutex = new(true, MutexName, out bool createdNew);
     if (!createdNew)
     {
       Log.Information("Another instance is already running. Signalling it to activate.");
@@ -31,7 +31,7 @@ sealed class Program
       return;
     }
 
-    var host = Host.CreateDefaultBuilder(args)
+    IHost host = Host.CreateDefaultBuilder(args)
       .UseSerilog()
       .ConfigureServices(services =>
       {
@@ -42,14 +42,19 @@ sealed class Program
         services.AddSingleton<StartupPreflightService>();
         services.AddSingleton<MountHealthService>();
         services.AddSingleton<MainWindowViewModel>(sp =>
-          new MainWindowViewModel(
-            logger: sp.GetRequiredService<ILogger<MainWindowViewModel>>(),
-            mountManagerService: sp.GetRequiredService<MountManagerService>(),
-            launchAgentService: sp.GetRequiredService<LaunchAgentService>(),
-            rcloneBackendService: sp.GetRequiredService<RcloneBackendService>(),
-            rcloneConfigWizardService: sp.GetRequiredService<RcloneConfigWizardService>(),
-            startupPreflightService: sp.GetRequiredService<StartupPreflightService>(),
-            mountHealthService: sp.GetRequiredService<MountHealthService>()));
+                                                     new MainWindowViewModel(
+                                                       logger: sp.GetRequiredService<ILogger<MainWindowViewModel>>(),
+                                                       mountManagerService:
+                                                       sp.GetRequiredService<MountManagerService>(),
+                                                       launchAgentService: sp.GetRequiredService<LaunchAgentService>(),
+                                                       rcloneBackendService:
+                                                       sp.GetRequiredService<RcloneBackendService>(),
+                                                       rcloneConfigWizardService: sp
+                                                         .GetRequiredService<RcloneConfigWizardService>(),
+                                                       startupPreflightService: sp
+                                                         .GetRequiredService<StartupPreflightService>(),
+                                                       mountHealthService: sp
+                                                         .GetRequiredService<MountHealthService>()));
       })
       .Build();
 
@@ -66,7 +71,7 @@ sealed class Program
         Log.Information("Ctrl+C received, shutting down");
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-          if (Avalonia.Application.Current?.ApplicationLifetime
+          if (Application.Current?.ApplicationLifetime
               is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
           {
             desktop.Shutdown();
@@ -90,18 +95,20 @@ sealed class Program
   }
 
   public static AppBuilder BuildAvaloniaApp()
-    => AppBuilder.Configure<App>()
+  {
+    return AppBuilder.Configure<App>()
       .UsePlatformDetect()
       .WithInterFont()
       .LogToTrace();
+  }
 
   private static void SignalExistingInstance()
   {
     try
     {
-      using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.Out);
-      client.Connect(timeout: 2000);
-      using var writer = new StreamWriter(client);
+      using NamedPipeClientStream client = new(".", PipeName, PipeDirection.Out);
+      client.Connect(2000);
+      using StreamWriter writer = new(client);
       writer.Write("ACTIVATE");
       writer.Flush();
     }
@@ -113,17 +120,17 @@ sealed class Program
 
   private static void ConfigureLogging()
   {
-    var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+    string logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
     Directory.CreateDirectory(logDirectory);
 
-    var logPath = Path.Combine(logDirectory, "rclone-mount-.log");
+    string logPath = Path.Combine(logDirectory, "rclone-mount-.log");
 
     Log.Logger = new LoggerConfiguration()
       .MinimumLevel.Debug()
       .Enrich.FromLogContext()
       .WriteTo.Console()
       .WriteTo.File(
-        path: logPath,
+        logPath,
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 14,
         shared: true,

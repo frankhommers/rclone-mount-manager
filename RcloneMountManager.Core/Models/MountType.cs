@@ -4,15 +4,11 @@ namespace RcloneMountManager.Core.Models;
 
 public enum MountType
 {
-    [Description("Rclone (auto)")]
-    RcloneAuto,
+  [Description("Rclone (auto)")] RcloneAuto,
 
-    [Description("Rclone FUSE")]
-    RcloneFuse,
+  [Description("Rclone FUSE")] RcloneFuse,
 
-    [Description("Rclone NFS")]
-    RcloneNfs,
+  [Description("Rclone NFS")] RcloneNfs,
 
-    [Description("macOS NFS")]
-    MacOsNfs,
+  [Description("macOS NFS")] MacOsNfs,
 }

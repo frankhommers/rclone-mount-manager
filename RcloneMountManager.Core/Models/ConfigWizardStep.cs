@@ -16,6 +16,6 @@ public sealed class ConfigWizardStep
   public List<ConfigWizardExample> Examples { get; init; } = [];
 
   public bool IsComplete => string.IsNullOrEmpty(State);
-  public bool IsOAuthBrowserPrompt => string.Equals(Name, "config_is_local", System.StringComparison.Ordinal);
-  public bool IsAdvancedPrompt => string.Equals(Name, "config_fs_advanced", System.StringComparison.Ordinal);
+  public bool IsOAuthBrowserPrompt => string.Equals(Name, "config_is_local", StringComparison.Ordinal);
+  public bool IsAdvancedPrompt => string.Equals(Name, "config_fs_advanced", StringComparison.Ordinal);
 }

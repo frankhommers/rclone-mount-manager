@@ -1,35 +1,35 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="using:RcloneMountManager.ViewModels"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:viewModels="clr-namespace:RcloneMountManager.GUI.ViewModels"
              mc:Ignorable="d"
              x:Class="RcloneMountManager.Views.MountOptionsView"
-             x:DataType="vm:MountOptionsViewModel">
+             x:DataType="viewModels:MountOptionsViewModel">
 
     <StackPanel Spacing="8">
-        <TextBlock Text="Mount Parameters" FontWeight="SemiBold" FontSize="14"/>
+        <TextBlock Text="Mount Parameters" FontWeight="SemiBold" FontSize="14" />
 
         <TextBlock Text="Loading rclone options..."
                    IsVisible="{Binding IsLoading}"
                    Opacity="0.7"
-                   FontStyle="Italic"/>
+                   FontStyle="Italic" />
 
         <ItemsControl ItemsSource="{Binding Groups}" IsVisible="{Binding !IsLoading}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <StackPanel Spacing="4"/>
+                    <StackPanel Spacing="4" />
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:MountOptionGroupViewModel">
+                <DataTemplate x:DataType="viewModels:MountOptionGroupViewModel">
                     <Expander IsExpanded="{Binding IsExpanded}"
                               IsVisible="{Binding HasVisibleOptions}"
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Stretch">
                         <Expander.Header>
                             <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Stretch">
-                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
                                 <Border Grid.Column="1"
                                         Background="{DynamicResource SystemAccentColorDark1}"
                                         CornerRadius="10"
@@ -39,7 +39,7 @@
                                     <TextBlock Text="{Binding ModifiedCount}"
                                                FontSize="11"
                                                Foreground="White"
-                                               FontWeight="SemiBold"/>
+                                               FontWeight="SemiBold" />
                                 </Border>
                             </Grid>
                         </Expander.Header>
@@ -50,13 +50,13 @@
                                        Opacity="0.7"
                                        FontStyle="Italic"
                                        TextWrapping="Wrap"
-                                       Margin="0,0,0,4"/>
+                                       Margin="0,0,0,4" />
                             <ItemsControl ItemsSource="{Binding VisibleOptions}"
                                           HorizontalAlignment="Stretch"
                                           ItemTemplate="{DynamicResource OptionTemplateSelector}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
-                                        <StackPanel Spacing="1"/>
+                                        <StackPanel Spacing="1" />
                                     </ItemsPanelTemplate>
                                 </ItemsControl.ItemsPanel>
                             </ItemsControl>

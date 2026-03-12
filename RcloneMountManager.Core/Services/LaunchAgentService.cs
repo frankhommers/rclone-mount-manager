@@ -14,219 +14,235 @@ namespace RcloneMountManager.Core.Services;
 
 public sealed class LaunchAgentService
 {
-    private readonly string _appDataDirectory;
-    private readonly ILogger<LaunchAgentService> _logger;
-    private readonly string _userProfileDirectory;
-    private readonly Func<string, string[], CancellationToken, Task<CommandExecutionResult>> _commandRunner;
-    private readonly Func<uint> _uidProvider;
+  private readonly string _appDataDirectory;
+  private readonly ILogger<LaunchAgentService> _logger;
+  private readonly string _userProfileDirectory;
+  private readonly Func<string, string[], CancellationToken, Task<CommandExecutionResult>> _commandRunner;
+  private readonly Func<uint> _uidProvider;
 
-    [DllImport("libc")]
-    private static extern uint getuid();
+  [DllImport("libc")]
+  private static extern uint getuid();
 
-    public readonly record struct CommandExecutionResult(int ExitCode, string StandardOutput, string StandardError);
+  public readonly record struct CommandExecutionResult(int ExitCode, string StandardOutput, string StandardError);
 
-    public LaunchAgentService(
-        ILogger<LaunchAgentService> logger,
-        string? appDataDirectory = null,
-        string? userProfileDirectory = null,
-        Func<string, string[], CancellationToken, Task<CommandExecutionResult>>? commandRunner = null,
-        Func<uint>? uidProvider = null)
+  public LaunchAgentService(
+    ILogger<LaunchAgentService> logger,
+    string? appDataDirectory = null,
+    string? userProfileDirectory = null,
+    Func<string, string[], CancellationToken, Task<CommandExecutionResult>>? commandRunner = null,
+    Func<uint>? uidProvider = null)
+  {
+    ArgumentNullException.ThrowIfNull(logger);
+
+    _logger = logger;
+    _appDataDirectory = appDataDirectory ?? Path.Combine(
+      Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+      "RcloneMountManager");
+    _userProfileDirectory = userProfileDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    _commandRunner = commandRunner ?? ExecuteCommandAsync;
+    _uidProvider = uidProvider ?? getuid;
+  }
+
+  public bool IsSupported => OperatingSystem.IsMacOS();
+
+  public string GetScriptPath(MountProfile profile)
+  {
+    string scriptsDirectory = Path.Combine(_appDataDirectory, "scripts");
+    string safeName = BuildSafeFileName(profile.Name);
+    return Path.Combine(scriptsDirectory, $"{safeName}-{profile.Id}.sh");
+  }
+
+  public string GetLaunchAgentPlistPath(MountProfile profile)
+  {
+    string launchAgentsDirectory = Path.Combine(
+      _userProfileDirectory,
+      "Library",
+      "LaunchAgents");
+
+    return Path.Combine(launchAgentsDirectory, $"{BuildLabel(profile)}.plist");
+  }
+
+  public async Task EnableAsync(MountProfile profile, string scriptContent, CancellationToken cancellationToken)
+  {
+    if (!IsSupported)
     {
-        ArgumentNullException.ThrowIfNull(logger);
-
-        _logger = logger;
-        _appDataDirectory = appDataDirectory ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RcloneMountManager");
-        _userProfileDirectory = userProfileDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        _commandRunner = commandRunner ?? ExecuteCommandAsync;
-        _uidProvider = uidProvider ?? getuid;
+      throw new InvalidOperationException("Start at login is currently implemented for macOS only.");
     }
 
-    public bool IsSupported => OperatingSystem.IsMacOS();
+    string scriptPath = GetScriptPath(profile);
+    Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
+    await File.WriteAllTextAsync(scriptPath, scriptContent, cancellationToken);
 
-    public string GetScriptPath(MountProfile profile)
+    if (!OperatingSystem.IsWindows())
     {
-        var scriptsDirectory = Path.Combine(_appDataDirectory, "scripts");
-        var safeName = BuildSafeFileName(profile.Name);
-        return Path.Combine(scriptsDirectory, $"{safeName}-{profile.Id}.sh");
+      File.SetUnixFileMode(
+        scriptPath,
+        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+        UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+        UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
     }
 
-    public string GetLaunchAgentPlistPath(MountProfile profile)
-    {
-        var launchAgentsDirectory = Path.Combine(
-            _userProfileDirectory,
-            "Library",
-            "LaunchAgents");
+    string plistPath = GetLaunchAgentPlistPath(profile);
+    Directory.CreateDirectory(Path.GetDirectoryName(plistPath)!);
+    string plistContent = BuildPlist(profile, scriptPath);
+    await File.WriteAllTextAsync(plistPath, plistContent, cancellationToken);
 
-        return Path.Combine(launchAgentsDirectory, $"{BuildLabel(profile)}.plist");
+    await RunPlutilLintAsync(plistPath, cancellationToken);
+
+    CommandExecutionResult bootoutResult = await _commandRunner(
+      "launchctl",
+      ["bootout", BuildServiceTarget(profile)],
+      cancellationToken);
+    if (bootoutResult.ExitCode == 0)
+    {
+      _logger.LogInformation("Removed stale LaunchAgent before re-registering.");
     }
 
-    public async Task EnableAsync(MountProfile profile, string scriptContent, CancellationToken cancellationToken)
+    await RunLaunchCtlAsync(["bootstrap", BuildGuiDomain(), plistPath], cancellationToken);
+
+    _logger.LogInformation("Enabled start at login for {ProfileName}.", profile.Name);
+    _logger.LogInformation("LaunchAgent: {PlistPath}", plistPath);
+  }
+
+  public async Task DisableAsync(MountProfile profile, CancellationToken cancellationToken)
+  {
+    if (!IsSupported)
     {
-        if (!IsSupported)
-        {
-            throw new InvalidOperationException("Start at login is currently implemented for macOS only.");
-        }
-
-        var scriptPath = GetScriptPath(profile);
-        Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
-        await File.WriteAllTextAsync(scriptPath, scriptContent, cancellationToken);
-
-        if (!OperatingSystem.IsWindows())
-        {
-            File.SetUnixFileMode(scriptPath,
-                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-                UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-                UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
-        }
-
-        var plistPath = GetLaunchAgentPlistPath(profile);
-        Directory.CreateDirectory(Path.GetDirectoryName(plistPath)!);
-        var plistContent = BuildPlist(profile, scriptPath);
-        await File.WriteAllTextAsync(plistPath, plistContent, cancellationToken);
-
-        await RunPlutilLintAsync(plistPath, cancellationToken);
-
-        var bootoutResult = await _commandRunner("launchctl", ["bootout", BuildServiceTarget(profile)], cancellationToken);
-        if (bootoutResult.ExitCode == 0)
-        {
-            _logger.LogInformation("Removed stale LaunchAgent before re-registering.");
-        }
-
-        await RunLaunchCtlAsync(["bootstrap", BuildGuiDomain(), plistPath], cancellationToken);
-
-        _logger.LogInformation("Enabled start at login for {ProfileName}.", profile.Name);
-        _logger.LogInformation("LaunchAgent: {PlistPath}", plistPath);
+      return;
     }
 
-    public async Task DisableAsync(MountProfile profile, CancellationToken cancellationToken)
+    string plistPath = GetLaunchAgentPlistPath(profile);
+    if (File.Exists(plistPath))
     {
-        if (!IsSupported)
-        {
-            return;
-        }
+      CommandExecutionResult result = await _commandRunner(
+        "launchctl",
+        ["bootout", BuildServiceTarget(profile)],
+        cancellationToken);
+      if (result.ExitCode != 0)
+      {
+        _logger.LogWarning(
+          "launchctl bootout exited with code {ExitCode} (service may already be unloaded).",
+          result.ExitCode);
+      }
 
-        var plistPath = GetLaunchAgentPlistPath(profile);
-        if (File.Exists(plistPath))
-        {
-            var result = await _commandRunner("launchctl", ["bootout", BuildServiceTarget(profile)], cancellationToken);
-            if (result.ExitCode != 0)
-            {
-                _logger.LogWarning("launchctl bootout exited with code {ExitCode} (service may already be unloaded).", result.ExitCode);
-            }
-
-            File.Delete(plistPath);
-        }
-
-        _logger.LogInformation("Disabled start at login for {ProfileName}.", profile.Name);
+      File.Delete(plistPath);
     }
 
-    public bool IsEnabled(MountProfile profile)
+    _logger.LogInformation("Disabled start at login for {ProfileName}.", profile.Name);
+  }
+
+  public bool IsEnabled(MountProfile profile)
+  {
+    return File.Exists(GetLaunchAgentPlistPath(profile));
+  }
+
+  private static string BuildPlist(MountProfile profile, string scriptPath)
+  {
+    string label = BuildLabel(profile);
+    string escapedPath = EscapeXml(scriptPath);
+    string escapedLabel = EscapeXml(label);
+
+    StringBuilder builder = new();
+    builder.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+    builder.AppendLine(
+      "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">");
+    builder.AppendLine("<plist version=\"1.0\">");
+    builder.AppendLine("<dict>");
+    builder.AppendLine("  <key>Label</key>");
+    builder.AppendLine($"  <string>{escapedLabel}</string>");
+    builder.AppendLine("  <key>ProgramArguments</key>");
+    builder.AppendLine("  <array>");
+    builder.AppendLine("    <string>/bin/bash</string>");
+    builder.AppendLine($"    <string>{escapedPath}</string>");
+    builder.AppendLine("  </array>");
+    builder.AppendLine("  <key>RunAtLoad</key>");
+    builder.AppendLine("  <true/>");
+    builder.AppendLine("  <key>KeepAlive</key>");
+    builder.AppendLine("  <true/>");
+    builder.AppendLine("</dict>");
+    builder.AppendLine("</plist>");
+    return builder.ToString();
+  }
+
+  private async Task RunLaunchCtlAsync(string[] args, CancellationToken cancellationToken)
+  {
+    await RunCommandWithStrictValidationAsync("launchctl", args, cancellationToken);
+  }
+
+  private async Task RunPlutilLintAsync(string plistPath, CancellationToken cancellationToken)
+  {
+    await RunCommandWithStrictValidationAsync("plutil", ["-lint", plistPath], cancellationToken);
+  }
+
+  private async Task RunCommandWithStrictValidationAsync(
+    string command,
+    string[] args,
+    CancellationToken cancellationToken)
+  {
+    CommandExecutionResult result = await _commandRunner(command, args, cancellationToken);
+
+    if (result.ExitCode != 0)
     {
-        return File.Exists(GetLaunchAgentPlistPath(profile));
+      string stderr = string.IsNullOrWhiteSpace(result.StandardError)
+        ? "(empty)"
+        : result.StandardError.Trim();
+      string stdout = string.IsNullOrWhiteSpace(result.StandardOutput)
+        ? "(empty)"
+        : result.StandardOutput.Trim();
+
+      throw new InvalidOperationException(
+        $"Command '{command} {string.Join(' ', args)}' failed with exit code {result.ExitCode}. stdout: {stdout} stderr: {stderr}");
+    }
+  }
+
+  private static string BuildLabel(MountProfile profile)
+  {
+    return $"com.rclonemountmanager.profile.{profile.Id}";
+  }
+
+  private string BuildGuiDomain()
+  {
+    return $"gui/{_uidProvider()}";
+  }
+
+  private string BuildServiceTarget(MountProfile profile)
+  {
+    return $"{BuildGuiDomain()}/{BuildLabel(profile)}";
+  }
+
+  private static async Task<CommandExecutionResult> ExecuteCommandAsync(
+    string command,
+    string[] args,
+    CancellationToken cancellationToken)
+  {
+    BufferedCommandResult result = await Cli.Wrap(command)
+      .WithArguments(args)
+      .WithValidation(CommandResultValidation.None)
+      .ExecuteBufferedAsync(cancellationToken);
+
+    return new CommandExecutionResult(result.ExitCode, result.StandardOutput, result.StandardError);
+  }
+
+  private static string BuildSafeFileName(string fileName)
+  {
+    HashSet<char> invalidChars = Path.GetInvalidFileNameChars().ToHashSet();
+    StringBuilder builder = new(fileName.Length);
+
+    foreach (char ch in fileName)
+    {
+      builder.Append(invalidChars.Contains(ch) ? '-' : ch);
     }
 
-    private static string BuildPlist(MountProfile profile, string scriptPath)
-    {
-        var label = BuildLabel(profile);
-        var escapedPath = EscapeXml(scriptPath);
-        var escapedLabel = EscapeXml(label);
+    return builder.Length == 0 ? "mount-profile" : builder.ToString();
+  }
 
-        var builder = new StringBuilder();
-        builder.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-        builder.AppendLine("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">");
-        builder.AppendLine("<plist version=\"1.0\">");
-        builder.AppendLine("<dict>");
-        builder.AppendLine("  <key>Label</key>");
-        builder.AppendLine($"  <string>{escapedLabel}</string>");
-        builder.AppendLine("  <key>ProgramArguments</key>");
-        builder.AppendLine("  <array>");
-        builder.AppendLine("    <string>/bin/bash</string>");
-        builder.AppendLine($"    <string>{escapedPath}</string>");
-        builder.AppendLine("  </array>");
-        builder.AppendLine("  <key>RunAtLoad</key>");
-        builder.AppendLine("  <true/>");
-        builder.AppendLine("  <key>KeepAlive</key>");
-        builder.AppendLine("  <true/>");
-        builder.AppendLine("</dict>");
-        builder.AppendLine("</plist>");
-        return builder.ToString();
-    }
-
-    private async Task RunLaunchCtlAsync(string[] args, CancellationToken cancellationToken)
-    {
-        await RunCommandWithStrictValidationAsync("launchctl", args, cancellationToken);
-    }
-
-    private async Task RunPlutilLintAsync(string plistPath, CancellationToken cancellationToken)
-    {
-        await RunCommandWithStrictValidationAsync("plutil", ["-lint", plistPath], cancellationToken);
-    }
-
-    private async Task RunCommandWithStrictValidationAsync(string command, string[] args, CancellationToken cancellationToken)
-    {
-        var result = await _commandRunner(command, args, cancellationToken);
-
-        if (result.ExitCode != 0)
-        {
-            var stderr = string.IsNullOrWhiteSpace(result.StandardError)
-                ? "(empty)"
-                : result.StandardError.Trim();
-            var stdout = string.IsNullOrWhiteSpace(result.StandardOutput)
-                ? "(empty)"
-                : result.StandardOutput.Trim();
-
-            throw new InvalidOperationException(
-                $"Command '{command} {string.Join(' ', args)}' failed with exit code {result.ExitCode}. stdout: {stdout} stderr: {stderr}");
-        }
-    }
-
-    private static string BuildLabel(MountProfile profile)
-    {
-        return $"com.rclonemountmanager.profile.{profile.Id}";
-    }
-
-    private string BuildGuiDomain()
-    {
-        return $"gui/{_uidProvider()}";
-    }
-
-    private string BuildServiceTarget(MountProfile profile)
-    {
-        return $"{BuildGuiDomain()}/{BuildLabel(profile)}";
-    }
-
-    private static async Task<CommandExecutionResult> ExecuteCommandAsync(string command, string[] args, CancellationToken cancellationToken)
-    {
-        var result = await Cli.Wrap(command)
-            .WithArguments(args)
-            .WithValidation(CommandResultValidation.None)
-            .ExecuteBufferedAsync(cancellationToken);
-
-        return new CommandExecutionResult(result.ExitCode, result.StandardOutput, result.StandardError);
-    }
-
-    private static string BuildSafeFileName(string fileName)
-    {
-        var invalidChars = Path.GetInvalidFileNameChars().ToHashSet();
-        var builder = new StringBuilder(fileName.Length);
-
-        foreach (var ch in fileName)
-        {
-            builder.Append(invalidChars.Contains(ch) ? '-' : ch);
-        }
-
-        return builder.Length == 0 ? "mount-profile" : builder.ToString();
-    }
-
-    private static string EscapeXml(string value)
-    {
-        return value
-            .Replace("&", "&amp;", StringComparison.Ordinal)
-            .Replace("<", "&lt;", StringComparison.Ordinal)
-            .Replace(">", "&gt;", StringComparison.Ordinal)
-            .Replace("\"", "&quot;", StringComparison.Ordinal)
-            .Replace("'", "&apos;", StringComparison.Ordinal);
-    }
+  private static string EscapeXml(string value)
+  {
+    return value
+      .Replace("&", "&amp;", StringComparison.Ordinal)
+      .Replace("<", "&lt;", StringComparison.Ordinal)
+      .Replace(">", "&gt;", StringComparison.Ordinal)
+      .Replace("\"", "&quot;", StringComparison.Ordinal)
+      .Replace("'", "&apos;", StringComparison.Ordinal);
+  }
 }

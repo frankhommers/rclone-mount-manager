@@ -4,27 +4,29 @@ namespace RcloneMountManager.Core.Models;
 
 public partial class RcloneBackendOptionInput : TypedOptionViewModel
 {
-    private readonly RcloneBackendOption _option;
+  private readonly RcloneBackendOption _option;
 
-    public RcloneBackendOptionInput() : this(new RcloneBackendOption()) { }
+  public RcloneBackendOptionInput() : this(new RcloneBackendOption())
+  {
+  }
 
-    public RcloneBackendOptionInput(RcloneBackendOption option)
+  public RcloneBackendOptionInput(RcloneBackendOption option)
+  {
+    _option = option;
+    InitializeTypedValues(null);
+  }
+
+  protected override IRcloneOptionDefinition Option => _option;
+
+  public bool Required => _option.Required;
+
+  public override string Label
+  {
+    get
     {
-        _option = option;
-        InitializeTypedValues(null);
+      string required = Required ? "required" : "optional";
+      string secret = IsPassword ? ", secret" : string.Empty;
+      return $"{Name} ({required}{secret})";
     }
-
-    protected override IRcloneOptionDefinition Option => _option;
-
-    public bool Required => _option.Required;
-
-    public override string Label
-    {
-        get
-        {
-            var required = Required ? "required" : "optional";
-            var secret = IsPassword ? ", secret" : string.Empty;
-            return $"{Name} ({required}{secret})";
-        }
-    }
+  }
 }

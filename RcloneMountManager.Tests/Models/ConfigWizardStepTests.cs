@@ -7,49 +7,49 @@ public class ConfigWizardStepTests
   [Fact]
   public void IsComplete_WhenStateEmpty_ReturnsTrue()
   {
-    var step = new ConfigWizardStep { State = "" };
+    ConfigWizardStep step = new() {State = ""};
     Assert.True(step.IsComplete);
   }
 
   [Fact]
   public void IsComplete_WhenStateHasValue_ReturnsFalse()
   {
-    var step = new ConfigWizardStep { State = "*oauth-islocal,choose_type,," };
+    ConfigWizardStep step = new() {State = "*oauth-islocal,choose_type,,"};
     Assert.False(step.IsComplete);
   }
 
   [Fact]
   public void IsOAuthBrowserPrompt_WhenNameIsConfigIsLocal_ReturnsTrue()
   {
-    var step = new ConfigWizardStep { State = "x", Name = "config_is_local" };
+    ConfigWizardStep step = new() {State = "x", Name = "config_is_local"};
     Assert.True(step.IsOAuthBrowserPrompt);
   }
 
   [Fact]
   public void IsOAuthBrowserPrompt_WhenNameIsDifferent_ReturnsFalse()
   {
-    var step = new ConfigWizardStep { State = "x", Name = "client_id" };
+    ConfigWizardStep step = new() {State = "x", Name = "client_id"};
     Assert.False(step.IsOAuthBrowserPrompt);
   }
 
   [Fact]
   public void IsAdvancedPrompt_WhenNameIsConfigFsAdvanced_ReturnsTrue()
   {
-    var step = new ConfigWizardStep { State = "x", Name = "config_fs_advanced" };
+    ConfigWizardStep step = new() {State = "x", Name = "config_fs_advanced"};
     Assert.True(step.IsAdvancedPrompt);
   }
 
   [Fact]
   public void IsAdvancedPrompt_WhenNameIsDifferent_ReturnsFalse()
   {
-    var step = new ConfigWizardStep { State = "x", Name = "region" };
+    ConfigWizardStep step = new() {State = "x", Name = "region"};
     Assert.False(step.IsAdvancedPrompt);
   }
 
   [Fact]
   public void DefaultValues_AreCorrect()
   {
-    var step = new ConfigWizardStep();
+    ConfigWizardStep step = new();
     Assert.Empty(step.State);
     Assert.Empty(step.Name);
     Assert.Empty(step.Help);
@@ -66,14 +66,14 @@ public class ConfigWizardStepTests
   [Fact]
   public void Examples_CanBePopulated()
   {
-    var step = new ConfigWizardStep
+    ConfigWizardStep step = new()
     {
       State = "x",
       Name = "region",
       Examples =
       [
-        new ConfigWizardExample { Value = "global", Help = "Microsoft Cloud Global" },
-        new ConfigWizardExample { Value = "us", Help = "US Government" },
+        new ConfigWizardExample {Value = "global", Help = "Microsoft Cloud Global"},
+        new ConfigWizardExample {Value = "us", Help = "US Government"},
       ],
     };
 

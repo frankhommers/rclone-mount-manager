@@ -1,10 +1,10 @@
-using Serilog.Core;
-using Serilog.Events;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using Serilog.Core;
+using Serilog.Events;
 
-namespace RcloneMountManager.Services;
+namespace RcloneMountManager.GUI.Services;
 
 public sealed class DiagnosticsSink : ILogEventSink
 {
@@ -23,7 +23,7 @@ public sealed class DiagnosticsSink : ILogEventSink
       _handlers.Add(handler);
     }
 
-    while (_pending.TryDequeue(out var buffered))
+    while (_pending.TryDequeue(out LogEvent? buffered))
     {
       handler(buffered);
     }
@@ -51,7 +51,7 @@ public sealed class DiagnosticsSink : ILogEventSink
       snapshot = _handlers.ToArray();
     }
 
-    foreach (var handler in snapshot)
+    foreach (Action<LogEvent> handler in snapshot)
     {
       handler(logEvent);
     }
@@ -60,7 +60,7 @@ public sealed class DiagnosticsSink : ILogEventSink
   public static string ExtractProfileId(LogEvent logEvent)
   {
     if (logEvent.Properties.TryGetValue("ProfileId", out LogEventPropertyValue? value)
-        && value is ScalarValue { Value: string profileId }
+        && value is ScalarValue {Value: string profileId}
         && !string.IsNullOrWhiteSpace(profileId))
     {
       return profileId;

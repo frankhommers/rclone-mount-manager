@@ -13,9 +13,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
-using RcloneMountManager.ViewModels;
 using RcloneMountManager.Views;
 using Serilog;
+using MainWindowViewModel = RcloneMountManager.GUI.ViewModels.MainWindowViewModel;
 
 namespace RcloneMountManager;
 
@@ -36,8 +36,8 @@ public partial class App : Application
     if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
     {
       DisableAvaloniaDataAnnotationValidation();
-      var viewModel = Services.GetRequiredService<MainWindowViewModel>();
-      var mainWindow = new MainWindow
+      MainWindowViewModel viewModel = Services.GetRequiredService<MainWindowViewModel>();
+      MainWindow mainWindow = new()
       {
         DataContext = viewModel,
       };
@@ -69,49 +69,56 @@ public partial class App : Application
   private void StartActivationListener(Window mainWindow)
   {
     _pipeCts = new CancellationTokenSource();
-    var token = _pipeCts.Token;
+    CancellationToken token = _pipeCts.Token;
 
-    Task.Run(async () =>
-    {
-      while (!token.IsCancellationRequested)
+    Task.Run(
+      async () =>
       {
-        try
+        while (!token.IsCancellationRequested)
         {
-          using var server = new NamedPipeServerStream(PipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-          await server.WaitForConnectionAsync(token);
-          using var reader = new StreamReader(server);
-          var message = await reader.ReadToEndAsync(token);
-
-          if (message.Trim() == "ACTIVATE")
+          try
           {
-            Log.Information("Received activation signal from another instance");
-            Dispatcher.UIThread.Post(() =>
+            using NamedPipeServerStream server = new(
+              PipeName,
+              PipeDirection.In,
+              1,
+              PipeTransmissionMode.Byte,
+              PipeOptions.Asynchronous);
+            await server.WaitForConnectionAsync(token);
+            using StreamReader reader = new(server);
+            string message = await reader.ReadToEndAsync(token);
+
+            if (message.Trim() == "ACTIVATE")
             {
-              mainWindow.WindowState = WindowState.Normal;
-              mainWindow.Activate();
-              mainWindow.Topmost = true;
-              mainWindow.Topmost = false;
-            });
+              Log.Information("Received activation signal from another instance");
+              Dispatcher.UIThread.Post(() =>
+              {
+                mainWindow.WindowState = WindowState.Normal;
+                mainWindow.Activate();
+                mainWindow.Topmost = true;
+                mainWindow.Topmost = false;
+              });
+            }
+          }
+          catch (OperationCanceledException)
+          {
+            break;
+          }
+          catch (Exception ex)
+          {
+            Log.Warning(ex, "Activation listener error");
           }
         }
-        catch (OperationCanceledException)
-        {
-          break;
-        }
-        catch (Exception ex)
-        {
-          Log.Warning(ex, "Activation listener error");
-        }
-      }
-    }, token);
+      },
+      token);
   }
 
   private void DisableAvaloniaDataAnnotationValidation()
   {
-    var dataValidationPluginsToRemove =
+    DataAnnotationsValidationPlugin[] dataValidationPluginsToRemove =
       BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
 
-    foreach (var plugin in dataValidationPluginsToRemove)
+    foreach (DataAnnotationsValidationPlugin plugin in dataValidationPluginsToRemove)
     {
       BindingPlugins.DataValidators.Remove(plugin);
     }

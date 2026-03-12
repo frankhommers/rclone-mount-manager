@@ -1,6 +1,6 @@
 namespace RcloneMountManager.Core.Models;
 
-public partial class WizardStepOptionInput : Core.ViewModels.TypedOptionViewModel
+public partial class WizardStepOptionInput : ViewModels.TypedOptionViewModel
 {
   private readonly WizardStepOptionDefinition _option;
 

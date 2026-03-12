@@ -1,82 +1,84 @@
 using RcloneMountManager.Core.Models;
-using RcloneMountManager.ViewModels;
 using System.Reflection;
+using RcloneMountManager.GUI.ViewModels;
 
 namespace RcloneMountManager.Tests.ViewModels;
 
 public class MountOptionsViewModelTests
 {
-    [Fact]
-    public void GetPinnedOptionNames_ReturnsOnlyPinnedOptions()
+  [Fact]
+  public void GetPinnedOptionNames_ReturnsOnlyPinnedOptions()
+  {
+    MountOptionsViewModel viewModel = CreateViewModelWithGroups();
+
+    MountOptionInputViewModel transfers = viewModel.Groups[0].AllOptions[0];
+    MountOptionInputViewModel cacheMode = viewModel.Groups[0].AllOptions[1];
+
+    transfers.IsPinned = true;
+    cacheMode.IsPinned = false;
+
+    HashSet<string> pinned = viewModel.GetPinnedOptionNames();
+
+    Assert.Single(pinned);
+    Assert.Contains("transfers", pinned);
+  }
+
+  [Fact]
+  public void UpdateFromProfile_RestoresPinnedStateFromProfile()
+  {
+    MountOptionsViewModel viewModel = CreateViewModelWithGroups();
+
+    Dictionary<string, string> values = new()
     {
-        var viewModel = CreateViewModelWithGroups();
+      ["transfers"] = "8",
+    };
 
-        var transfers = viewModel.Groups[0].AllOptions[0];
-        var cacheMode = viewModel.Groups[0].AllOptions[1];
-
-        transfers.IsPinned = true;
-        cacheMode.IsPinned = false;
-
-        var pinned = viewModel.GetPinnedOptionNames();
-
-        Assert.Single(pinned);
-        Assert.Contains("transfers", pinned);
-    }
-
-    [Fact]
-    public void UpdateFromProfile_RestoresPinnedStateFromProfile()
+    HashSet<string> pinnedNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        var viewModel = CreateViewModelWithGroups();
+      "transfers",
+    };
 
-        var values = new Dictionary<string, string>
-        {
-            ["transfers"] = "8",
-        };
+    viewModel.UpdateFromProfile(values, pinnedNames);
 
-        var pinnedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "transfers",
-        };
+    MountOptionInputViewModel transfers = viewModel.Groups[0].AllOptions.Single(o => o.Name == "transfers");
+    MountOptionInputViewModel cacheMode = viewModel.Groups[0].AllOptions.Single(o => o.Name == "vfs_cache_mode");
 
-        viewModel.UpdateFromProfile(values, pinnedNames);
+    Assert.True(transfers.IsPinned);
+    Assert.Equal("8", transfers.Value);
+    Assert.False(cacheMode.IsPinned);
+  }
 
-        var transfers = viewModel.Groups[0].AllOptions.Single(o => o.Name == "transfers");
-        var cacheMode = viewModel.Groups[0].AllOptions.Single(o => o.Name == "vfs_cache_mode");
+  private static MountOptionsViewModel CreateViewModelWithGroups()
+  {
+    MountOptionsViewModel viewModel = new();
+    SetAllGroups(viewModel, CreateOptionGroups());
+    viewModel.UpdateFromProfile(new Dictionary<string, string>());
+    return viewModel;
+  }
 
-        Assert.True(transfers.IsPinned);
-        Assert.Equal("8", transfers.Value);
-        Assert.False(cacheMode.IsPinned);
-    }
-
-    private static MountOptionsViewModel CreateViewModelWithGroups()
-    {
-        var viewModel = new MountOptionsViewModel();
-        SetAllGroups(viewModel, CreateOptionGroups());
-        viewModel.UpdateFromProfile(new Dictionary<string, string>());
-        return viewModel;
-    }
-
-    private static IReadOnlyList<RcloneOptionGroup> CreateOptionGroups()
-    {
-        return
+  private static IReadOnlyList<RcloneOptionGroup> CreateOptionGroups()
+  {
+    return
+    [
+      new RcloneOptionGroup
+      {
+        Name = "vfs",
+        DisplayName = "VFS",
+        Options =
         [
-            new RcloneOptionGroup
-            {
-                Name = "vfs",
-                DisplayName = "VFS",
-                Options =
-                [
-                    new RcloneOption { Name = "transfers", Type = "int" },
-                    new RcloneOption { Name = "vfs_cache_mode", Type = "string" },
-                ],
-            },
-        ];
-    }
+          new RcloneOption {Name = "transfers", Type = "int"},
+          new RcloneOption {Name = "vfs_cache_mode", Type = "string"},
+        ],
+      },
+    ];
+  }
 
-    private static void SetAllGroups(MountOptionsViewModel viewModel, IReadOnlyList<RcloneOptionGroup> groups)
-    {
-        var field = typeof(MountOptionsViewModel).GetField("_allGroups", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-        field.SetValue(viewModel, groups);
-    }
+  private static void SetAllGroups(MountOptionsViewModel viewModel, IReadOnlyList<RcloneOptionGroup> groups)
+  {
+    FieldInfo? field = typeof(MountOptionsViewModel).GetField(
+      "_allGroups",
+      BindingFlags.Instance | BindingFlags.NonPublic);
+    Assert.NotNull(field);
+    field.SetValue(viewModel, groups);
+  }
 }

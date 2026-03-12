@@ -12,7 +12,7 @@ public sealed class WizardStepOptionDefinition : IRcloneOptionDefinition
   public WizardStepOptionDefinition(ConfigWizardStep step)
   {
     _step = step;
-    _enumValues = step.Examples is { Count: > 0 }
+    _enumValues = step.Examples is {Count: > 0}
       ? step.Examples.Select(e => e.Value).Where(v => !string.IsNullOrEmpty(v)).ToList()
       : null;
   }
@@ -29,9 +29,12 @@ public sealed class WizardStepOptionDefinition : IRcloneOptionDefinition
 
   public OptionControlType GetControlType()
   {
-    if (IsPassword) return OptionControlType.Text;
+    if (IsPassword)
+    {
+      return OptionControlType.Text;
+    }
 
-    var typeControl = Type switch
+    OptionControlType typeControl = Type switch
     {
       "bool" => OptionControlType.Toggle,
       "int" or "int64" or "uint32" or "float64" => OptionControlType.Numeric,
@@ -41,7 +44,10 @@ public sealed class WizardStepOptionDefinition : IRcloneOptionDefinition
       _ => OptionControlType.Text,
     };
 
-    if (typeControl is not OptionControlType.Text) return typeControl;
+    if (typeControl is not OptionControlType.Text)
+    {
+      return typeControl;
+    }
 
     if (_enumValues is not null)
     {
@@ -53,7 +59,11 @@ public sealed class WizardStepOptionDefinition : IRcloneOptionDefinition
 
   public IReadOnlyList<string>? GetEnumValues()
   {
-    if (Type == "bool") return null;
+    if (Type == "bool")
+    {
+      return null;
+    }
+
     return _enumValues;
   }
 }

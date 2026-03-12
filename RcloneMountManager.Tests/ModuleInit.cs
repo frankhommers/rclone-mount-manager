@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using RcloneMountManager.Services;
+using RcloneMountManager.GUI.Services;
 using Serilog;
 using Serilog.Events;
 

@@ -1,5 +1,6 @@
-using RcloneMountManager.ViewModels;
+using System.Collections.ObjectModel;
 using RcloneMountManager.Core.Models;
+using RcloneMountManager.GUI.ViewModels;
 
 namespace RcloneMountManager.Tests.ViewModels;
 
@@ -8,21 +9,21 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void IsWizardActive_DefaultsFalse()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     Assert.False(vm.IsWizardActive);
   }
 
   [Fact]
   public void ShowWizardContent_FalseWhenWizardInactive()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     Assert.False(vm.ShowWizardContent);
   }
 
   [Fact]
   public void ShowStandardRemoteForm_TrueWhenRemoteEditorActiveAndWizardInactive()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     Assert.True(vm.ShowStandardRemoteForm);
   }
@@ -30,7 +31,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void ShowStandardRemoteForm_FalseWhenWizardActive()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     vm.IsWizardActive = true;
     Assert.False(vm.ShowStandardRemoteForm);
@@ -39,21 +40,21 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void WizardStepTitle_EmptyWhenNoStep()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     Assert.Empty(vm.WizardStepTitle);
   }
 
   [Fact]
   public void WizardStepHelp_EmptyWhenNoStep()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     Assert.Empty(vm.WizardStepHelp);
   }
 
   [Fact]
   public void WizardStepHelp_ReplacesNewLinesWithSpaces()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.CurrentWizardStep = new ConfigWizardStep
     {
       Name = "provider",
@@ -67,14 +68,14 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void WizardHasExamples_FalseWhenNoStep()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     Assert.False(vm.WizardHasExamples);
   }
 
   [Fact]
   public void WizardHasExamples_TrueWhenExclusiveAndExamplesExist()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.CurrentWizardStep = new ConfigWizardStep
     {
       Name = "provider",
@@ -82,7 +83,7 @@ public class MainWindowViewModelWizardTests
       Exclusive = true,
       Examples =
       [
-        new ConfigWizardExample { Value = "drive", Help = "Google Drive" },
+        new ConfigWizardExample {Value = "drive", Help = "Google Drive"},
       ],
     };
 
@@ -92,7 +93,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void WizardHasExamples_FalseWhenExamplesExistButNotExclusive()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.CurrentWizardStep = new ConfigWizardStep
     {
       Name = "provider",
@@ -100,7 +101,7 @@ public class MainWindowViewModelWizardTests
       Exclusive = false,
       Examples =
       [
-        new ConfigWizardExample { Value = "drive", Help = "Google Drive" },
+        new ConfigWizardExample {Value = "drive", Help = "Google Drive"},
       ],
     };
 
@@ -110,7 +111,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public async Task CancelWizard_ResetsState()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.IsWizardActive = true;
     vm.WizardAnswer = "test";
     vm.WizardOAuthUrl = "http://example.com";
@@ -127,7 +128,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void ShowRemoteChooser_TrueWhenRemoteEditorActiveAndNeitherWizardNorManual()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     Assert.True(vm.ShowRemoteChooser);
   }
@@ -135,7 +136,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void ShowRemoteChooser_FalseWhenWizardActive()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     vm.IsWizardActive = true;
     Assert.False(vm.ShowRemoteChooser);
@@ -144,7 +145,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void ShowRemoteChooser_FalseWhenManualMode()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     vm.IsManualMode = true;
     Assert.False(vm.ShowRemoteChooser);
@@ -153,7 +154,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void ShowManualRemoteForm_TrueWhenManualModeAndRemoteEditorActive()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     vm.IsManualMode = true;
     Assert.True(vm.ShowManualRemoteForm);
@@ -162,7 +163,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void ShowManualRemoteForm_FalseWhenNotManualMode()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     Assert.False(vm.ShowManualRemoteForm);
   }
@@ -170,7 +171,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void EnterManualMode_SetsIsManualModeTrue()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     vm.EnterManualModeCommand.Execute(null);
     Assert.True(vm.IsManualMode);
@@ -181,7 +182,7 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void ExitManualMode_SetsIsManualModeFalse()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.ShowRemoteEditor = true;
     vm.IsManualMode = true;
     vm.ExitManualModeCommand.Execute(null);
@@ -193,12 +194,12 @@ public class MainWindowViewModelWizardTests
   [Fact]
   public void SwitchingRemoteProfile_ResetsManualMode()
   {
-    var vm = new MainWindowViewModel(loadStartupData: false);
+    MainWindowViewModel vm = new(loadStartupData: false);
     vm.AddRemoteCommand.Execute(null);
     vm.AddRemoteCommand.Execute(null);
     vm.ShowRemoteEditor = true;
 
-    var remoteProfiles = vm.RemoteProfiles;
+    ObservableCollection<MountProfile> remoteProfiles = vm.RemoteProfiles;
     Assert.True(remoteProfiles.Count >= 2);
 
     vm.SelectedRemoteProfile = remoteProfiles[0];

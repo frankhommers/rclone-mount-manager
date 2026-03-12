@@ -11,337 +11,378 @@ namespace RcloneMountManager.Core.ViewModels;
 
 public abstract partial class TypedOptionViewModel : ObservableObject
 {
-    private bool _syncing;
+  private bool _syncing;
 
-    protected abstract IRcloneOptionDefinition Option { get; }
+  protected abstract IRcloneOptionDefinition Option { get; }
 
-    public string Name => Option.Name;
-    public string Help => Option.Help;
-    public string DefaultStr => Option.DefaultStr;
-    public bool IsAdvanced => Option.Advanced;
-    public bool IsPassword => Option.IsPassword;
-    public OptionControlType ControlType => Option.GetControlType();
-    public IReadOnlyList<string>? EnumValues => Option.GetEnumValues();
-    public IReadOnlyList<SizeSuffixUnit> SizeSuffixUnits => SizeSuffixHelper.UnitItems;
-    public ObservableCollection<StringListItemViewModel> StringListItems { get; } = [];
-    public bool IsKeyValue => Option.IsKeyValue;
-    public string ListSeparator => Option.ListSeparator;
+  public string Name => Option.Name;
+  public string Help => Option.Help;
+  public string DefaultStr => Option.DefaultStr;
+  public bool IsAdvanced => Option.Advanced;
+  public bool IsPassword => Option.IsPassword;
+  public OptionControlType ControlType => Option.GetControlType();
+  public IReadOnlyList<string>? EnumValues => Option.GetEnumValues();
+  public IReadOnlyList<SizeSuffixUnit> SizeSuffixUnits => SizeSuffixHelper.UnitItems;
+  public ObservableCollection<StringListItemViewModel> StringListItems { get; } = [];
+  public bool IsKeyValue => Option.IsKeyValue;
+  public string ListSeparator => Option.ListSeparator;
 
-    public abstract string Label { get; }
+  public abstract string Label { get; }
 
-    [ObservableProperty]
-    private string _value = string.Empty;
+  [ObservableProperty] private string _value = string.Empty;
 
-    [ObservableProperty]
-    private bool _boolValue;
+  [ObservableProperty] private bool _boolValue;
 
-    [ObservableProperty]
-    private decimal? _numericValue;
+  [ObservableProperty] private decimal? _numericValue;
 
-    [ObservableProperty]
-    private TimeSpan? _durationValue;
+  [ObservableProperty] private TimeSpan? _durationValue;
 
-    [ObservableProperty]
-    private decimal? _sizeSuffixNumericValue;
+  [ObservableProperty] private decimal? _sizeSuffixNumericValue;
 
-    [ObservableProperty]
-    private SizeSuffixUnit _sizeSuffixUnit = SizeSuffixHelper.UnitItems[0];
+  [ObservableProperty] private SizeSuffixUnit _sizeSuffixUnit = SizeSuffixHelper.UnitItems[0];
 
-    [ObservableProperty]
-    private string? _selectedEnumValue;
+  [ObservableProperty] private string? _selectedEnumValue;
 
-    [ObservableProperty]
-    private bool _isPinned;
+  [ObservableProperty] private bool _isPinned;
 
-    [ObservableProperty]
-    private string _confirmValue = string.Empty;
+  [ObservableProperty] private string _confirmValue = string.Empty;
 
-    [ObservableProperty]
-    private bool _isSecretVisible;
+  [ObservableProperty] private bool _isSecretVisible;
 
-    public bool HasSecretMismatch =>
-        IsPassword &&
-        !string.Equals(Value, ConfirmValue, StringComparison.Ordinal);
+  public bool HasSecretMismatch =>
+    IsPassword &&
+    !string.Equals(Value, ConfirmValue, StringComparison.Ordinal);
 
-    public virtual bool HasNonDefaultValue =>
-        !string.IsNullOrEmpty(Value) &&
-        !string.Equals(Value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase);
+  public virtual bool HasNonDefaultValue =>
+    !string.IsNullOrEmpty(Value) &&
+    !string.Equals(Value, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase);
 
-    public virtual bool ShouldInclude =>
-        IsPinned || HasNonDefaultValue;
+  public virtual bool ShouldInclude =>
+    IsPinned || HasNonDefaultValue;
 
-    /// <summary>
-    /// DefaultStr normalized through the same parse→format roundtrip as Value,
-    /// so "5m0s" matches "5m" and "128Mi" matches "128Mi".
-    /// </summary>
-    protected string NormalizedDefaultStr
+  /// <summary>
+  /// DefaultStr normalized through the same parse→format roundtrip as Value,
+  /// so "5m0s" matches "5m" and "128Mi" matches "128Mi".
+  /// </summary>
+  protected string NormalizedDefaultStr
+  {
+    get
     {
-        get
-        {
-            var raw = DefaultStr;
-            if (string.IsNullOrEmpty(raw)) return raw;
-            return ControlType switch
-            {
-                OptionControlType.Duration => DurationHelper.Format(DurationHelper.Parse(raw)),
-                OptionControlType.SizeSuffix => SizeSuffixHelper.Format(SizeSuffixHelper.Parse(raw).Value, SizeSuffixHelper.Parse(raw).Unit),
-                _ => raw,
-            };
-        }
+      string raw = DefaultStr;
+      if (string.IsNullOrEmpty(raw))
+      {
+        return raw;
+      }
+
+      return ControlType switch
+      {
+        OptionControlType.Duration => DurationHelper.Format(DurationHelper.Parse(raw)),
+        OptionControlType.SizeSuffix => SizeSuffixHelper.Format(
+          SizeSuffixHelper.Parse(raw).Value,
+          SizeSuffixHelper.Parse(raw).Unit),
+        _ => raw,
+      };
+    }
+  }
+
+  protected void InitializeTypedValues(string? currentValue)
+  {
+    _syncing = true;
+    try
+    {
+      Value = currentValue ?? string.Empty;
+      switch (ControlType)
+      {
+        case OptionControlType.Toggle:
+          BoolValue = string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
+          break;
+        case OptionControlType.Numeric:
+          string numStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
+          NumericValue = decimal.TryParse(numStr, out decimal num) ? num : null;
+          break;
+        case OptionControlType.Duration:
+          string durStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
+          DurationValue = string.IsNullOrEmpty(durStr) ? null : DurationHelper.Parse(durStr);
+          break;
+        case OptionControlType.SizeSuffix:
+          string sizeStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
+          if (!string.IsNullOrEmpty(sizeStr))
+          {
+            (decimal sv, string su) = SizeSuffixHelper.Parse(sizeStr);
+            SizeSuffixNumericValue = sv;
+            SizeSuffixUnit = ResolveSizeSuffixUnit(su);
+          }
+
+          break;
+        case OptionControlType.ComboBox:
+        case OptionControlType.EditableComboBox:
+          SelectedEnumValue = !string.IsNullOrEmpty(currentValue)
+            ? currentValue
+            : !string.IsNullOrEmpty(DefaultStr)
+              ? DefaultStr
+              : null;
+          break;
+        case OptionControlType.StringList:
+          InitializeStringListFromValue(currentValue);
+          break;
+      }
+    }
+    finally
+    {
+      _syncing = false;
+
+      // Force property change notifications for all typed values so
+      // bindings that missed the initial set (same value as field default) get updated.
+      OnPropertyChanged(nameof(Value));
+      OnPropertyChanged(nameof(BoolValue));
+      OnPropertyChanged(nameof(NumericValue));
+      OnPropertyChanged(nameof(DurationValue));
+      OnPropertyChanged(nameof(SizeSuffixNumericValue));
+      OnPropertyChanged(nameof(SizeSuffixUnit));
+      OnPropertyChanged(nameof(SelectedEnumValue));
+      OnPropertyChanged(nameof(HasNonDefaultValue));
+      OnPropertyChanged(nameof(ShouldInclude));
+    }
+  }
+
+  partial void OnBoolValueChanged(bool value)
+  {
+    if (_syncing)
+    {
+      return;
     }
 
-    protected void InitializeTypedValues(string? currentValue)
-    {
-        _syncing = true;
-        try
-        {
-            Value = currentValue ?? string.Empty;
-            switch (ControlType)
-            {
-                case OptionControlType.Toggle:
-                    BoolValue = string.Equals(currentValue, "true", StringComparison.OrdinalIgnoreCase);
-                    break;
-                case OptionControlType.Numeric:
-                    var numStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
-                    NumericValue = decimal.TryParse(numStr, out var num) ? num : null;
-                    break;
-                case OptionControlType.Duration:
-                    var durStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
-                    DurationValue = string.IsNullOrEmpty(durStr) ? null : DurationHelper.Parse(durStr);
-                    break;
-                case OptionControlType.SizeSuffix:
-                    var sizeStr = !string.IsNullOrEmpty(currentValue) ? currentValue : DefaultStr;
-                    if (!string.IsNullOrEmpty(sizeStr))
-                    {
-                        var (sv, su) = SizeSuffixHelper.Parse(sizeStr);
-                        SizeSuffixNumericValue = sv;
-                        SizeSuffixUnit = ResolveSizeSuffixUnit(su);
-                    }
-                    break;
-                case OptionControlType.ComboBox:
-                case OptionControlType.EditableComboBox:
-                    SelectedEnumValue = !string.IsNullOrEmpty(currentValue)
-                        ? currentValue
-                        : !string.IsNullOrEmpty(DefaultStr) ? DefaultStr : null;
-                    break;
-                case OptionControlType.StringList:
-                    InitializeStringListFromValue(currentValue);
-                    break;
-            }
-        }
-        finally
-        {
-            _syncing = false;
+    SyncToString(value ? "true" : "false");
+  }
 
-            // Force property change notifications for all typed values so
-            // bindings that missed the initial set (same value as field default) get updated.
-            OnPropertyChanged(nameof(Value));
-            OnPropertyChanged(nameof(BoolValue));
-            OnPropertyChanged(nameof(NumericValue));
-            OnPropertyChanged(nameof(DurationValue));
-            OnPropertyChanged(nameof(SizeSuffixNumericValue));
-            OnPropertyChanged(nameof(SizeSuffixUnit));
-            OnPropertyChanged(nameof(SelectedEnumValue));
-            OnPropertyChanged(nameof(HasNonDefaultValue));
-            OnPropertyChanged(nameof(ShouldInclude));
-        }
+  partial void OnNumericValueChanged(decimal? value)
+  {
+    if (_syncing)
+    {
+      return;
     }
 
-    partial void OnBoolValueChanged(bool value)
+    SyncToString(value?.ToString() ?? string.Empty);
+  }
+
+  partial void OnDurationValueChanged(TimeSpan? value)
+  {
+    if (_syncing)
     {
-        if (_syncing) return;
-        SyncToString(value ? "true" : "false");
+      return;
     }
 
-    partial void OnNumericValueChanged(decimal? value)
+    SyncToString(value.HasValue ? DurationHelper.Format(value.Value) : string.Empty);
+  }
+
+  partial void OnSizeSuffixNumericValueChanged(decimal? value)
+  {
+    if (_syncing)
     {
-        if (_syncing) return;
-        SyncToString(value?.ToString() ?? string.Empty);
+      return;
     }
 
-    partial void OnDurationValueChanged(TimeSpan? value)
+    SyncSizeSuffix();
+  }
+
+  partial void OnSizeSuffixUnitChanged(SizeSuffixUnit value)
+  {
+    if (_syncing)
     {
-        if (_syncing) return;
-        SyncToString(value.HasValue ? DurationHelper.Format(value.Value) : string.Empty);
+      return;
     }
 
-    partial void OnSizeSuffixNumericValueChanged(decimal? value)
+    SyncSizeSuffix();
+  }
+
+  partial void OnSelectedEnumValueChanged(string? value)
+  {
+    if (_syncing)
     {
-        if (_syncing) return;
-        SyncSizeSuffix();
+      return;
     }
 
-    partial void OnSizeSuffixUnitChanged(SizeSuffixUnit value)
+    SyncToString(value ?? string.Empty);
+  }
+
+  partial void OnConfirmValueChanged(string value)
+  {
+    OnPropertyChanged(nameof(HasSecretMismatch));
+    OnPropertyChanged(nameof(ShouldInclude));
+  }
+
+  private void SyncSizeSuffix()
+  {
+    decimal val = SizeSuffixNumericValue ?? 0m;
+    SyncToString(SizeSuffixHelper.Format(val, SizeSuffixUnit.Value));
+  }
+
+  private static SizeSuffixUnit ResolveSizeSuffixUnit(string unitValue)
+  {
+    return SizeSuffixHelper.UnitItems.FirstOrDefault(u =>
+                                                       string.Equals(
+                                                         u.Value,
+                                                         unitValue,
+                                                         StringComparison.OrdinalIgnoreCase))
+           ?? SizeSuffixHelper.UnitItems[0];
+  }
+
+  protected virtual void SyncToString(string newValue)
+  {
+    _syncing = true;
+    try
     {
-        if (_syncing) return;
-        SyncSizeSuffix();
+      Value = newValue;
+      OnPropertyChanged(nameof(HasNonDefaultValue));
+      if (!string.IsNullOrEmpty(newValue) &&
+          !string.Equals(newValue, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase))
+      {
+        IsPinned = true;
+      }
+
+      OnPropertyChanged(nameof(ShouldInclude));
+    }
+    finally
+    {
+      _syncing = false;
+    }
+  }
+
+  partial void OnValueChanged(string value)
+  {
+    if (_syncing)
+    {
+      return;
     }
 
-    partial void OnSelectedEnumValueChanged(string? value)
+    OnPropertyChanged(nameof(HasNonDefaultValue));
+    OnPropertyChanged(nameof(HasSecretMismatch));
+    OnPropertyChanged(nameof(ShouldInclude));
+    OnValueChangedExtra(value);
+
+    _syncing = true;
+    try
     {
-        if (_syncing) return;
-        SyncToString(value ?? string.Empty);
+      switch (ControlType)
+      {
+        case OptionControlType.Toggle:
+          BoolValue = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+          break;
+        case OptionControlType.Numeric:
+          NumericValue = decimal.TryParse(value, out decimal n) ? n : null;
+          break;
+        case OptionControlType.Duration:
+          DurationValue = string.IsNullOrEmpty(value) ? null : DurationHelper.Parse(value);
+          break;
+        case OptionControlType.SizeSuffix:
+          if (!string.IsNullOrEmpty(value))
+          {
+            (decimal sv, string su) = SizeSuffixHelper.Parse(value);
+            SizeSuffixNumericValue = sv;
+            SizeSuffixUnit = ResolveSizeSuffixUnit(su);
+          }
+          else
+          {
+            SizeSuffixNumericValue = null;
+            SizeSuffixUnit = SizeSuffixHelper.UnitItems[0];
+          }
+
+          break;
+        case OptionControlType.ComboBox:
+        case OptionControlType.EditableComboBox:
+          SelectedEnumValue = string.IsNullOrEmpty(value) ? null : value;
+          break;
+        case OptionControlType.StringList:
+          InitializeStringListFromValue(value);
+          break;
+      }
+    }
+    finally
+    {
+      _syncing = false;
+    }
+  }
+
+  protected virtual void OnValueChangedExtra(string value)
+  {
+  }
+
+  [RelayCommand]
+  public void AddStringListItem()
+  {
+    StringListItems.Add(CreateStringListItem());
+  }
+
+  private StringListItemViewModel CreateStringListItem()
+  {
+    return new StringListItemViewModel(
+      IsKeyValue,
+      item =>
+      {
+        StringListItems.Remove(item);
+        SyncStringListToValue();
+      },
+      SyncStringListToValue);
+  }
+
+  private void SyncStringListToValue()
+  {
+    if (_syncing)
+    {
+      return;
     }
 
-    partial void OnConfirmValueChanged(string value)
+    string newValue = string.Join(
+      ListSeparator,
+      StringListItems
+        .Select(item => item.Serialize())
+        .Where(serialized => !string.IsNullOrWhiteSpace(serialized)));
+
+    SyncToString(newValue);
+  }
+
+  private void InitializeStringListFromValue(string? currentValue)
+  {
+    StringListItems.Clear();
+    if (string.IsNullOrWhiteSpace(currentValue))
     {
-        OnPropertyChanged(nameof(HasSecretMismatch));
-        OnPropertyChanged(nameof(ShouldInclude));
+      return;
     }
 
-    private void SyncSizeSuffix()
+    string[] values = currentValue.Split(
+      ListSeparator,
+      StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    foreach (string value in values)
     {
-        var val = SizeSuffixNumericValue ?? 0m;
-        SyncToString(SizeSuffixHelper.Format(val, SizeSuffixUnit.Value));
+      StringListItemViewModel item = CreateStringListItem();
+      item.Deserialize(value);
+      StringListItems.Add(item);
     }
+  }
 
-    private static SizeSuffixUnit ResolveSizeSuffixUnit(string unitValue) =>
-        SizeSuffixHelper.UnitItems.FirstOrDefault(u =>
-            string.Equals(u.Value, unitValue, StringComparison.OrdinalIgnoreCase))
-        ?? SizeSuffixHelper.UnitItems[0];
+  [RelayCommand]
+  private void TogglePin()
+  {
+    IsPinned = !IsPinned;
+    OnPropertyChanged(nameof(ShouldInclude));
+  }
 
-    protected virtual void SyncToString(string newValue)
-    {
-        _syncing = true;
-        try
-        {
-            Value = newValue;
-            OnPropertyChanged(nameof(HasNonDefaultValue));
-            if (!string.IsNullOrEmpty(newValue) &&
-                !string.Equals(newValue, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase))
-            {
-                IsPinned = true;
-            }
-            OnPropertyChanged(nameof(ShouldInclude));
-        }
-        finally
-        {
-            _syncing = false;
-        }
-    }
+  [RelayCommand]
+  private void ToggleSecretVisibility()
+  {
+    IsSecretVisible = !IsSecretVisible;
+  }
 
-    partial void OnValueChanged(string value)
-    {
-        if (_syncing) return;
-
-        OnPropertyChanged(nameof(HasNonDefaultValue));
-        OnPropertyChanged(nameof(HasSecretMismatch));
-        OnPropertyChanged(nameof(ShouldInclude));
-        OnValueChangedExtra(value);
-
-        _syncing = true;
-        try
-        {
-            switch (ControlType)
-            {
-                case OptionControlType.Toggle:
-                    BoolValue = string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
-                    break;
-                case OptionControlType.Numeric:
-                    NumericValue = decimal.TryParse(value, out var n) ? n : null;
-                    break;
-                case OptionControlType.Duration:
-                    DurationValue = string.IsNullOrEmpty(value) ? null : DurationHelper.Parse(value);
-                    break;
-                case OptionControlType.SizeSuffix:
-                    if (!string.IsNullOrEmpty(value))
-                    {
-                        var (sv, su) = SizeSuffixHelper.Parse(value);
-                        SizeSuffixNumericValue = sv;
-                        SizeSuffixUnit = ResolveSizeSuffixUnit(su);
-                    }
-                    else
-                    {
-                        SizeSuffixNumericValue = null;
-                        SizeSuffixUnit = SizeSuffixHelper.UnitItems[0];
-                    }
-                    break;
-                case OptionControlType.ComboBox:
-                case OptionControlType.EditableComboBox:
-                    SelectedEnumValue = string.IsNullOrEmpty(value) ? null : value;
-                    break;
-                case OptionControlType.StringList:
-                    InitializeStringListFromValue(value);
-                    break;
-            }
-        }
-        finally
-        {
-            _syncing = false;
-        }
-    }
-
-    protected virtual void OnValueChangedExtra(string value) { }
-
-    [RelayCommand]
-    public void AddStringListItem()
-    {
-        StringListItems.Add(CreateStringListItem());
-    }
-
-    private StringListItemViewModel CreateStringListItem()
-    {
-        return new StringListItemViewModel(
-            IsKeyValue,
-            item =>
-            {
-                StringListItems.Remove(item);
-                SyncStringListToValue();
-            },
-            SyncStringListToValue);
-    }
-
-    private void SyncStringListToValue()
-    {
-        if (_syncing) return;
-
-        var newValue = string.Join(
-            ListSeparator,
-            StringListItems
-                .Select(item => item.Serialize())
-                .Where(serialized => !string.IsNullOrWhiteSpace(serialized)));
-
-        SyncToString(newValue);
-    }
-
-    private void InitializeStringListFromValue(string? currentValue)
-    {
-        StringListItems.Clear();
-        if (string.IsNullOrWhiteSpace(currentValue)) return;
-
-        var values = currentValue.Split(
-            ListSeparator,
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-        foreach (var value in values)
-        {
-            var item = CreateStringListItem();
-            item.Deserialize(value);
-            StringListItems.Add(item);
-        }
-    }
-
-    [RelayCommand]
-    private void TogglePin()
-    {
-        IsPinned = !IsPinned;
-        OnPropertyChanged(nameof(ShouldInclude));
-    }
-
-    [RelayCommand]
-    private void ToggleSecretVisibility()
-    {
-        IsSecretVisible = !IsSecretVisible;
-    }
-
-    [RelayCommand]
-    protected virtual void ResetToDefault()
-    {
-        IsPinned = false;
-        ConfirmValue = string.Empty;
-        IsSecretVisible = false;
-        Value = string.Empty;
-        OnPropertyChanged(nameof(HasNonDefaultValue));
-        OnPropertyChanged(nameof(HasSecretMismatch));
-        OnPropertyChanged(nameof(ShouldInclude));
-    }
+  [RelayCommand]
+  protected virtual void ResetToDefault()
+  {
+    IsPinned = false;
+    ConfirmValue = string.Empty;
+    IsSecretVisible = false;
+    Value = string.Empty;
+    OnPropertyChanged(nameof(HasNonDefaultValue));
+    OnPropertyChanged(nameof(HasSecretMismatch));
+    OnPropertyChanged(nameof(ShouldInclude));
+  }
 }

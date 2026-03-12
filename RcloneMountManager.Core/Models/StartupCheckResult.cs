@@ -4,45 +4,51 @@ namespace RcloneMountManager.Core.Models;
 
 public enum StartupCheckSeverity
 {
-    Pass,
-    Warning,
-    Critical,
+  Pass,
+  Warning,
+  Critical,
 }
 
 public sealed record StartupCheckResult(string CheckKey, StartupCheckSeverity Severity, string Message)
 {
-    public bool IsPass => Severity is StartupCheckSeverity.Pass;
+  public bool IsPass => Severity is StartupCheckSeverity.Pass;
 
-    public bool IsCriticalFailure => Severity is StartupCheckSeverity.Critical;
+  public bool IsCriticalFailure => Severity is StartupCheckSeverity.Critical;
 
-    public bool IsWarningFailure => Severity is StartupCheckSeverity.Warning;
+  public bool IsWarningFailure => Severity is StartupCheckSeverity.Warning;
 
-    public static StartupCheckResult Pass(string checkKey, string message) =>
-        new(ValidateCheckKey(checkKey), StartupCheckSeverity.Pass, ValidateMessage(message));
+  public static StartupCheckResult Pass(string checkKey, string message)
+  {
+    return new StartupCheckResult(ValidateCheckKey(checkKey), StartupCheckSeverity.Pass, ValidateMessage(message));
+  }
 
-    public static StartupCheckResult Warning(string checkKey, string message) =>
-        new(ValidateCheckKey(checkKey), StartupCheckSeverity.Warning, ValidateMessage(message));
+  public static StartupCheckResult Warning(string checkKey, string message)
+  {
+    return new StartupCheckResult(ValidateCheckKey(checkKey), StartupCheckSeverity.Warning, ValidateMessage(message));
+  }
 
-    public static StartupCheckResult Critical(string checkKey, string message) =>
-        new(ValidateCheckKey(checkKey), StartupCheckSeverity.Critical, ValidateMessage(message));
+  public static StartupCheckResult Critical(string checkKey, string message)
+  {
+    return new StartupCheckResult(ValidateCheckKey(checkKey), StartupCheckSeverity.Critical, ValidateMessage(message));
+  }
 
-    private static string ValidateCheckKey(string checkKey)
+  private static string ValidateCheckKey(string checkKey)
+  {
+    if (string.IsNullOrWhiteSpace(checkKey))
     {
-        if (string.IsNullOrWhiteSpace(checkKey))
-        {
-            throw new ArgumentException("Check key is required.", nameof(checkKey));
-        }
-
-        return checkKey.Trim();
+      throw new ArgumentException("Check key is required.", nameof(checkKey));
     }
 
-    private static string ValidateMessage(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            throw new ArgumentException("Message is required.", nameof(message));
-        }
+    return checkKey.Trim();
+  }
 
-        return message.Trim();
+  private static string ValidateMessage(string message)
+  {
+    if (string.IsNullOrWhiteSpace(message))
+    {
+      throw new ArgumentException("Message is required.", nameof(message));
     }
+
+    return message.Trim();
+  }
 }

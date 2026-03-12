@@ -28,8 +28,8 @@ public sealed class RcloneConfigWizardService
     string backendName,
     CancellationToken cancellationToken)
   {
-    var binary = ResolveBinary(rcloneBinaryPath);
-    var result = await Cli.Wrap(binary)
+    string binary = ResolveBinary(rcloneBinaryPath);
+    BufferedCommandResult result = await Cli.Wrap(binary)
       .WithArguments(["config", "create", remoteName.Trim(), backendName.Trim(), "--non-interactive"])
       .WithValidation(CommandResultValidation.None)
       .ExecuteBufferedAsync(cancellationToken);
@@ -49,10 +49,13 @@ public sealed class RcloneConfigWizardService
     string answer,
     CancellationToken cancellationToken)
   {
-    var binary = ResolveBinary(rcloneBinaryPath);
-    var result = await Cli.Wrap(binary)
-      .WithArguments(["config", "update", remoteName.Trim(),
-        "--continue", "--state", state, "--result", answer, "--non-interactive"])
+    string binary = ResolveBinary(rcloneBinaryPath);
+    BufferedCommandResult result = await Cli.Wrap(binary)
+      .WithArguments(
+      [
+        "config", "update", remoteName.Trim(),
+        "--continue", "--state", state, "--result", answer, "--non-interactive",
+      ])
       .WithValidation(CommandResultValidation.None)
       .ExecuteBufferedAsync(cancellationToken);
 
@@ -71,26 +74,30 @@ public sealed class RcloneConfigWizardService
     Action<string> onAuthUrl,
     CancellationToken cancellationToken)
   {
-    var binary = ResolveBinary(rcloneBinaryPath);
-    var stdoutBuilder = new StringBuilder();
-    var authUrlDetected = false;
+    string binary = ResolveBinary(rcloneBinaryPath);
+    StringBuilder stdoutBuilder = new();
+    bool authUrlDetected = false;
 
-    var command = Cli.Wrap(binary)
-      .WithArguments(["config", "update", remoteName.Trim(),
-        "--continue", "--state", state, "--result", "true", "--non-interactive"])
+    Command command = Cli.Wrap(binary)
+      .WithArguments(
+      [
+        "config", "update", remoteName.Trim(),
+        "--continue", "--state", state, "--result", "true", "--non-interactive",
+      ])
       .WithValidation(CommandResultValidation.None)
       .WithStandardOutputPipe(PipeTarget.ToStringBuilder(stdoutBuilder))
-      .WithStandardErrorPipe(PipeTarget.ToDelegate(line =>
-      {
-        _logger.LogDebug("OAuth stderr: {Line}", line);
-        if (!authUrlDetected && TryExtractAuthUrl(line, out string? url))
+      .WithStandardErrorPipe(
+        PipeTarget.ToDelegate(line =>
         {
-          authUrlDetected = true;
-          onAuthUrl(url!);
-        }
-      }));
+          _logger.LogDebug("OAuth stderr: {Line}", line);
+          if (!authUrlDetected && TryExtractAuthUrl(line, out string? url))
+          {
+            authUrlDetected = true;
+            onAuthUrl(url!);
+          }
+        }));
 
-    var result = await command.ExecuteAsync(cancellationToken);
+    CommandResult result = await command.ExecuteAsync(cancellationToken);
 
     if (result.ExitCode != 0 && stdoutBuilder.Length == 0)
     {
@@ -105,8 +112,8 @@ public sealed class RcloneConfigWizardService
     string remoteName,
     CancellationToken cancellationToken)
   {
-    var binary = ResolveBinary(rcloneBinaryPath);
-    var result = await Cli.Wrap(binary)
+    string binary = ResolveBinary(rcloneBinaryPath);
+    BufferedCommandResult result = await Cli.Wrap(binary)
       .WithArguments(["config", "dump"])
       .WithValidation(CommandResultValidation.None)
       .ExecuteBufferedAsync(cancellationToken);
@@ -116,7 +123,8 @@ public sealed class RcloneConfigWizardService
       throw new InvalidOperationException($"Failed to read config: {result.StandardError.Trim()}");
     }
 
-    var dump = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(result.StandardOutput);
+    Dictionary<string, Dictionary<string, string>>? dump =
+      JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string>>>(result.StandardOutput);
     if (dump is not null && dump.TryGetValue(remoteName.Trim(), out Dictionary<string, string>? config))
     {
       return config;
@@ -130,15 +138,17 @@ public sealed class RcloneConfigWizardService
     string remoteName,
     CancellationToken cancellationToken)
   {
-    var binary = ResolveBinary(rcloneBinaryPath);
+    string binary = ResolveBinary(rcloneBinaryPath);
     await Cli.Wrap(binary)
       .WithArguments(["config", "delete", remoteName.Trim()])
       .WithValidation(CommandResultValidation.None)
       .ExecuteBufferedAsync(cancellationToken);
   }
 
-  private static string ResolveBinary(string rcloneBinaryPath) =>
-    string.IsNullOrWhiteSpace(rcloneBinaryPath) ? "rclone" : rcloneBinaryPath;
+  private static string ResolveBinary(string rcloneBinaryPath)
+  {
+    return string.IsNullOrWhiteSpace(rcloneBinaryPath) ? "rclone" : rcloneBinaryPath;
+  }
 
   private ConfigWizardStep ParseStep(string json)
   {
@@ -147,7 +157,7 @@ public sealed class RcloneConfigWizardService
       return new ConfigWizardStep();
     }
 
-    var dto = JsonSerializer.Deserialize<WizardResponseDto>(json, JsonOptions);
+    WizardResponseDto? dto = JsonSerializer.Deserialize<WizardResponseDto>(json, JsonOptions);
     if (dto is null)
     {
       return new ConfigWizardStep();
@@ -170,14 +180,14 @@ public sealed class RcloneConfigWizardService
       Exclusive = dto.Option.Exclusive,
       Error = dto.Error ?? string.Empty,
       Examples = dto.Option.Examples?
-        .Select(e => new ConfigWizardExample { Value = e.Value, Help = e.Help })
+        .Select(e => new ConfigWizardExample {Value = e.Value, Help = e.Help})
         .ToList() ?? [],
     };
   }
 
   private static bool TryExtractAuthUrl(string line, out string? url)
   {
-    var match = Regex.Match(line, @"(http://127\.0\.0\.1:\d+/auth\S+)");
+    Match match = Regex.Match(line, @"(http://127\.0\.0\.1:\d+/auth\S+)");
     if (match.Success)
     {
       url = match.Groups[1].Value;
