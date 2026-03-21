@@ -14,6 +14,18 @@ A cross-platform desktop application for managing filesystem mounts via [rclone]
 - **Diagnostics** - Per-profile log timeline with filtering and search
 - **Dark/Light theme** - Follow system theme or choose manually
 
+## Installation (macOS)
+
+```bash
+brew tap frankhommers/tap
+brew install --cask frankhommers/tap/rclone-mount-manager
+```
+
+> **Note:** The app is not notarized by Apple. On first launch macOS may show a warning. The Homebrew cask automatically removes the quarantine flag. If you downloaded manually, run:
+> ```bash
+> xattr -d com.apple.quarantine "/Applications/Rclone Mount Manager.app"
+> ```
+
 ## Tech Stack
 
 - **UI:** [Avalonia UI](https://avaloniaui.net/) 11.3 with Fluent theme
