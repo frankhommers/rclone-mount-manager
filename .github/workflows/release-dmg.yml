@@ -98,7 +98,7 @@ jobs:
           event-type: update-cask
           client-payload: |
             {
-              "cask": "rclone-mount",
+              "cask": "rclone-mount-manager",
               "version": "${{ steps.version.outputs.version }}",
               "repo": "frankhommers/rclone-mount-manager",
               "dmg_prefix": "RcloneMountManager"
