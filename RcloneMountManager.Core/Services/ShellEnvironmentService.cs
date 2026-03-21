@@ -23,7 +23,7 @@ public static class ShellEnvironmentService
         UseShellExecute = false,
         CreateNoWindow = true,
       };
-      psi.ArgumentList.Add("-l");
+      psi.ArgumentList.Add("-li");
       psi.ArgumentList.Add("-c");
       psi.ArgumentList.Add("echo $PATH");
 
