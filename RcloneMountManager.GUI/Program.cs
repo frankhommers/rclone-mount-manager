@@ -23,6 +23,8 @@ internal sealed class Program
   {
     ConfigureLogging();
 
+    ShellEnvironmentService.ResolveAsync().GetAwaiter().GetResult();
+
     using Mutex mutex = new(true, MutexName, out bool createdNew);
     if (!createdNew)
     {
