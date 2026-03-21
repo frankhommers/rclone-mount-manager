@@ -494,3 +494,5 @@ nuget.config
 .planning/
 docs/plans/
 opencode.json
+
+.agent-session-logs/
