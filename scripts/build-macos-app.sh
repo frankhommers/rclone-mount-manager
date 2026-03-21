@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Rclone Mount Manager"
-BUNDLE_ID="io.github.frankhommers.rclone-mount-manager"
+BUNDLE_ID="tools.franks.rclone-mount-manager"
 CONFIGURATION="Release"
 OUTPUT_DIR="$ROOT_DIR/dist"
 RID=""
