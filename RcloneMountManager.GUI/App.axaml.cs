@@ -113,6 +113,24 @@ public partial class App : Application
       token);
   }
 
+  private async void AboutMenuItem_OnClick(object? sender, EventArgs e)
+  {
+    if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop &&
+        desktop.MainWindow != null)
+    {
+      AboutWindow aboutWindow = new();
+      await aboutWindow.ShowDialog(desktop.MainWindow);
+    }
+  }
+
+  private void QuitMenuItem_OnClick(object? sender, EventArgs e)
+  {
+    if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+    {
+      desktop.Shutdown();
+    }
+  }
+
   private void DisableAvaloniaDataAnnotationValidation()
   {
     DataAnnotationsValidationPlugin[] dataValidationPluginsToRemove =

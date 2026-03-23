@@ -570,7 +570,11 @@
     </Application.Resources>
 
     <NativeMenu.Menu>
-        <NativeMenu />
+        <NativeMenu>
+            <NativeMenuItem Header="About Rclone Mount Manager" Click="AboutMenuItem_OnClick" />
+            <NativeMenuItemSeparator />
+            <NativeMenuItem Header="Quit Rclone Mount Manager" Gesture="Cmd+Q" Click="QuitMenuItem_OnClick" />
+        </NativeMenu>
     </NativeMenu.Menu>
 
     <Application.DataTemplates>

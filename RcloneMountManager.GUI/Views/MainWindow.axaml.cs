@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using RcloneMountManager.GUI.Controls;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.GUI.ViewModels;
@@ -11,6 +12,12 @@ public partial class MainWindow : Window
   {
     InitializeComponent();
     Resources["BackendOptionTemplateSelector"] = OptionTemplateSelectorFactory.Create(this, ActualThemeVariant);
+  }
+
+  private async void AboutButton_OnClick(object? sender, RoutedEventArgs e)
+  {
+    AboutWindow aboutWindow = new();
+    await aboutWindow.ShowDialog(this);
   }
 
   private void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
