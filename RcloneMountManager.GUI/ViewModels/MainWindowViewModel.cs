@@ -2692,6 +2692,11 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
       "Light" => ThemeVariant.Light,
       _ => ThemeVariant.Default,
     };
+
+    if (!_isLoadingProfiles)
+    {
+      SaveProfiles();
+    }
   }
 
   partial void OnSelectedWindowCloseBehaviorChanged(WindowCloseBehavior value)
@@ -3363,6 +3368,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedWindowCloseBehavior = savedCloseBehavior.Value;
       }
 
+      string? savedThemeMode = savedProfiles
+        .Select(p => p.ThemeMode)
+        .FirstOrDefault(v => !string.IsNullOrEmpty(v));
+
+      if (!string.IsNullOrEmpty(savedThemeMode))
+      {
+        SelectedThemeMode = savedThemeMode;
+      }
+
       Profiles.Clear();
       _profileLogs.Clear();
       _profileScripts.Clear();
@@ -3474,6 +3488,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
           RcPort = profile.RcPort,
           EnableRemoteControl = profile.EnableRemoteControl,
           WindowCloseBehavior = SelectedWindowCloseBehavior,
+          ThemeMode = SelectedThemeMode,
         })
         .ToList();
 
@@ -4142,5 +4157,6 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public int RcPort { get; set; }
     public bool EnableRemoteControl { get; set; } = true;
     public WindowCloseBehavior? WindowCloseBehavior { get; set; }
+    public string? ThemeMode { get; set; }
   }
 }
