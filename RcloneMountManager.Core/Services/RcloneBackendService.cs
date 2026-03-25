@@ -142,13 +142,13 @@ public sealed class RcloneBackendService
     List<string> args = new() {"config", "update", remoteName.Trim()};
     foreach (RcloneBackendOptionInput option in optionList)
     {
-      if (string.IsNullOrWhiteSpace(option.Name) || string.IsNullOrWhiteSpace(option.Value))
+      if (string.IsNullOrWhiteSpace(option.Name))
       {
         continue;
       }
 
       args.Add(option.Name);
-      args.Add(option.Value);
+      args.Add(option.Value ?? string.Empty);
     }
 
     if (optionList.Any(o => o.IsPassword && !string.IsNullOrWhiteSpace(o.Value)))

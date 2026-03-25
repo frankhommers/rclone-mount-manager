@@ -131,6 +131,48 @@ public sealed class LaunchAgentService
     _logger.LogInformation("Disabled start at login for {ProfileName}.", profile.Name);
   }
 
+  public async Task UnloadAsync(MountProfile profile, CancellationToken cancellationToken)
+  {
+    if (!IsSupported)
+    {
+      return;
+    }
+
+    CommandExecutionResult result = await _commandRunner(
+      "launchctl",
+      ["bootout", BuildServiceTarget(profile)],
+      cancellationToken);
+
+    if (result.ExitCode == 0)
+    {
+      _logger.LogInformation("Unloaded LaunchAgent for {ProfileName}.", profile.Name);
+    }
+    else
+    {
+      _logger.LogDebug(
+        "launchctl bootout exited with code {ExitCode} (service may already be unloaded).",
+        result.ExitCode);
+    }
+  }
+
+  public async Task LoadAsync(MountProfile profile, CancellationToken cancellationToken)
+  {
+    if (!IsSupported)
+    {
+      return;
+    }
+
+    string plistPath = GetLaunchAgentPlistPath(profile);
+    if (!File.Exists(plistPath))
+    {
+      _logger.LogDebug("No plist found for {ProfileName}, skipping load.", profile.Name);
+      return;
+    }
+
+    await RunLaunchCtlAsync(["bootstrap", BuildGuiDomain(), plistPath], cancellationToken);
+    _logger.LogInformation("Loaded LaunchAgent for {ProfileName}.", profile.Name);
+  }
+
   public bool IsEnabled(MountProfile profile)
   {
     return File.Exists(GetLaunchAgentPlistPath(profile));

@@ -4,6 +4,8 @@ namespace RcloneMountManager.Core.Services;
 
 public static class ShellEnvironmentService
 {
+  private static readonly string[] EnvironmentVariables = ["PATH", "SSH_AUTH_SOCK"];
+
   public static async Task ResolveAsync()
   {
     if (OperatingSystem.IsWindows())
@@ -12,6 +14,9 @@ public static class ShellEnvironmentService
     }
 
     string shell = Environment.GetEnvironmentVariable("SHELL") ?? "/bin/zsh";
+    string printScript = string.Join(
+      "; ",
+      EnvironmentVariables.Select(v => "echo \"" + v + "=$" + v + "\""));
 
     try
     {
@@ -25,7 +30,7 @@ public static class ShellEnvironmentService
       };
       psi.ArgumentList.Add("-li");
       psi.ArgumentList.Add("-c");
-      psi.ArgumentList.Add("echo $PATH");
+      psi.ArgumentList.Add(printScript);
 
       using Process? process = Process.Start(psi);
       if (process is null)
@@ -36,18 +41,31 @@ public static class ShellEnvironmentService
       string output = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(false);
       await process.WaitForExitAsync().ConfigureAwait(false);
 
-      if (process.ExitCode == 0)
+      if (process.ExitCode != 0)
       {
-        string path = output.Trim();
-        if (!string.IsNullOrEmpty(path))
+        return;
+      }
+
+      foreach (string line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+      {
+        int separatorIndex = line.IndexOf('=');
+        if (separatorIndex <= 0)
         {
-          Environment.SetEnvironmentVariable("PATH", path);
+          continue;
+        }
+
+        string name = line[..separatorIndex];
+        string value = line[(separatorIndex + 1)..];
+
+        if (!string.IsNullOrEmpty(value) && EnvironmentVariables.Contains(name))
+        {
+          Environment.SetEnvironmentVariable(name, value);
         }
       }
     }
     catch
     {
-      // Fall back to inherited PATH silently
+      // Fall back to inherited environment silently
     }
   }
 }

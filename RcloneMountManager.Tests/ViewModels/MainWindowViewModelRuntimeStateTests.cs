@@ -52,7 +52,9 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
   public async Task StartMountCommand_MapsVerificationFailureToFailedState()
   {
     ProfileRuntimeState failedState = CreateState(MountLifecycleState.Failed, MountHealthState.Failed, "mount missing");
-    MainWindowViewModel viewModel = CreateViewModel(runtimeStateVerifier: (_, _) => Task.FromResult(failedState));
+    MainWindowViewModel viewModel = CreateViewModel(
+      mountStartRunner: (_, _) => Task.CompletedTask,
+      runtimeStateVerifier: (_, _) => Task.FromResult(failedState));
 
     await viewModel.StartMountCommand.ExecuteAsync(null);
 

@@ -455,7 +455,7 @@ public sealed class MountManagerService
       source,
       mountPoint);
 
-    FileStream logStream = new(logFile, FileMode.Append, FileAccess.Write, FileShare.Read);
+    FileStream logStream = new(logFile, FileMode.Create, FileAccess.Write, FileShare.Read);
     Command command = Cli.Wrap(binary)
       .WithArguments(arguments)
       .WithStandardOutputPipe(PipeTarget.ToStream(logStream))
@@ -496,11 +496,16 @@ public sealed class MountManagerService
 
       if (!pid.HasValue)
       {
+        string logTail = ReadLogTail(logFile);
+        string detail = ExtractRcloneErrorDetail(logTail);
         _logger.LogWarning(
           "rclone launched but RC not responding on port {RcPort}. Check log: {LogFile}",
           profile.RcPort,
           logFile);
-        return;
+        throw new InvalidOperationException(
+          string.IsNullOrWhiteSpace(detail)
+            ? $"rclone failed to start. Check log: {logFile}"
+            : detail);
       }
 
       _logger.LogInformation(
@@ -520,8 +525,13 @@ public sealed class MountManagerService
 
         if (!await rcClient.IsAliveAsync(profile.RcPort, cancellationToken))
         {
+          string earlyLogTail = ReadLogTail(logFile);
+          string earlyDetail = ExtractRcloneErrorDetail(earlyLogTail);
           _logger.LogError("rclone process died before mount appeared. Check log: {LogFile}", logFile);
-          return;
+          throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(earlyDetail)
+              ? $"rclone process died before mount appeared. Check log: {logFile}"
+              : earlyDetail);
         }
       }
 
@@ -536,10 +546,16 @@ public sealed class MountManagerService
       }
       else
       {
+        string lateLogTail = ReadLogTail(logFile);
+        string lateDetail = ExtractRcloneErrorDetail(lateLogTail);
         _logger.LogWarning(
           "rclone running (PID {Pid}) but mount not appearing. Check log: {LogFile}",
           pid.Value,
           logFile);
+        throw new InvalidOperationException(
+          string.IsNullOrWhiteSpace(lateDetail)
+            ? $"rclone is running but mount did not appear. Check log: {logFile}"
+            : lateDetail);
       }
     }
     else
@@ -1241,6 +1257,48 @@ public sealed class MountManagerService
     }
 
     return binaryPath;
+  }
+
+  private static string ReadLogTail(string logFile, int maxLines = 20)
+  {
+    try
+    {
+      if (!File.Exists(logFile))
+      {
+        return string.Empty;
+      }
+
+      string[] lines = File.ReadAllLines(logFile);
+      int start = Math.Max(0, lines.Length - maxLines);
+      return string.Join('\n', lines[start..]);
+    }
+    catch
+    {
+      return string.Empty;
+    }
+  }
+
+  public static string ExtractRcloneErrorDetail(string logTail)
+  {
+    if (string.IsNullOrWhiteSpace(logTail))
+    {
+      return string.Empty;
+    }
+
+    List<string> errorLines = new();
+    foreach (string line in logTail.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+    {
+      if (line.Contains("ERROR", StringComparison.OrdinalIgnoreCase) ||
+          line.Contains("CRITICAL", StringComparison.OrdinalIgnoreCase) ||
+          line.Contains("Fatal", StringComparison.OrdinalIgnoreCase))
+      {
+        errorLines.Add(line.Trim());
+      }
+    }
+
+    return errorLines.Count > 0
+      ? string.Join(Environment.NewLine, errorLines)
+      : string.Empty;
   }
 
   private sealed record RunningMount(int Pid, int RcPort);

@@ -1257,6 +1257,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
           await Task.Run(() => _mountStartRunner(profile, cancellationToken), cancellationToken);
         }
 
+        if (profile.StartAtLogin && _launchAgentService.IsEnabled(profile))
+        {
+          using (ProfileScope(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Execution))
+          {
+            _logger.LogInformation("Reloading LaunchAgent for KeepAlive protection...");
+            await _launchAgentService.LoadAsync(profile, cancellationToken);
+          }
+        }
+
         await RefreshRuntimeStateInternalAsync(profile, cancellationToken);
       }
       catch (Exception ex)
@@ -1283,6 +1292,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
       using (ProfileScope(profileId, ProfileLogCategory.ManualStop, ProfileLogStage.Initialization))
       {
         _logger.LogInformation("Stopping mount...");
+      }
+
+      if (profile.StartAtLogin && _launchAgentService.IsEnabled(profile))
+      {
+        using (ProfileScope(profileId, ProfileLogCategory.ManualStop, ProfileLogStage.Execution))
+        {
+          _logger.LogInformation("Unloading LaunchAgent to prevent automatic restart...");
+          await _launchAgentService.UnloadAsync(profile, cancellationToken);
+        }
       }
 
       try

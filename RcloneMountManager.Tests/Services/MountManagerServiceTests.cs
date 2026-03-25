@@ -191,6 +191,55 @@ public class MountManagerServiceTests
       $"Expected resolved path or 'rclone' fallback but got: {result}");
   }
 
+  [Fact]
+  public void ExtractRcloneErrorDetail_FindsCriticalAndErrorLines()
+  {
+    string logTail = string.Join(
+      "\n",
+      "2026/03/25 11:59:14 NOTICE: Serving remote control on http://127.0.0.1:59116/",
+      "2026/03/25 11:59:14 CRITICAL: Failed to create file system for \"Aivy-Box:/home/frank\": failed to read private key file: open /Users/frankhommers/.ssh/id_ed25519: no such file or directory");
+
+    string result = MountManagerService.ExtractRcloneErrorDetail(logTail);
+
+    Assert.Contains("CRITICAL", result);
+    Assert.Contains("failed to read private key file", result);
+    Assert.DoesNotContain("NOTICE", result);
+  }
+
+  [Fact]
+  public void ExtractRcloneErrorDetail_ReturnsEmpty_WhenNoErrors()
+  {
+    string logTail = "2026/03/25 11:59:14 NOTICE: Serving remote control on http://127.0.0.1:59116/";
+
+    string result = MountManagerService.ExtractRcloneErrorDetail(logTail);
+
+    Assert.Empty(result);
+  }
+
+  [Fact]
+  public void ExtractRcloneErrorDetail_ReturnsEmpty_WhenBlank()
+  {
+    string result = MountManagerService.ExtractRcloneErrorDetail("");
+
+    Assert.Empty(result);
+  }
+
+  [Fact]
+  public void ExtractRcloneErrorDetail_FindsMultipleErrorLines()
+  {
+    string logTail = string.Join(
+      "\n",
+      "2026/03/25 11:59:14 ERROR: first problem",
+      "2026/03/25 11:59:14 NOTICE: something normal",
+      "2026/03/25 11:59:15 ERROR: second problem");
+
+    string result = MountManagerService.ExtractRcloneErrorDetail(logTail);
+
+    Assert.Contains("first problem", result);
+    Assert.Contains("second problem", result);
+    Assert.DoesNotContain("something normal", result);
+  }
+
   private static MountProfile CreateProfile()
   {
     return new MountProfile
