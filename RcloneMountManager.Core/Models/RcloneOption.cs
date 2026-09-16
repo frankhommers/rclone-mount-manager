@@ -16,6 +16,12 @@ public sealed class RcloneOption : IRcloneOptionDefinition
   public string ListSeparator => Type == "SpaceSepList" ? " " : ",";
   public bool IsKeyValue => string.Equals(Name, "headers", StringComparison.OrdinalIgnoreCase);
 
+  public bool IsFilePath =>
+    Type is "string" &&
+    !IsPassword &&
+    (Name.EndsWith("_file", StringComparison.OrdinalIgnoreCase) ||
+     Help.StartsWith("Path to", StringComparison.OrdinalIgnoreCase));
+
   public IReadOnlyList<string>? GetEnumValues()
   {
     return Type switch

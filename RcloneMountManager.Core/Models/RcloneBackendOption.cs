@@ -16,6 +16,12 @@ public sealed class RcloneBackendOption : IRcloneOptionDefinition
   public string ListSeparator => Type == "SpaceSepList" ? " " : ",";
   public bool IsKeyValue => string.Equals(Name, "headers", StringComparison.OrdinalIgnoreCase);
 
+  public bool IsFilePath =>
+    Type is "string" &&
+    !IsPassword &&
+    (Name.EndsWith("_file", StringComparison.OrdinalIgnoreCase) ||
+     Help.StartsWith("Path to", StringComparison.OrdinalIgnoreCase));
+
   public OptionControlType GetControlType()
   {
     if (IsPassword)

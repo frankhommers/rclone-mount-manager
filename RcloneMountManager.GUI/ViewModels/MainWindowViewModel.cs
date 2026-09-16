@@ -73,6 +73,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
   private bool _syncingSidebarSelection;
   private bool _syncingMountRemoteSelection;
   private bool _syncingRemoteNameInput;
+  private bool _isRestoringRemoteEditorMode;
   private MountProfile? _rememberedRemoteProfile;
   private MountProfile? _rememberedMountProfile;
 
@@ -87,6 +88,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
   [ObservableProperty] private string _selectedThemeMode = "Follow system";
 
   [ObservableProperty] private WindowCloseBehavior _selectedWindowCloseBehavior = WindowCloseBehavior.Quit;
+
+  [ObservableProperty] private string _globalRcloneBinaryPath = "rclone";
 
   [ObservableProperty] private RcloneBackendInfo? _selectedBackend;
 
@@ -113,6 +116,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
   [ObservableProperty] private int _wizardStepNumber;
 
   [ObservableProperty] private bool _showAdvancedBackendOptions;
+
+  [ObservableProperty] private string _backendOptionSearchText = string.Empty;
 
   [ObservableProperty] private bool _hasAdvancedBackendOptions;
 
@@ -256,6 +261,41 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
   public bool WizardStepIsTextBox => !WizardStepIsBool && !WizardStepIsComboBox;
   public string WizardStepPasswordChar => CurrentWizardStep is {IsPassword: true} ? "\u2022" : string.Empty;
 
+  public string WizardUnavailableReason
+  {
+    get
+    {
+      if (IsBusy)
+      {
+        return "Busy. Please wait until the current operation finishes.";
+      }
+
+      if (!HasProfiles)
+      {
+        return "Add a remote first.";
+      }
+
+      if (SelectedProfile is null || !SelectedProfile.IsRemoteDefinition)
+      {
+        return "Select a remote profile first.";
+      }
+
+      if (SelectedBackend is null)
+      {
+        return "Select a backend type to enable the wizard.";
+      }
+
+      if (string.IsNullOrWhiteSpace(NewRemoteName))
+      {
+        return "Enter a remote name to enable the wizard.";
+      }
+
+      return string.Empty;
+    }
+  }
+
+  public bool IsWizardUnavailable => !string.IsNullOrEmpty(WizardUnavailableReason);
+
   public bool ShowMountOperationsContent =>
     !ShowRemoteEditor && !ShowDiagnosticsView && !ShowSettingsView && !ShowDashboard && !IsConfigurationMode;
 
@@ -352,6 +392,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     _profileLogs.TryAdd(DiagnosticsSink.SystemProfileId, new List<ProfileLogEvent>());
     DiagnosticsSink.Instance.RegisterHandler(OnSerilogEvent);
     LoadProfiles();
+    AutoDetectRcloneBinary();
+    MountProfile.GlobalBinaryPath = string.IsNullOrWhiteSpace(GlobalRcloneBinaryPath) ? "rclone" : GlobalRcloneBinaryPath;
     LoadBackendsSync(loadStartupData);
 
     if (Profiles.Count == 0 && !File.Exists(_profilesFilePath))
@@ -413,7 +455,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
       try
       {
-        string binary = SelectedProfile?.RcloneBinaryPath ?? "rclone";
+        string binary = ResolveRcloneBinary(SelectedProfile);
         await MountOptionsVm.LoadOptionsAsync(
           binary,
           SelectedProfile?.MountOptions ?? new Dictionary<string, string>(),
@@ -543,8 +585,32 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
   public string SelectedProfileHealthText =>
     FormatHealth(SelectedProfile?.RuntimeState.Health ?? MountHealthState.Unknown);
 
-  public bool HasBackendOptions => BackendOptionInputs.Count > 0;
+  public bool HasBackendOptions => BackendOptionInputs.Count > 0 || AdvancedBackendOptionInputs.Count > 0;
   public bool HasAdvancedBackendOptionInputs => AdvancedBackendOptionInputs.Count > 0;
+
+  public IEnumerable<RcloneBackendOptionInput> VisibleBackendOptionInputs =>
+    BackendOptionInputs.Where(option => option.MatchesSearch(BackendOptionSearchText));
+
+  public IEnumerable<RcloneBackendOptionInput> VisibleAdvancedBackendOptionInputs =>
+    AdvancedBackendOptionInputs.Where(option => option.MatchesSearch(BackendOptionSearchText));
+
+  public bool HasBackendOptionSearch => !string.IsNullOrWhiteSpace(BackendOptionSearchText);
+  public bool HasVisibleBackendOptions => VisibleBackendOptionInputs.Any();
+  public bool HasVisibleAdvancedBackendOptions => VisibleAdvancedBackendOptionInputs.Any();
+  public bool HasNoBackendOptionMatches =>
+    HasBackendOptionSearch && !HasVisibleBackendOptions && !HasVisibleAdvancedBackendOptions;
+
+  public bool AreAdvancedBackendOptionsExpanded
+  {
+    get => ShowAdvancedBackendOptions || HasBackendOptionSearch;
+    set
+    {
+      if (!HasBackendOptionSearch)
+      {
+        ShowAdvancedBackendOptions = value;
+      }
+    }
+  }
 
   public string SelectedBackendDescription => SelectedBackend?.Details ?? string.Empty;
 
@@ -691,7 +757,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
     try
     {
-      string binary = SelectedProfile?.RcloneBinaryPath ?? "rclone";
+      string binary = ResolveRcloneBinary(SelectedProfile);
       IReadOnlyList<RcloneBackendInfo> backends = Task
         .Run(() => _rcloneBackendService.GetBackendsAsync(binary, CancellationToken.None)).GetAwaiter().GetResult();
 
@@ -746,7 +812,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         throw new InvalidOperationException($"Missing required fields: {string.Join(", ", missingRequired)}");
       }
 
-      string binary = SelectedProfile?.RcloneBinaryPath ?? "rclone";
+      string binary = ResolveRcloneBinary(SelectedProfile);
       MountProfile activeProfile = SelectedProfile ?? throw new InvalidOperationException("No profile selected.");
       if (!activeProfile.IsRemoteDefinition)
       {
@@ -761,7 +827,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         await _rcloneBackendService.UpdateRemoteAsync(
           binary,
           NewRemoteName,
-          BackendOptionInputs,
+          BackendOptionInputs.Concat(AdvancedBackendOptionInputs),
           cancellationToken);
       }
       else
@@ -770,7 +836,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
           binary,
           NewRemoteName,
           SelectedBackend.Name,
-          BackendOptionInputs,
+          BackendOptionInputs.Concat(AdvancedBackendOptionInputs),
           cancellationToken);
       }
 
@@ -807,7 +873,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return;
       }
 
-      string binary = SelectedProfile.RcloneBinaryPath ?? "rclone";
+      string binary = ResolveRcloneBinary(SelectedProfile);
       string remoteName = string.IsNullOrWhiteSpace(NewRemoteName)
         ? $"{SelectedBackend.Name}-remote"
         : NewRemoteName;
@@ -822,6 +888,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
         IsWizardActive = true;
         WizardStepNumber = 1;
+        PersistRemoteEditorMode(RemoteEditorMode.Wizard);
         await HandleWizardStepAsync(step, binary, remoteName, cancellationToken);
       }
       catch
@@ -852,7 +919,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         return;
       }
 
-      string binary = SelectedProfile.RcloneBinaryPath ?? "rclone";
+      string binary = ResolveRcloneBinary(SelectedProfile);
       string remoteName = NewRemoteName;
 
       try
@@ -896,7 +963,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     {
       try
       {
-        string binary = SelectedProfile.RcloneBinaryPath ?? "rclone";
+        string binary = ResolveRcloneBinary(SelectedProfile);
         await _rcloneConfigWizardService.DeleteRemoteAsync(binary, NewRemoteName, CancellationToken.None);
       }
       catch
@@ -1022,12 +1089,35 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
   private void EnterManualMode()
   {
     IsManualMode = true;
+    PersistRemoteEditorMode(RemoteEditorMode.Manual);
   }
 
   [RelayCommand]
   private void ExitManualMode()
   {
     IsManualMode = false;
+    PersistRemoteEditorMode(RemoteEditorMode.Chooser);
+  }
+
+  private void PersistRemoteEditorMode(RemoteEditorMode mode)
+  {
+    if (_isLoadingProfiles || _isRestoringRemoteEditorMode)
+    {
+      return;
+    }
+
+    if (SelectedProfile is not { IsRemoteDefinition: true } profile)
+    {
+      return;
+    }
+
+    if (profile.LastRemoteEditorMode == mode)
+    {
+      return;
+    }
+
+    profile.LastRemoteEditorMode = mode;
+    SaveProfiles();
   }
 
   private void ResetWizardState()
@@ -1079,7 +1169,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     SelectedProfile.Source = "remote:media";
     SelectedProfile.MountPoint = DefaultMountPoint("media");
     SelectedProfile.ExtraOptions = "--vfs-cache-mode full --dir-cache-time 15m";
-    SelectedProfile.RcloneBinaryPath = "rclone";
+
     ResetQuickConnectFields();
     StatusText = "Preset loaded: rclone remote.";
     NotifyLabelsChanged();
@@ -1093,7 +1183,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     SelectedProfile.Source = "/";
     SelectedProfile.MountPoint = DefaultMountPoint("webdav");
     SelectedProfile.ExtraOptions = "--vfs-cache-mode full --dir-cache-time 15m";
-    SelectedProfile.RcloneBinaryPath = "rclone";
+
     SelectedProfile.QuickConnectEndpoint = "https://example.com/remote.php/webdav";
     SelectedProfile.QuickConnectPort = string.Empty;
     SelectedProfile.QuickConnectUsername = string.Empty;
@@ -1110,7 +1200,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     SelectedProfile.Source = "/";
     SelectedProfile.MountPoint = DefaultMountPoint("sftp");
     SelectedProfile.ExtraOptions = "--vfs-cache-mode full";
-    SelectedProfile.RcloneBinaryPath = "rclone";
+
     SelectedProfile.QuickConnectEndpoint = "sftp.example.com";
     SelectedProfile.QuickConnectPort = "22";
     SelectedProfile.QuickConnectUsername = string.Empty;
@@ -1127,7 +1217,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     SelectedProfile.Source = "/";
     SelectedProfile.MountPoint = DefaultMountPoint("ftp");
     SelectedProfile.ExtraOptions = "--vfs-cache-mode full";
-    SelectedProfile.RcloneBinaryPath = "rclone";
+
     SelectedProfile.QuickConnectEndpoint = "ftp.example.com";
     SelectedProfile.QuickConnectPort = "21";
     SelectedProfile.QuickConnectUsername = string.Empty;
@@ -1144,7 +1234,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     SelectedProfile.Source = "/";
     SelectedProfile.MountPoint = DefaultMountPoint("ftps");
     SelectedProfile.ExtraOptions = "--vfs-cache-mode full";
-    SelectedProfile.RcloneBinaryPath = "rclone";
+
     SelectedProfile.QuickConnectEndpoint = "ftp.example.com";
     SelectedProfile.QuickConnectPort = "21";
     SelectedProfile.QuickConnectUsername = string.Empty;
@@ -1627,7 +1717,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
       }
       else if (profile.IsRemoteDefinition && SelectedBackend is not null)
       {
-        string binary = profile.RcloneBinaryPath ?? "rclone";
+        string binary = ResolveRcloneBinary(profile);
         using (ProfileScope(profileId, ProfileLogCategory.General, ProfileLogStage.Execution))
         {
           await _mountManagerService.TestBackendConnectionAsync(
@@ -1813,8 +1903,9 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
           return;
         }
 
-        string resolved = MountManagerService.ResolveAbsoluteBinaryPath(profile.RcloneBinaryPath);
-        if (!string.Equals(profile.RcloneBinaryPath, resolved, StringComparison.Ordinal))
+        string binaryToResolve = ResolveRcloneBinary(profile);
+        string resolved = MountManagerService.ResolveAbsoluteBinaryPath(binaryToResolve);
+        if (!string.Equals(binaryToResolve, resolved, StringComparison.Ordinal))
         {
           profile.RcloneBinaryPath = resolved;
           using (ProfileScope(profileId, ProfileLogCategory.Startup, ProfileLogStage.Execution))
@@ -2695,6 +2786,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     AddMountCommand.NotifyCanExecuteChanged();
     AddRemoteCommand.NotifyCanExecuteChanged();
     AddProfileCommand.NotifyCanExecuteChanged();
+    OnPropertyChanged(nameof(WizardUnavailableReason));
+    OnPropertyChanged(nameof(IsWizardUnavailable));
   }
 
   partial void OnSelectedThemeModeChanged(string value)
@@ -2727,6 +2820,58 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     SaveProfiles();
+  }
+
+  partial void OnGlobalRcloneBinaryPathChanged(string value)
+  {
+    MountProfile.GlobalBinaryPath = string.IsNullOrWhiteSpace(value) ? "rclone" : value;
+
+    if (_isLoadingProfiles)
+    {
+      return;
+    }
+
+    SaveProfiles();
+  }
+
+  private void AutoDetectRcloneBinary()
+  {
+    if (!string.IsNullOrWhiteSpace(GlobalRcloneBinaryPath) && GlobalRcloneBinaryPath != "rclone")
+    {
+      return;
+    }
+
+    string resolved = MountManagerService.ResolveAbsoluteBinaryPath("rclone");
+    if (resolved != "rclone")
+    {
+      _isLoadingProfiles = true;
+      try
+      {
+        GlobalRcloneBinaryPath = resolved;
+      }
+      finally
+      {
+        _isLoadingProfiles = false;
+      }
+
+      _logger.LogInformation("Auto-detected rclone binary at '{RclonePath}'.", resolved);
+    }
+  }
+
+  private string ResolveRcloneBinary(MountProfile? profile = null)
+  {
+    string? perProfile = profile?.RcloneBinaryPath;
+    if (!string.IsNullOrWhiteSpace(perProfile))
+    {
+      return perProfile;
+    }
+
+    if (!string.IsNullOrWhiteSpace(GlobalRcloneBinaryPath))
+    {
+      return GlobalRcloneBinaryPath;
+    }
+
+    return "rclone";
   }
 
   private bool CanRemoveProfile()
@@ -2804,6 +2949,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
   partial void OnSelectedBackendChanged(RcloneBackendInfo? value)
   {
     OnPropertyChanged(nameof(SelectedBackendDescription));
+    BackendOptionSearchText = string.Empty;
 
     Dictionary<string, (string Value, bool IsPassword)> previousValues = BackendOptionInputs
       .Concat(AdvancedBackendOptionInputs)
@@ -2817,6 +2963,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
       HasAdvancedBackendOptions = false;
       OnPropertyChanged(nameof(HasBackendOptions));
       OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));
+      NotifyBackendOptionSearchChanged();
       NotifyCommandStateChanged();
       return;
     }
@@ -2849,14 +2996,26 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
 
   partial void OnShowAdvancedBackendOptionsChanged(bool value)
   {
-    if (SelectedBackend is null)
-    {
-      return;
-    }
+    OnPropertyChanged(nameof(AreAdvancedBackendOptionsExpanded));
+  }
 
-    PopulateBackendOptionInputs(SelectedBackend);
-    OnPropertyChanged(nameof(HasBackendOptions));
-    OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));
+  partial void OnBackendOptionSearchTextChanged(string value)
+  {
+    NotifyBackendOptionSearchChanged();
+  }
+
+  [RelayCommand]
+  private void ClearBackendOptionSearch() => BackendOptionSearchText = string.Empty;
+
+  private void NotifyBackendOptionSearchChanged()
+  {
+    OnPropertyChanged(nameof(VisibleBackendOptionInputs));
+    OnPropertyChanged(nameof(VisibleAdvancedBackendOptionInputs));
+    OnPropertyChanged(nameof(HasBackendOptionSearch));
+    OnPropertyChanged(nameof(HasVisibleBackendOptions));
+    OnPropertyChanged(nameof(HasVisibleAdvancedBackendOptions));
+    OnPropertyChanged(nameof(HasNoBackendOptionMatches));
+    OnPropertyChanged(nameof(AreAdvancedBackendOptionsExpanded));
   }
 
   private void RestoreBackendSelection(MountProfile profile)
@@ -2912,19 +3071,54 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
                .Where(o => o.Required || !o.Advanced)
                .OrderByDescending(o => o.Required))
     {
-      BackendOptionInputs.Add(new RcloneBackendOptionInput(option));
+      RcloneBackendOptionInput input = new(option);
+      AttachFilePickerIfNeeded(input);
+      BackendOptionInputs.Add(input);
     }
 
-    if (ShowAdvancedBackendOptions)
+    foreach (RcloneBackendOption option in backend.Options
+               .Where(o => o.Advanced && !o.Required))
     {
-      foreach (RcloneBackendOption option in backend.Options
-                 .Where(o => o.Advanced && !o.Required))
-      {
-        AdvancedBackendOptionInputs.Add(new RcloneBackendOptionInput(option));
-      }
+      RcloneBackendOptionInput input = new(option);
+      AttachFilePickerIfNeeded(input);
+      AdvancedBackendOptionInputs.Add(input);
     }
 
     OnPropertyChanged(nameof(HasAdvancedBackendOptionInputs));
+    NotifyBackendOptionSearchChanged();
+  }
+
+  private static void AttachFilePickerIfNeeded(RcloneBackendOptionInput input)
+  {
+    if (!input.IsFilePath)
+    {
+      return;
+    }
+
+    input.FilePickerHandler = async () =>
+    {
+      if (Application.Current?.ApplicationLifetime
+            is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+          || desktop.MainWindow is null)
+      {
+        return null;
+      }
+
+      TopLevel? topLevel = TopLevel.GetTopLevel(desktop.MainWindow);
+      if (topLevel?.StorageProvider is not { } storageProvider)
+      {
+        return null;
+      }
+
+      IReadOnlyList<IStorageFile> files = await storageProvider.OpenFilePickerAsync(
+        new FilePickerOpenOptions
+        {
+          Title = $"Select file for {input.Name}",
+          AllowMultiple = false,
+        });
+
+      return files.Count > 0 ? files[0].Path.LocalPath : null;
+    };
   }
 
   partial void OnNewRemoteNameChanged(string value)
@@ -3097,6 +3291,43 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     if (!ReferenceEquals(SelectedProfile, value))
     {
       SelectedProfile = value;
+    }
+
+    RestoreRemoteEditorMode(value);
+  }
+
+  private void RestoreRemoteEditorMode(MountProfile profile)
+  {
+    if (!profile.IsRemoteDefinition)
+    {
+      return;
+    }
+
+    _isRestoringRemoteEditorMode = true;
+    try
+    {
+      switch (profile.LastRemoteEditorMode)
+      {
+        case RemoteEditorMode.Manual:
+          IsManualMode = true;
+          break;
+        case RemoteEditorMode.Wizard:
+          IsManualMode = false;
+          if (CanStartWizard())
+          {
+            _ = StartWizardCommand.ExecuteAsync(null);
+          }
+
+          break;
+        case RemoteEditorMode.Chooser:
+        default:
+          IsManualMode = false;
+          break;
+      }
+    }
+    finally
+    {
+      _isRestoringRemoteEditorMode = false;
     }
   }
 
@@ -3395,6 +3626,15 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedThemeMode = savedThemeMode;
       }
 
+      string? savedGlobalBinaryPath = savedProfiles
+        .Select(p => p.GlobalRcloneBinaryPath)
+        .FirstOrDefault(v => !string.IsNullOrEmpty(v));
+
+      if (!string.IsNullOrEmpty(savedGlobalBinaryPath))
+      {
+        GlobalRcloneBinaryPath = savedGlobalBinaryPath;
+      }
+
       Profiles.Clear();
       _profileLogs.Clear();
       _profileScripts.Clear();
@@ -3424,6 +3664,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
           BackendOptions = saved.BackendOptions ?? new Dictionary<string, string>(),
           RcPort = saved.RcPort,
           EnableRemoteControl = saved.EnableRemoteControl,
+          LastRemoteEditorMode = saved.LastRemoteEditorMode,
         };
 
         if (profile.RcPort == 0 && !profile.IsRemoteDefinition)
@@ -3505,8 +3746,10 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
           BackendOptions = profile.BackendOptions,
           RcPort = profile.RcPort,
           EnableRemoteControl = profile.EnableRemoteControl,
+          LastRemoteEditorMode = profile.LastRemoteEditorMode,
           WindowCloseBehavior = SelectedWindowCloseBehavior,
           ThemeMode = SelectedThemeMode,
+          GlobalRcloneBinaryPath = GlobalRcloneBinaryPath,
         })
         .ToList();
 
@@ -3688,9 +3931,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     string remoteAlias,
     CancellationToken cancellationToken)
   {
-    string binary = string.IsNullOrWhiteSpace(mountProfile.RcloneBinaryPath)
-      ? "rclone"
-      : mountProfile.RcloneBinaryPath;
+    string binary = ResolveRcloneBinary(mountProfile);
 
     return RemoteExistsInRcloneConfigAsync(binary, remoteAlias, cancellationToken);
   }
@@ -3721,9 +3962,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
       throw new InvalidOperationException("Linked remote has no backend options to write.");
     }
 
-    string binary = string.IsNullOrWhiteSpace(remote.RcloneBinaryPath)
-      ? string.IsNullOrWhiteSpace(mountProfile.RcloneBinaryPath) ? "rclone" : mountProfile.RcloneBinaryPath
-      : remote.RcloneBinaryPath;
+    string binary = ResolveRcloneBinary(remote);
 
     List<RcloneBackendOptionInput> repairOptions = remote.BackendOptions
       .Select(option =>
@@ -4161,7 +4400,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public string SelectedReliabilityPresetId { get; set; } = ReliabilityPolicyPreset.NormalId;
     public Dictionary<string, string> MountOptions { get; set; } = new();
     public HashSet<string> PinnedMountOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-    public string RcloneBinaryPath { get; set; } = "rclone";
+    public string RcloneBinaryPath { get; set; } = string.Empty;
     public QuickConnectMode QuickConnectMode { get; set; } = QuickConnectMode.None;
     public string QuickConnectEndpoint { get; set; } = string.Empty;
     public string QuickConnectPort { get; set; } = string.Empty;
@@ -4176,5 +4415,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     public bool EnableRemoteControl { get; set; } = true;
     public WindowCloseBehavior? WindowCloseBehavior { get; set; }
     public string? ThemeMode { get; set; }
+    public string? GlobalRcloneBinaryPath { get; set; }
+    public RemoteEditorMode LastRemoteEditorMode { get; set; } = RemoteEditorMode.Chooser;
   }
 }

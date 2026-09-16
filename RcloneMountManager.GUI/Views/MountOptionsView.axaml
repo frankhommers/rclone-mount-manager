@@ -10,6 +10,20 @@
     <StackPanel Spacing="8">
         <TextBlock Text="Mount Parameters" FontWeight="SemiBold" FontSize="14" />
 
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBox Text="{Binding SearchText}"
+                     Watermark="Search all parameters by name or description..."
+                     AutomationProperties.Name="Search mount parameters"
+                     ToolTip.Tip="Search includes advanced options and opens matching groups." />
+            <Button Grid.Column="1" Content="Clear" Margin="8,0,0,0"
+                    Command="{Binding ClearSearchCommand}"
+                    IsVisible="{Binding HasSearchText}" />
+        </Grid>
+
+        <TextBlock Text="No parameters match your search."
+                   IsVisible="{Binding HasNoSearchResults}"
+                   Opacity="0.7" />
+
         <TextBlock Text="Loading rclone options..."
                    IsVisible="{Binding IsLoading}"
                    Opacity="0.7"
@@ -23,7 +37,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="viewModels:MountOptionGroupViewModel">
-                    <Expander IsExpanded="{Binding IsExpanded}"
+                    <Expander IsExpanded="{Binding IsEffectivelyExpanded, Mode=TwoWay}"
                               IsVisible="{Binding HasVisibleOptions}"
                               HorizontalAlignment="Stretch"
                               HorizontalContentAlignment="Stretch">

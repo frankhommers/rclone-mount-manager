@@ -147,8 +147,20 @@ public sealed class RcloneBackendService
         continue;
       }
 
+      if (option.IsErased)
+      {
+        args.Add(option.Name);
+        args.Add(string.Empty);
+        continue;
+      }
+
+      if (string.IsNullOrWhiteSpace(option.Value))
+      {
+        continue;
+      }
+
       args.Add(option.Name);
-      args.Add(option.Value ?? string.Empty);
+      args.Add(option.Value);
     }
 
     if (optionList.Any(o => o.IsPassword && !string.IsNullOrWhiteSpace(o.Value)))

@@ -6,6 +6,69 @@ namespace RcloneMountManager.Tests.ViewModels;
 
 public class MountOptionsViewModelTests
 {
+  [Theory]
+  [InlineData("vfs_cache_mode")]
+  [InlineData("--VFS-CACHE-MODE")]
+  [InlineData("vfs cache mode")]
+  [InlineData("disk caching")]
+  public void Search_FiltersAndExpandsMatchingGroups(string search)
+  {
+    MountOptionsViewModel viewModel = CreateViewModelWithGroups();
+    viewModel.Groups.Add(new MountOptionGroupViewModel
+    {
+      Name = "rc",
+      AllOptions = [new MountOptionInputViewModel(new RcloneOption { Name = "rc_addr" })],
+    });
+
+    viewModel.SearchText = search;
+
+    Assert.Equal("vfs_cache_mode", Assert.Single(viewModel.Groups[0].VisibleOptions).Name);
+    Assert.True(viewModel.Groups[0].IsEffectivelyExpanded);
+    Assert.False(viewModel.Groups[1].HasVisibleOptions);
+    Assert.False(viewModel.HasNoSearchResults);
+  }
+
+  [Fact]
+  public void Search_IncludesAdvancedOptionsAndRestoresPreviousExpansion()
+  {
+    MountOptionsViewModel viewModel = CreateViewModelWithGroups();
+    viewModel.ShowAdvancedOptions = false;
+    Assert.DoesNotContain(viewModel.Groups[0].VisibleOptions, option => option.Name == "vfs_cache_mode");
+
+    viewModel.SearchText = "cache";
+
+    Assert.Equal("vfs_cache_mode", Assert.Single(viewModel.Groups[0].VisibleOptions).Name);
+    Assert.True(viewModel.Groups[0].IsEffectivelyExpanded);
+    Assert.False(viewModel.ShowAdvancedOptions);
+
+    viewModel.ClearSearchCommand.Execute(null);
+
+    Assert.False(viewModel.Groups[0].IsEffectivelyExpanded);
+    Assert.Equal("transfers", Assert.Single(viewModel.Groups[0].VisibleOptions).Name);
+  }
+
+  [Fact]
+  public void Search_PreservesHiddenValuesAndPinsWhenSaving()
+  {
+    MountOptionsViewModel viewModel = CreateViewModelWithGroups();
+    MountOptionInputViewModel transfers = viewModel.Groups[0].AllOptions[0];
+    transfers.Value = "8";
+    transfers.IsPinned = true;
+
+    viewModel.SearchText = "no-such-option";
+
+    Assert.True(viewModel.HasNoSearchResults);
+    Assert.Equal("8", viewModel.GetNonDefaultValues()["transfers"]);
+    Assert.Contains("transfers", viewModel.GetPinnedOptionNames());
+    Assert.Equal(["--transfers", "8"], viewModel.ToCommandLineArguments());
+
+    viewModel.ClearSearchCommand.Execute(null);
+
+    Assert.False(viewModel.HasNoSearchResults);
+    Assert.Same(transfers, viewModel.Groups[0].VisibleOptions.First());
+    Assert.Equal("8", transfers.Value);
+  }
+
   [Fact]
   public void GetPinnedOptionNames_ReturnsOnlyPinnedOptions()
   {
@@ -67,7 +130,7 @@ public class MountOptionsViewModelTests
         Options =
         [
           new RcloneOption {Name = "transfers", Type = "int"},
-          new RcloneOption {Name = "vfs_cache_mode", Type = "string"},
+          new RcloneOption {Name = "vfs_cache_mode", Type = "string", Advanced = true, Help = "Disk caching mode"},
         ],
       },
     ];

@@ -20,6 +20,7 @@ public abstract partial class TypedOptionViewModel : ObservableObject
   public string DefaultStr => Option.DefaultStr;
   public bool IsAdvanced => Option.Advanced;
   public bool IsPassword => Option.IsPassword;
+  public bool IsFilePath => Option.IsFilePath;
   public OptionControlType ControlType => Option.GetControlType();
   public IReadOnlyList<string>? EnumValues => Option.GetEnumValues();
   public IReadOnlyList<SizeSuffixUnit> SizeSuffixUnits => SizeSuffixHelper.UnitItems;
@@ -28,6 +29,19 @@ public abstract partial class TypedOptionViewModel : ObservableObject
   public string ListSeparator => Option.ListSeparator;
 
   public abstract string Label { get; }
+
+  public bool MatchesSearch(string searchText)
+  {
+    if (string.IsNullOrWhiteSpace(searchText))
+    {
+      return true;
+    }
+
+    string searchableText = $"{Name} {Label} {Help}".Replace('_', ' ').Replace('-', ' ');
+    string[] terms = searchText.Replace('_', ' ').Replace('-', ' ')
+      .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+    return terms.All(term => searchableText.Contains(term, StringComparison.OrdinalIgnoreCase));
+  }
 
   [ObservableProperty] private string _value = string.Empty;
 
@@ -44,6 +58,8 @@ public abstract partial class TypedOptionViewModel : ObservableObject
   [ObservableProperty] private string? _selectedEnumValue;
 
   [ObservableProperty] private bool _isPinned;
+
+  [ObservableProperty] private bool _isErased;
 
   [ObservableProperty] private string _confirmValue = string.Empty;
 
@@ -233,6 +249,11 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     try
     {
       Value = newValue;
+      if (!string.IsNullOrEmpty(newValue))
+      {
+        IsErased = false;
+      }
+
       OnPropertyChanged(nameof(HasNonDefaultValue));
       if (!string.IsNullOrEmpty(newValue) &&
           !string.Equals(newValue, NormalizedDefaultStr, StringComparison.OrdinalIgnoreCase))
@@ -253,6 +274,11 @@ public abstract partial class TypedOptionViewModel : ObservableObject
     if (_syncing)
     {
       return;
+    }
+
+    if (!string.IsNullOrEmpty(value))
+    {
+      IsErased = false;
     }
 
     OnPropertyChanged(nameof(HasNonDefaultValue));
@@ -377,6 +403,37 @@ public abstract partial class TypedOptionViewModel : ObservableObject
   [RelayCommand]
   protected virtual void ResetToDefault()
   {
+    IsPinned = false;
+    IsErased = false;
+    ConfirmValue = string.Empty;
+    IsSecretVisible = false;
+    Value = string.Empty;
+    OnPropertyChanged(nameof(HasNonDefaultValue));
+    OnPropertyChanged(nameof(HasSecretMismatch));
+    OnPropertyChanged(nameof(ShouldInclude));
+  }
+
+  public Func<Task<string?>>? FilePickerHandler { get; set; }
+
+  [RelayCommand]
+  private async Task BrowseFileAsync()
+  {
+    if (FilePickerHandler is null)
+    {
+      return;
+    }
+
+    string? path = await FilePickerHandler();
+    if (!string.IsNullOrWhiteSpace(path))
+    {
+      Value = path;
+    }
+  }
+
+  [RelayCommand]
+  private void Erase()
+  {
+    IsErased = true;
     IsPinned = false;
     ConfirmValue = string.Empty;
     IsSecretVisible = false;

@@ -131,6 +131,16 @@ public class MountManagerServiceTests
   }
 
   [Fact]
+  public void GenerateScript_ExecsRcloneMountProcess()
+  {
+    MountProfile profile = CreateProfile();
+
+    string script = _service.GenerateScript(profile);
+
+    Assert.Contains("exec \"rclone\" mount", script, StringComparison.Ordinal);
+  }
+
+  [Fact]
   public void GenerateScript_IncludesRcFlags_WhenRemoteControlEnabledAndRcAddrMissing()
   {
     MountProfile profile = CreateProfile();

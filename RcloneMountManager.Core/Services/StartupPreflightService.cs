@@ -60,7 +60,7 @@ public sealed class StartupPreflightService
       return;
     }
 
-    string binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath.Trim();
+    string binary = profile.EffectiveRcloneBinaryPath;
     if (!TryResolveBinaryPath(binary, out string resolvedPath, out string error))
     {
       report.AddCritical(BinaryCheckKey, $"Could not resolve executable rclone binary '{binary}': {error}");
@@ -182,7 +182,7 @@ public sealed class StartupPreflightService
       return;
     }
 
-    string binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath.Trim();
+    string binary = profile.EffectiveRcloneBinaryPath;
 
     try
     {

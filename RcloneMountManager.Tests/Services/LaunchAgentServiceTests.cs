@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using RcloneMountManager.Core.Models;
@@ -99,6 +101,60 @@ public sealed class LaunchAgentServiceTests : IDisposable
 
     Assert.EndsWith($"{expectedLabel}.plist", plistPath, StringComparison.Ordinal);
     Assert.Contains($"<string>{expectedLabel}</string>", plistContent, StringComparison.Ordinal);
+  }
+
+  [Fact]
+  public async Task EnableAsync_LoadsAgentFromLoginShellAndPreservesQuotedScriptPath()
+  {
+    if (!OperatingSystem.IsMacOS())
+    {
+      return;
+    }
+
+    Directory.CreateDirectory(_tempRoot);
+    string shellPath = Path.Combine(_tempRoot, "test-login-shell");
+    await File.WriteAllTextAsync(shellPath, """
+      #!/bin/sh
+      [ "$1" = "-lic" ] || exit 64
+      export SSH_AUTH_SOCK=/tmp/test-ssh-agent.sock
+      exec /bin/sh -c "$2"
+      """);
+    File.SetUnixFileMode(shellPath, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    LaunchAgentService service = new(
+      NullLogger<LaunchAgentService>.Instance,
+      appDataDirectory: Path.Combine(_tempRoot, "User's App Data & Mounts"),
+      userProfileDirectory: Path.Combine(_tempRoot, "User"),
+      commandRunner: (_, _, _) => Task.FromResult(new LaunchAgentService.CommandExecutionResult(0, "", "")),
+      uidProvider: () => 501,
+      loginShellPath: shellPath);
+    MountProfile profile = CreateProfile();
+
+    await service.EnableAsync(profile, "#!/bin/bash\nprintf '%s' \"$SSH_AUTH_SOCK\"\n", CancellationToken.None);
+
+    XDocument plist = XDocument.Load(service.GetLaunchAgentPlistPath(profile));
+    XElement argumentsElement = (XElement)plist.Root!.Element("dict")!.Elements("key")
+      .Single(key => key.Value == "ProgramArguments").NextNode!;
+    string[] arguments = argumentsElement.Elements("string").Select(value => value.Value).ToArray();
+    ProcessStartInfo startInfo = new(arguments[0])
+    {
+      UseShellExecute = false,
+      RedirectStandardOutput = true,
+      RedirectStandardError = true,
+    };
+    startInfo.Environment["SSH_AUTH_SOCK"] = "/tmp/wrong-inherited-agent.sock";
+    foreach (string argument in arguments.Skip(1))
+    {
+      startInfo.ArgumentList.Add(argument);
+    }
+
+    using Process process = Process.Start(startInfo)!;
+    using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(10));
+    string output = await process.StandardOutput.ReadToEndAsync(timeout.Token);
+    string error = await process.StandardError.ReadToEndAsync(timeout.Token);
+    await process.WaitForExitAsync(timeout.Token);
+
+    Assert.True(process.ExitCode == 0, error);
+    Assert.Equal("/tmp/test-ssh-agent.sock", output);
   }
 
   private LaunchAgentService CreateService(List<(string Command, string[] Args)> calls)

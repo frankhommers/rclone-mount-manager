@@ -27,6 +27,12 @@ public sealed class WizardStepOptionDefinition : IRcloneOptionDefinition
   public string ListSeparator => ",";
   public bool IsKeyValue => false;
 
+  public bool IsFilePath =>
+    Type is "string" &&
+    !IsPassword &&
+    (Name.EndsWith("_file", StringComparison.OrdinalIgnoreCase) ||
+     Help.StartsWith("Path to", StringComparison.OrdinalIgnoreCase));
+
   public OptionControlType GetControlType()
   {
     if (IsPassword)

@@ -13,6 +13,7 @@ public interface IRcloneOptionDefinition
   bool IsPassword { get; }
   string ListSeparator { get; }
   bool IsKeyValue { get; }
+  bool IsFilePath { get; }
   OptionControlType GetControlType();
   IReadOnlyList<string>? GetEnumValues();
 }

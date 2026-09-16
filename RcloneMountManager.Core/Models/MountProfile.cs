@@ -6,6 +6,13 @@ namespace RcloneMountManager.Core.Models;
 
 public partial class MountProfile : ObservableObject
 {
+  public static string GlobalBinaryPath { get; set; } = "rclone";
+
+  public string EffectiveRcloneBinaryPath =>
+    !string.IsNullOrWhiteSpace(RcloneBinaryPath) ? RcloneBinaryPath
+    : !string.IsNullOrWhiteSpace(GlobalBinaryPath) ? GlobalBinaryPath
+    : "rclone";
+
   [ObservableProperty] private string _id = Guid.NewGuid().ToString("N");
 
   [ObservableProperty] private string _name = "New profile";
@@ -24,7 +31,7 @@ public partial class MountProfile : ObservableObject
 
   [ObservableProperty] private HashSet<string> _pinnedMountOptions = new(StringComparer.OrdinalIgnoreCase);
 
-  [ObservableProperty] private string _rcloneBinaryPath = "rclone";
+  [ObservableProperty] private string _rcloneBinaryPath = string.Empty;
 
   [ObservableProperty] private QuickConnectMode _quickConnectMode;
 
@@ -35,6 +42,8 @@ public partial class MountProfile : ObservableObject
   [ObservableProperty] private string _quickConnectUsername = string.Empty;
 
   [ObservableProperty] private string _quickConnectPassword = string.Empty;
+
+  [ObservableProperty] private string _quickConnectKeyFile = string.Empty;
 
   [ObservableProperty] private bool _allowInsecurePasswordsInScript;
 
@@ -49,6 +58,8 @@ public partial class MountProfile : ObservableObject
   [ObservableProperty] private int _rcPort;
 
   [ObservableProperty] private bool _enableRemoteControl = true;
+
+  [ObservableProperty] private RemoteEditorMode _lastRemoteEditorMode = RemoteEditorMode.Chooser;
 
   [ObservableProperty] private bool _isMounted;
 

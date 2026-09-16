@@ -17,6 +17,7 @@ public sealed class LaunchAgentService
   private readonly string _appDataDirectory;
   private readonly ILogger<LaunchAgentService> _logger;
   private readonly string _userProfileDirectory;
+  private readonly string _loginShellPath;
   private readonly Func<string, string[], CancellationToken, Task<CommandExecutionResult>> _commandRunner;
   private readonly Func<uint> _uidProvider;
 
@@ -30,7 +31,8 @@ public sealed class LaunchAgentService
     string? appDataDirectory = null,
     string? userProfileDirectory = null,
     Func<string, string[], CancellationToken, Task<CommandExecutionResult>>? commandRunner = null,
-    Func<uint>? uidProvider = null)
+    Func<uint>? uidProvider = null,
+    string? loginShellPath = null)
   {
     ArgumentNullException.ThrowIfNull(logger);
 
@@ -41,6 +43,7 @@ public sealed class LaunchAgentService
     _userProfileDirectory = userProfileDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     _commandRunner = commandRunner ?? ExecuteCommandAsync;
     _uidProvider = uidProvider ?? getuid;
+    _loginShellPath = loginShellPath ?? Environment.GetEnvironmentVariable("SHELL") ?? "/bin/zsh";
   }
 
   public bool IsSupported => OperatingSystem.IsMacOS();
@@ -178,10 +181,10 @@ public sealed class LaunchAgentService
     return File.Exists(GetLaunchAgentPlistPath(profile));
   }
 
-  private static string BuildPlist(MountProfile profile, string scriptPath)
+  private string BuildPlist(MountProfile profile, string scriptPath)
   {
     string label = BuildLabel(profile);
-    string escapedPath = EscapeXml(scriptPath);
+    string escapedCommand = EscapeXml($"exec /bin/bash '{scriptPath.Replace("'", "'\\''")}'");
     string escapedLabel = EscapeXml(label);
 
     StringBuilder builder = new();
@@ -194,8 +197,9 @@ public sealed class LaunchAgentService
     builder.AppendLine($"  <string>{escapedLabel}</string>");
     builder.AppendLine("  <key>ProgramArguments</key>");
     builder.AppendLine("  <array>");
-    builder.AppendLine("    <string>/bin/bash</string>");
-    builder.AppendLine($"    <string>{escapedPath}</string>");
+    builder.AppendLine($"    <string>{EscapeXml(_loginShellPath)}</string>");
+    builder.AppendLine("    <string>-lic</string>");
+    builder.AppendLine($"    <string>{escapedCommand}</string>");
     builder.AppendLine("  </array>");
     builder.AppendLine("  <key>RunAtLoad</key>");
     builder.AppendLine("  <true/>");

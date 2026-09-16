@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using RcloneMountManager.Core.Models;
 using RcloneMountManager.Core.Services;
 
@@ -17,9 +18,19 @@ public partial class MountOptionsViewModel : ObservableObject
 
   [ObservableProperty] private bool _showAdvancedOptions = true;
 
-  [ObservableProperty] private bool _isLoading;
+  [ObservableProperty] private string _searchText = string.Empty;
+
+  [ObservableProperty]
+  [NotifyPropertyChangedFor(nameof(HasNoSearchResults))]
+  private bool _isLoading;
 
   public ObservableCollection<MountOptionGroupViewModel> Groups { get; } = new();
+
+  public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
+  public bool HasNoSearchResults => !IsLoading && HasSearchText && !Groups.Any(group => group.HasVisibleOptions);
+
+  [RelayCommand]
+  private void ClearSearch() => SearchText = string.Empty;
 
   public async Task LoadOptionsAsync(
     string rcloneBinaryPath,
@@ -113,6 +124,19 @@ public partial class MountOptionsViewModel : ObservableObject
     {
       group.ShowAdvanced = value;
     }
+
+    OnPropertyChanged(nameof(HasNoSearchResults));
+  }
+
+  partial void OnSearchTextChanged(string value)
+  {
+    foreach (MountOptionGroupViewModel group in Groups)
+    {
+      group.SearchText = value;
+    }
+
+    OnPropertyChanged(nameof(HasSearchText));
+    OnPropertyChanged(nameof(HasNoSearchResults));
   }
 
   private void RebuildGroups(Dictionary<string, string> currentValues, HashSet<string>? pinnedNames = null)
@@ -149,11 +173,14 @@ public partial class MountOptionsViewModel : ObservableObject
           DisplayName = group.DisplayName,
           AllOptions = optionVms,
           ShowAdvanced = ShowAdvancedOptions,
+          SearchText = SearchText,
           InfoText = group.Name == "rc"
             ? "Enable Remote Control to allow mount status monitoring and management."
             : null,
         });
     }
+
+    OnPropertyChanged(nameof(HasNoSearchResults));
   }
 }
 
@@ -169,8 +196,24 @@ public partial class MountOptionGroupViewModel : ObservableObject
 
   [ObservableProperty] private bool _isExpanded;
 
+  [ObservableProperty] private string _searchText = string.Empty;
+
+  public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
+
+  public bool IsEffectivelyExpanded
+  {
+    get => IsExpanded || HasSearchText;
+    set
+    {
+      if (!HasSearchText)
+      {
+        IsExpanded = value;
+      }
+    }
+  }
+
   public IEnumerable<GUI.ViewModels.MountOptionInputViewModel> VisibleOptions =>
-    ShowAdvanced ? AllOptions : AllOptions.Where(o => !o.IsAdvanced);
+    AllOptions.Where(option => (ShowAdvanced || HasSearchText || !option.IsAdvanced) && option.MatchesSearch(SearchText));
 
   public bool HasVisibleOptions => VisibleOptions.Any();
   public int ModifiedCount => VisibleOptions.Count(o => o.ShouldInclude);
@@ -179,6 +222,23 @@ public partial class MountOptionGroupViewModel : ObservableObject
   public string Header => $"{DisplayName} ({VisibleOptions.Count(o => o.ShouldInclude)}/{VisibleOptions.Count()})";
 
   partial void OnShowAdvancedChanged(bool value)
+  {
+    NotifyVisibleOptionsChanged();
+  }
+
+  partial void OnIsExpandedChanged(bool value)
+  {
+    OnPropertyChanged(nameof(IsEffectivelyExpanded));
+  }
+
+  partial void OnSearchTextChanged(string value)
+  {
+    OnPropertyChanged(nameof(HasSearchText));
+    OnPropertyChanged(nameof(IsEffectivelyExpanded));
+    NotifyVisibleOptionsChanged();
+  }
+
+  private void NotifyVisibleOptionsChanged()
   {
     OnPropertyChanged(nameof(VisibleOptions));
     OnPropertyChanged(nameof(HasVisibleOptions));

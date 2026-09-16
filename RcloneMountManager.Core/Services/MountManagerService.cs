@@ -163,7 +163,7 @@ public sealed class MountManagerService
       throw new InvalidOperationException("Connectivity test currently supports rclone profiles only.");
     }
 
-    string binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
+    string binary = profile.EffectiveRcloneBinaryPath;
 
     List<string> arguments;
     if (profile.QuickConnectMode is QuickConnectMode.None)
@@ -311,11 +311,11 @@ public sealed class MountManagerService
 
     if (IsRcloneMountType(profile.Type))
     {
-      string binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
+      string binary = profile.EffectiveRcloneBinaryPath;
       string mountCommand = GetRcloneMountCommandForScript(binary, profile.Type);
       string source = ResolveRcloneSource(profile);
 
-      builder.Append("\"");
+      builder.Append("exec \"");
       builder.Append(EscapeForBash(binary));
       builder.Append("\" ");
       builder.Append(mountCommand);
@@ -403,7 +403,7 @@ public sealed class MountManagerService
     }
 
     string source = ResolveRcloneSource(profile);
-    string binary = string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath;
+    string binary = profile.EffectiveRcloneBinaryPath;
     string mountCommand = await ResolveRcloneMountCommandAsync(binary, profile.Type, cancellationToken);
     List<string> arguments = new() {mountCommand, source, mountPoint};
     await AddQuickConnectArgumentsAsync(profile, arguments, cancellationToken);
@@ -885,6 +885,12 @@ public sealed class MountManagerService
           builder.Append(EscapeArgument(profile.QuickConnectUsername));
         }
 
+        if (!string.IsNullOrWhiteSpace(profile.QuickConnectKeyFile))
+        {
+          builder.Append(" --sftp-key-file ");
+          builder.Append(EscapeArgument(profile.QuickConnectKeyFile));
+        }
+
         builder.Append(" --sftp-pass ");
         builder.Append(BuildScriptPasswordValue(profile, "SFTP_PASSWORD"));
         return;
@@ -960,6 +966,12 @@ public sealed class MountManagerService
           arguments.Add(profile.QuickConnectUsername);
         }
 
+        if (!string.IsNullOrWhiteSpace(profile.QuickConnectKeyFile))
+        {
+          arguments.Add("--sftp-key-file");
+          arguments.Add(profile.QuickConnectKeyFile);
+        }
+
         await AddObscuredPasswordArgumentAsync(
           profile,
           arguments,
@@ -1007,7 +1019,7 @@ public sealed class MountManagerService
     }
 
     BufferedCommandResult obscureResult = await Cli
-      .Wrap(string.IsNullOrWhiteSpace(profile.RcloneBinaryPath) ? "rclone" : profile.RcloneBinaryPath)
+      .Wrap(profile.EffectiveRcloneBinaryPath)
       .WithArguments(["obscure", rawPassword])
       .WithValidation(CommandResultValidation.None)
       .ExecuteBufferedAsync(cancellationToken);

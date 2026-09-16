@@ -6,6 +6,7 @@ A cross-platform desktop application for managing filesystem mounts via [rclone]
 
 - **Multiple mount profiles** - Create and manage different mount configurations
 - **Typed mount parameters** - All rclone mount, VFS, NFS, filter, and general options with appropriate UI controls (toggles, dropdowns, text fields) auto-discovered from rclone
+- **Search configuration options** - Filter remote and mount options by name or description, including advanced options; matching groups open automatically without losing edits
 - **Quick Connect** - Mount WebDAV, SFTP, FTP, and FTPS endpoints without pre-configuring rclone remotes
 - **Backend builder** - Discover and configure any of rclone's 60+ backend types directly from the app
 - **OAuth Setup Wizard** - Step-by-step guided setup for OAuth backends (OneDrive, Google Drive, Dropbox, etc.) with automatic browser authorization
