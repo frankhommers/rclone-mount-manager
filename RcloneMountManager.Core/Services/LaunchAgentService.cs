@@ -18,6 +18,7 @@ public sealed class LaunchAgentService
   private readonly ILogger<LaunchAgentService> _logger;
   private readonly string _userProfileDirectory;
   private readonly string _loginShellPath;
+  private readonly LaunchAgentRestartPolicy _restartPolicy;
   private readonly Func<string, string[], CancellationToken, Task<CommandExecutionResult>> _commandRunner;
   private readonly Func<uint> _uidProvider;
 
@@ -32,7 +33,8 @@ public sealed class LaunchAgentService
     string? userProfileDirectory = null,
     Func<string, string[], CancellationToken, Task<CommandExecutionResult>>? commandRunner = null,
     Func<uint>? uidProvider = null,
-    string? loginShellPath = null)
+    string? loginShellPath = null,
+    LaunchAgentRestartPolicy? restartPolicy = null)
   {
     ArgumentNullException.ThrowIfNull(logger);
 
@@ -44,6 +46,7 @@ public sealed class LaunchAgentService
     _commandRunner = commandRunner ?? ExecuteCommandAsync;
     _uidProvider = uidProvider ?? getuid;
     _loginShellPath = loginShellPath ?? Environment.GetEnvironmentVariable("SHELL") ?? "/bin/zsh";
+    _restartPolicy = restartPolicy ?? LaunchAgentRestartPolicy.Default;
   }
 
   public bool IsSupported => OperatingSystem.IsMacOS();
@@ -53,6 +56,22 @@ public sealed class LaunchAgentService
     string scriptsDirectory = Path.Combine(_appDataDirectory, "scripts");
     string safeName = BuildSafeFileName(profile.Name);
     return Path.Combine(scriptsDirectory, $"{safeName}-{profile.Id}.sh");
+  }
+
+  public string GetSupervisorScriptPath(MountProfile profile)
+  {
+    string scriptPath = GetScriptPath(profile);
+    return Path.ChangeExtension(scriptPath, ".supervisor.sh");
+  }
+
+  public string GetBackoffStatePath(MountProfile profile)
+  {
+    return Path.Combine(_appDataDirectory, "state", $"{profile.Id}.backoff");
+  }
+
+  public string GetLaunchAgentLogPath(MountProfile profile)
+  {
+    return Path.Combine(_appDataDirectory, "logs", $"{profile.Id}.launchagent.log");
   }
 
   public string GetLaunchAgentPlistPath(MountProfile profile)
@@ -85,9 +104,25 @@ public sealed class LaunchAgentService
         UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
     }
 
+    string supervisorPath = GetSupervisorScriptPath(profile);
+    string supervisorContent = LaunchAgentSupervisorScript.Build(
+      scriptPath,
+      GetBackoffStatePath(profile),
+      _restartPolicy);
+    await File.WriteAllTextAsync(supervisorPath, supervisorContent, cancellationToken);
+    if (!OperatingSystem.IsWindows())
+    {
+      File.SetUnixFileMode(
+        supervisorPath,
+        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+    }
+
+    ResetBackoff(profile);
+    Directory.CreateDirectory(Path.GetDirectoryName(GetLaunchAgentLogPath(profile))!);
+
     string plistPath = GetLaunchAgentPlistPath(profile);
     Directory.CreateDirectory(Path.GetDirectoryName(plistPath)!);
-    string plistContent = BuildPlist(profile, scriptPath);
+    string plistContent = BuildPlist(profile, supervisorPath);
     await File.WriteAllTextAsync(plistPath, plistContent, cancellationToken);
 
     await RunPlutilLintAsync(plistPath, cancellationToken);
@@ -131,7 +166,15 @@ public sealed class LaunchAgentService
       File.Delete(plistPath);
     }
 
+    DeleteIfExists(GetSupervisorScriptPath(profile));
+    ResetBackoff(profile);
+
     _logger.LogInformation("Disabled start at login for {ProfileName}.", profile.Name);
+  }
+
+  public void ResetBackoff(MountProfile profile)
+  {
+    DeleteIfExists(GetBackoffStatePath(profile));
   }
 
   public async Task UnloadAsync(MountProfile profile, CancellationToken cancellationToken)
@@ -172,6 +215,7 @@ public sealed class LaunchAgentService
       return;
     }
 
+    ResetBackoff(profile);
     await RunLaunchCtlAsync(["bootstrap", BuildGuiDomain(), plistPath], cancellationToken);
     _logger.LogInformation("Loaded LaunchAgent for {ProfileName}.", profile.Name);
   }
@@ -181,7 +225,7 @@ public sealed class LaunchAgentService
     return File.Exists(GetLaunchAgentPlistPath(profile));
   }
 
-  private string BuildPlist(MountProfile profile, string scriptPath)
+  internal string BuildPlist(MountProfile profile, string scriptPath)
   {
     string label = BuildLabel(profile);
     string escapedCommand = EscapeXml($"exec /bin/bash '{scriptPath.Replace("'", "'\\''")}'");
@@ -205,6 +249,10 @@ public sealed class LaunchAgentService
     builder.AppendLine("  <true/>");
     builder.AppendLine("  <key>KeepAlive</key>");
     builder.AppendLine("  <true/>");
+    builder.AppendLine("  <key>ThrottleInterval</key>");
+    builder.AppendLine($"  <integer>{_restartPolicy.ThrottleIntervalSeconds}</integer>");
+    builder.AppendLine("  <key>StandardErrorPath</key>");
+    builder.AppendLine($"  <string>{EscapeXml(GetLaunchAgentLogPath(profile))}</string>");
     builder.AppendLine("</dict>");
     builder.AppendLine("</plist>");
     return builder.ToString();
@@ -267,6 +315,14 @@ public sealed class LaunchAgentService
       .ExecuteBufferedAsync(cancellationToken);
 
     return new CommandExecutionResult(result.ExitCode, result.StandardOutput, result.StandardError);
+  }
+
+  private static void DeleteIfExists(string path)
+  {
+    if (File.Exists(path))
+    {
+      File.Delete(path);
+    }
   }
 
   private static string BuildSafeFileName(string fileName)
