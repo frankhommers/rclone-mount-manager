@@ -5,6 +5,9 @@ using RcloneMountManager.Core.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -17,6 +20,9 @@ namespace RcloneMountManager.Core.Services;
 
 public sealed class MountManagerService
 {
+  private const int ForceStopGracePollCount = 10;
+  private static readonly TimeSpan ForceStopPollInterval = TimeSpan.FromMilliseconds(300);
+  private static readonly TimeSpan UnmountAttemptTimeout = TimeSpan.FromSeconds(15);
   private readonly ILogger<MountManagerService> _logger;
   private readonly ConcurrentDictionary<string, RunningMount> _runningMounts = new(StringComparer.OrdinalIgnoreCase);
 
@@ -614,7 +620,150 @@ public sealed class MountManagerService
     }
   }
 
-  private async Task UnmountAsync(string mountPoint, CancellationToken cancellationToken)
+  public async Task ForceStopAsync(MountProfile profile, CancellationToken cancellationToken)
+  {
+    ArgumentNullException.ThrowIfNull(profile);
+
+    string mountPoint = ResolveMountPoint(profile.MountPoint);
+    if (string.IsNullOrWhiteSpace(mountPoint))
+    {
+      throw new InvalidOperationException("Mount point is required.");
+    }
+
+    if (IsRcloneMountType(profile.Type))
+    {
+      HashSet<int> pids = new();
+      if (_runningMounts.TryRemove(mountPoint, out RunningMount? runningMount) && runningMount.Pid > 0)
+      {
+        pids.Add(runningMount.Pid);
+      }
+
+      if (profile.EnableRemoteControl && await ProbeRcPidAsync(profile.RcPort, cancellationToken) is { } rcPid)
+      {
+        pids.Add(rcPid);
+      }
+
+      pids.UnionWith(await FindRcloneProcessIdsAsync(mountPoint, cancellationToken));
+      await KillProcessesAsync(pids, cancellationToken);
+    }
+
+    await UnmountAsync(mountPoint, cancellationToken, force: true);
+  }
+
+  private async Task<IReadOnlyCollection<int>> FindRcloneProcessIdsAsync(
+    string mountPoint,
+    CancellationToken cancellationToken)
+  {
+    BufferedCommandResult result = await Cli.Wrap("ps")
+      .WithArguments(["-A", "-o", "pid=", "-o", "command="])
+      .WithValidation(CommandResultValidation.None)
+      .ExecuteBufferedAsync(cancellationToken);
+
+    if (result.ExitCode != 0)
+    {
+      return [];
+    }
+
+    return FindRcloneProcessIds(result.StandardOutput, mountPoint);
+  }
+
+  public static IReadOnlyCollection<int> FindRcloneProcessIds(string psOutput, string mountPoint)
+  {
+    List<int> pids = new();
+    string trimmedMountPoint = mountPoint.TrimEnd('/');
+    foreach (string rawLine in psOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+    {
+      string line = rawLine.Trim();
+      int separator = line.IndexOf(' ');
+      if (separator <= 0 || !int.TryParse(line[..separator], out int pid))
+      {
+        continue;
+      }
+
+      string command = line[(separator + 1)..].TrimStart();
+      string executable = command.Split(' ', 2)[0];
+      if (!Path.GetFileName(executable).StartsWith("rclone", StringComparison.Ordinal))
+      {
+        continue;
+      }
+
+      string paddedCommand = command + " ";
+      if (paddedCommand.Contains($" {trimmedMountPoint} ", StringComparison.Ordinal) ||
+          paddedCommand.Contains($" {trimmedMountPoint}/ ", StringComparison.Ordinal))
+      {
+        pids.Add(pid);
+      }
+    }
+
+    return pids;
+  }
+
+  private async Task KillProcessesAsync(IReadOnlyCollection<int> pids, CancellationToken cancellationToken)
+  {
+    if (pids.Count == 0)
+    {
+      _logger.LogInformation("No running rclone process found for this mount point");
+      return;
+    }
+
+    foreach (int pid in pids)
+    {
+      _logger.LogInformation("Sending SIGTERM to rclone process {Pid}...", pid);
+      await Cli.Wrap("kill")
+        .WithArguments(["-TERM", pid.ToString(CultureInfo.InvariantCulture)])
+        .WithValidation(CommandResultValidation.None)
+        .ExecuteBufferedAsync(cancellationToken);
+    }
+
+    for (int attempt = 0; attempt < ForceStopGracePollCount; attempt++)
+    {
+      if (pids.All(pid => !IsProcessAlive(pid)))
+      {
+        return;
+      }
+
+      await Task.Delay(ForceStopPollInterval, cancellationToken);
+    }
+
+    foreach (int pid in pids.Where(IsProcessAlive))
+    {
+      _logger.LogWarning("rclone process {Pid} did not exit; killing it", pid);
+      try
+      {
+        using Process process = Process.GetProcessById(pid);
+        process.Kill();
+      }
+      catch (ArgumentException)
+      {
+      }
+      catch (InvalidOperationException)
+      {
+      }
+      catch (Win32Exception ex)
+      {
+        _logger.LogWarning("Could not kill process {Pid}: {Error}", pid, ex.Message);
+      }
+    }
+  }
+
+  private static bool IsProcessAlive(int pid)
+  {
+    try
+    {
+      using Process process = Process.GetProcessById(pid);
+      return !process.HasExited;
+    }
+    catch (ArgumentException)
+    {
+      return false;
+    }
+    catch (InvalidOperationException)
+    {
+      return false;
+    }
+  }
+
+  private async Task UnmountAsync(string mountPoint, CancellationToken cancellationToken, bool force = false)
   {
     if (!await IsMountedAsync(mountPoint, cancellationToken))
     {
@@ -623,25 +772,51 @@ public sealed class MountManagerService
     }
 
     (string Binary, string[] Args)[] unmountCandidates = RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
-      ? new[]
-      {
-        (Binary: "fusermount", Args: new[] {"-u", mountPoint}),
-        (Binary: "umount", Args: new[] {mountPoint}),
-      }
-      : new[]
-      {
-        (Binary: "diskutil", Args: new[] {"unmount", mountPoint}),
-        (Binary: "umount", Args: new[] {mountPoint}),
-        (Binary: "diskutil", Args: new[] {"unmount", "force", mountPoint}),
-        (Binary: "umount", Args: new[] {"-f", mountPoint}),
-      };
+      ? force
+        ? new[]
+        {
+          (Binary: "fusermount", Args: new[] {"-uz", mountPoint}),
+          (Binary: "umount", Args: new[] {"-l", mountPoint}),
+        }
+        : new[]
+        {
+          (Binary: "fusermount", Args: new[] {"-u", mountPoint}),
+          (Binary: "umount", Args: new[] {mountPoint}),
+        }
+      : force
+        ? new[]
+        {
+          (Binary: "diskutil", Args: new[] {"unmount", "force", mountPoint}),
+          (Binary: "umount", Args: new[] {"-f", mountPoint}),
+        }
+        : new[]
+        {
+          (Binary: "diskutil", Args: new[] {"unmount", mountPoint}),
+          (Binary: "umount", Args: new[] {mountPoint}),
+          (Binary: "diskutil", Args: new[] {"unmount", "force", mountPoint}),
+          (Binary: "umount", Args: new[] {"-f", mountPoint}),
+        };
 
     foreach ((string Binary, string[] Args) candidate in unmountCandidates)
     {
-      BufferedCommandResult result = await Cli.Wrap(candidate.Binary)
-        .WithArguments(candidate.Args)
-        .WithValidation(CommandResultValidation.None)
-        .ExecuteBufferedAsync(cancellationToken);
+      using CancellationTokenSource attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+      attemptTimeout.CancelAfter(UnmountAttemptTimeout);
+      BufferedCommandResult result;
+      try
+      {
+        result = await Cli.Wrap(candidate.Binary)
+          .WithArguments(candidate.Args)
+          .WithValidation(CommandResultValidation.None)
+          .ExecuteBufferedAsync(attemptTimeout.Token);
+      }
+      catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+      {
+        _logger.LogWarning(
+          "Unmount attempt timed out: {Binary} {Args}",
+          candidate.Binary,
+          string.Join(" ", candidate.Args));
+        continue;
+      }
 
       if (result.ExitCode == 0)
       {

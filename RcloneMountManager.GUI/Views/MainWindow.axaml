@@ -397,6 +397,10 @@
                                                             IsVisible="{Binding Profile.IsMounted}"
                                                             Command="{Binding StopMountCommand}"
                                                             Margin="0,0,6,0" Padding="10,4" MinHeight="26" />
+                                                    <Button Content="Force restart"
+                                                            Command="{Binding ForceRestartMountCommand}"
+                                                            ToolTip.Tip="Kill a hung rclone process, force unmount and start again"
+                                                            Margin="0,0,6,0" Padding="10,4" MinHeight="26" />
                                                     <Button Content="Refresh cache"
                                                             IsVisible="{Binding Profile.IsMounted}"
                                                             Command="{Binding RefreshCacheCommand}"
@@ -859,6 +863,9 @@
                                         <Button Content="Start mount" Command="{Binding StartMountCommand}"
                                                 Margin="0,0,8,8" />
                                         <Button Content="Stop mount" Command="{Binding StopMountCommand}"
+                                                Margin="0,0,8,8" />
+                                        <Button Content="Force restart" Command="{Binding ForceRestartMountCommand}"
+                                                ToolTip.Tip="Kill a hung rclone process, force unmount and start again"
                                                 Margin="0,0,8,8" />
                                         <Button Content="Refresh cache" Command="{Binding RefreshCacheCommand}"
                                                 Margin="0,0,8,8" />

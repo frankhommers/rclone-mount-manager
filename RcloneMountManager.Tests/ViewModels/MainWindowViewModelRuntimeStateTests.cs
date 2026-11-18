@@ -76,6 +76,30 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
     Assert.Contains("Lifecycle: idle", viewModel.StatusText, StringComparison.Ordinal);
   }
 
+  [Fact]
+  public async Task ForceRestartMountCommand_ForceStopsThenStartsMount()
+  {
+    List<string> calls = new();
+    MainWindowViewModel viewModel = CreateViewModel(
+      mountStartRunner: (_, _) =>
+      {
+        calls.Add("start");
+        return Task.CompletedTask;
+      },
+      mountForceStopRunner: (_, _) =>
+      {
+        calls.Add("force-stop");
+        return Task.CompletedTask;
+      },
+      runtimeStateVerifier: (_, _) => Task.FromResult(CreateState(MountLifecycleState.Mounted, MountHealthState.Healthy)));
+    viewModel.SelectedProfile.RuntimeState = CreateState(MountLifecycleState.Mounted, MountHealthState.Failed);
+
+    await viewModel.ForceRestartMountCommand.ExecuteAsync(null);
+
+    Assert.Equal(["force-stop", "start"], calls);
+    Assert.Equal(MountHealthState.Healthy, viewModel.SelectedProfile.RuntimeState.Health);
+  }
+
   [Theory]
   [InlineData(MountHealthState.Degraded)]
   [InlineData(MountHealthState.Failed)]
@@ -223,6 +247,7 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
     Func<MountProfile, CancellationToken, Task>? mountStartRunner = null,
     Func<MountProfile, CancellationToken, Task>? mountStopRunner = null,
     Func<MountProfile, CancellationToken, Task<bool>>? mountedProbe = null,
+    Func<MountProfile, CancellationToken, Task>? mountForceStopRunner = null,
     Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>>? runtimeStateVerifier = null,
     Func<TimeSpan, CancellationToken, Task<bool>>? runtimeRefreshWaiter = null)
   {
@@ -251,7 +276,8 @@ public sealed class MainWindowViewModelRuntimeStateTests : IDisposable
       runtimeRefreshWaiter: runtimeRefreshWaiter,
       runtimeStateBatchVerifier: RuntimeStateBatchVerifier,
       loadStartupData: false,
-      logger: TestLogger.CreateMainWindowViewModelLogger());
+      logger: TestLogger.CreateMainWindowViewModelLogger(),
+      mountForceStopRunner: mountForceStopRunner);
 
     _viewModels.Add(viewModel);
     return viewModel;

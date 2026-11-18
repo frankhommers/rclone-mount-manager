@@ -43,6 +43,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
   private readonly Func<MountProfile, CancellationToken, Task<StartupPreflightReport>> _startupPreflightRunner;
   private readonly Func<MountProfile, CancellationToken, Task> _mountStartRunner;
   private readonly Func<MountProfile, CancellationToken, Task> _mountStopRunner;
+  private readonly Func<MountProfile, CancellationToken, Task> _mountForceStopRunner;
   private readonly Func<MountProfile, CancellationToken, Task<bool>> _mountedProbe;
   private readonly Func<MountProfile, CancellationToken, Task<ProfileRuntimeState>> _runtimeStateVerifier;
   private readonly Func<MountProfile, string, CancellationToken, Task> _startupEnableRunner;
@@ -355,7 +356,8 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     Func<IEnumerable<MountProfile>, CancellationToken, Task<IReadOnlyList<ProfileRuntimeState>>>?
       runtimeStateBatchVerifier = null,
     bool loadStartupData = true,
-    ILogger<MainWindowViewModel>? logger = null)
+    ILogger<MainWindowViewModel>? logger = null,
+    Func<MountProfile, CancellationToken, Task>? mountForceStopRunner = null)
   {
     _mountManagerService = mountManagerService ?? new MountManagerService(NullLogger<MountManagerService>.Instance);
     _launchAgentService = launchAgentService ?? new LaunchAgentService(NullLogger<LaunchAgentService>.Instance);
@@ -368,6 +370,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     _logger = logger ?? NullLogger<MainWindowViewModel>.Instance;
     _mountStartRunner = mountStartRunner ?? _mountManagerService.StartAsync;
     _mountStopRunner = mountStopRunner ?? _mountManagerService.StopAsync;
+    _mountForceStopRunner = mountForceStopRunner ?? _mountManagerService.ForceStopAsync;
     _testConnectionRunner = testConnectionRunner;
     _mountedProbe = mountedProbe ?? ((profile, cancellationToken) =>
       _mountManagerService.IsMountedAsync(profile.MountPoint, cancellationToken));
@@ -1425,6 +1428,62 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     });
   }
 
+  [RelayCommand(CanExecute = nameof(CanRunActions))]
+  private async Task ForceRestartMountAsync()
+  {
+    SyncMountOptionsToProfile();
+    await RunBusyActionAsync(async cancellationToken =>
+    {
+      MountProfile profile = SelectedProfile;
+      string profileId = profile.Id;
+      using (ProfileScope(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Initialization))
+      {
+        _logger.LogInformation("Force restarting mount...");
+      }
+
+      ApplyRuntimeState(
+        profile,
+        new ProfileRuntimeState(MountLifecycleState.Mounting, MountHealthState.Unknown, DateTimeOffset.UtcNow, null));
+
+      try
+      {
+        bool launchAgentEnabled = profile.StartAtLogin && _launchAgentService.IsEnabled(profile);
+        using (ProfileScope(profileId, ProfileLogCategory.ManualStart, ProfileLogStage.Execution))
+        {
+          if (launchAgentEnabled)
+          {
+            _logger.LogInformation("Unloading LaunchAgent before force stop...");
+            await _launchAgentService.UnloadAsync(profile, cancellationToken);
+          }
+
+          _logger.LogInformation("Force stopping rclone and unmounting...");
+          await Task.Run(() => _mountForceStopRunner(profile, cancellationToken), cancellationToken);
+          _logger.LogInformation("Starting mount...");
+          await Task.Run(() => _mountStartRunner(profile, cancellationToken), cancellationToken);
+
+          if (launchAgentEnabled)
+          {
+            _logger.LogInformation("Reloading LaunchAgent for KeepAlive protection...");
+            await _launchAgentService.LoadAsync(profile, cancellationToken);
+          }
+        }
+
+        await RefreshRuntimeStateInternalAsync(profile, cancellationToken);
+      }
+      catch (Exception ex)
+      {
+        ApplyRuntimeState(
+          profile,
+          new ProfileRuntimeState(
+            MountLifecycleState.Failed,
+            MountHealthState.Failed,
+            DateTimeOffset.UtcNow,
+            ex.Message));
+        throw;
+      }
+    });
+  }
+
   [RelayCommand(CanExecute = nameof(CanRevealInFileManager))]
   private async Task RevealInFileManagerAsync()
   {
@@ -1567,6 +1626,16 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     if (StopMountCommand.CanExecute(null))
     {
       await StopMountCommand.ExecuteAsync(null);
+    }
+  }
+
+  [RelayCommand]
+  private async Task DashboardForceRestartMountAsync(MountProfile profile)
+  {
+    SelectedProfile = profile;
+    if (ForceRestartMountCommand.CanExecute(null))
+    {
+      await ForceRestartMountCommand.ExecuteAsync(null);
     }
   }
 
@@ -2772,6 +2841,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
     RemoveProfileCommand.NotifyCanExecuteChanged();
     StartMountCommand.NotifyCanExecuteChanged();
     StopMountCommand.NotifyCanExecuteChanged();
+    ForceRestartMountCommand.NotifyCanExecuteChanged();
     RevealInFileManagerCommand.NotifyCanExecuteChanged();
     RefreshStatusCommand.NotifyCanExecuteChanged();
     RefreshCacheCommand.NotifyCanExecuteChanged();
@@ -4246,6 +4316,7 @@ public partial class MainWindowViewModel : ViewModelBase, IDisposable
           DashboardHasLinkedRemote,
           DashboardStartMountAsync,
           DashboardStopMountAsync,
+          DashboardForceRestartMountAsync,
           DashboardRefreshCacheAsync,
           DashboardRevealInFinderAsync));
     }

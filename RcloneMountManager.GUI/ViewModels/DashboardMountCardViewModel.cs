@@ -14,6 +14,7 @@ public sealed class DashboardMountCardViewModel : ViewModelBase
   private readonly Func<MountProfile, bool> _hasLinkedRemote;
   private readonly Func<MountProfile, Task> _startMountAsync;
   private readonly Func<MountProfile, Task> _stopMountAsync;
+  private readonly Func<MountProfile, Task> _forceRestartMountAsync;
   private readonly Func<MountProfile, Task> _refreshCacheAsync;
   private readonly Func<MountProfile, Task> _revealInFinderAsync;
 
@@ -25,6 +26,7 @@ public sealed class DashboardMountCardViewModel : ViewModelBase
     Func<MountProfile, bool> hasLinkedRemote,
     Func<MountProfile, Task> startMountAsync,
     Func<MountProfile, Task> stopMountAsync,
+    Func<MountProfile, Task> forceRestartMountAsync,
     Func<MountProfile, Task> refreshCacheAsync,
     Func<MountProfile, Task> revealInFinderAsync)
   {
@@ -35,6 +37,7 @@ public sealed class DashboardMountCardViewModel : ViewModelBase
     _hasLinkedRemote = hasLinkedRemote;
     _startMountAsync = startMountAsync;
     _stopMountAsync = stopMountAsync;
+    _forceRestartMountAsync = forceRestartMountAsync;
     _refreshCacheAsync = refreshCacheAsync;
     _revealInFinderAsync = revealInFinderAsync;
 
@@ -43,6 +46,7 @@ public sealed class DashboardMountCardViewModel : ViewModelBase
     EditRemoteCommand = new RelayCommand(EditRemote, CanEditRemote);
     StartMountCommand = new AsyncRelayCommand(StartMountAsync);
     StopMountCommand = new AsyncRelayCommand(StopMountAsync);
+    ForceRestartMountCommand = new AsyncRelayCommand(ForceRestartMountAsync);
     RefreshCacheCommand = new AsyncRelayCommand(RefreshCacheAsync);
     RevealInFinderCommand = new AsyncRelayCommand(RevealInFinderAsync);
   }
@@ -58,6 +62,8 @@ public sealed class DashboardMountCardViewModel : ViewModelBase
   public IAsyncRelayCommand StartMountCommand { get; }
 
   public IAsyncRelayCommand StopMountCommand { get; }
+
+  public IAsyncRelayCommand ForceRestartMountCommand { get; }
 
   public IAsyncRelayCommand RefreshCacheCommand { get; }
 
@@ -84,6 +90,11 @@ public sealed class DashboardMountCardViewModel : ViewModelBase
   private Task StopMountAsync()
   {
     return _stopMountAsync(Profile);
+  }
+
+  private Task ForceRestartMountAsync()
+  {
+    return _forceRestartMountAsync(Profile);
   }
 
   private Task RefreshCacheAsync()

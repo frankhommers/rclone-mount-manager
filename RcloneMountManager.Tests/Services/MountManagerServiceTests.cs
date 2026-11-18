@@ -10,6 +10,21 @@ public class MountManagerServiceTests
   private readonly MountManagerService _service = new(NullLogger<MountManagerService>.Instance);
 
   [Fact]
+  public void FindRcloneProcessIds_MatchesOnlyRcloneProcessesForMountPoint()
+  {
+    string psOutput = string.Join('\n',
+      "  101 /opt/homebrew/bin/rclone nfsmount remote: /Users/me/Mounts/a --rc",
+      "  102 /opt/homebrew/bin/rclone mount remote: /Users/me/Mounts/ab",
+      "  103 rclone mount other: /Users/me/Mounts/a/",
+      "  104 /usr/bin/vim /Users/me/Mounts/a",
+      "  105 /usr/local/bin/rclone mount x: /Users/me/Mounts/a");
+
+    IReadOnlyCollection<int> pids = MountManagerService.FindRcloneProcessIds(psOutput, "/Users/me/Mounts/a");
+
+    Assert.Equal([101, 103, 105], pids);
+  }
+
+  [Fact]
   public void GenerateScript_IncludesMountOptions_BoolTrue()
   {
     MountProfile profile = CreateProfile();
