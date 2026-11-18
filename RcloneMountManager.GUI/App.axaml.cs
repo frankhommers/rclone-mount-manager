@@ -1,15 +1,12 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core;
-using Avalonia.Data.Core.Plugins;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
 using System.IO.Pipes;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
@@ -35,7 +32,6 @@ public partial class App : Application
   {
     if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
     {
-      DisableAvaloniaDataAnnotationValidation();
       MainWindowViewModel viewModel = Services.GetRequiredService<MainWindowViewModel>();
       MainWindow mainWindow = new()
       {
@@ -56,7 +52,7 @@ public partial class App : Application
     base.OnFrameworkInitializationCompleted();
   }
 
-  public void EditableComboBox_GotFocus(object? sender, GotFocusEventArgs e)
+  public void EditableComboBox_GotFocus(object? sender, FocusChangedEventArgs e)
   {
     if (sender is ComboBox comboBox
         && !comboBox.IsDropDownOpen
@@ -128,17 +124,6 @@ public partial class App : Application
     if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
     {
       desktop.Shutdown();
-    }
-  }
-
-  private void DisableAvaloniaDataAnnotationValidation()
-  {
-    DataAnnotationsValidationPlugin[] dataValidationPluginsToRemove =
-      BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
-
-    foreach (DataAnnotationsValidationPlugin plugin in dataValidationPluginsToRemove)
-    {
-      BindingPlugins.DataValidators.Remove(plugin);
     }
   }
 }

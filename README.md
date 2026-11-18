@@ -30,7 +30,7 @@ brew install --cask frankhommers/tap/rclone-mount-manager
 ## Tech Stack
 
 - **UI:** [Avalonia UI](https://avaloniaui.net/) 11.3 with Fluent theme
-- **Language:** C# / .NET 10
+- **Language:** C# / .NET 11
 - **MVVM:** CommunityToolkit.Mvvm
 - **Process execution:** CliWrap
 - **Logging:** Serilog
@@ -39,7 +39,7 @@ brew install --cask frankhommers/tap/rclone-mount-manager
 
 ### Prerequisites
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [.NET 11 SDK](https://dotnet.microsoft.com/download)
 - [rclone](https://rclone.org/install/) (for runtime functionality)
 
 ### Build

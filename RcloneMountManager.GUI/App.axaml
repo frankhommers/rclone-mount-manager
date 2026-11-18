@@ -239,7 +239,7 @@
                            FontWeight="{Binding ShouldInclude, Converter={StaticResource ModifiedFontWeightConverter}}" />
                 <NumericUpDown Grid.Row="0" Grid.Column="1"
                                Value="{Binding NumericValue}"
-                               Watermark="{Binding DefaultStr}"
+                               PlaceholderText="{Binding DefaultStr}"
                                Minimum="0"
                                Increment="1"
                                Margin="8,0,0,0"
@@ -365,7 +365,7 @@
                 <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="8,0,0,0">
                     <NumericUpDown Grid.Column="0"
                                    Value="{Binding SizeSuffixNumericValue}"
-                                   Watermark="{Binding DefaultStr}"
+                                   PlaceholderText="{Binding DefaultStr}"
                                    Minimum="0"
                                    Increment="1"
                                    ShowButtonSpinner="True"
@@ -446,7 +446,7 @@
                           IsVisible="{Binding !IsPassword}">
                         <TextBox Grid.Column="0"
                                  Text="{Binding Value}"
-                                 Watermark="{Binding DefaultStr}"
+                                 PlaceholderText="{Binding DefaultStr}"
                                  HorizontalAlignment="Stretch" />
                         <Button Grid.Column="1"
                                 Command="{Binding BrowseFileCommand}"
@@ -497,11 +497,11 @@
                         <TextBox Text="{Binding ConfirmValue}"
                                  PasswordChar="•"
                                  IsVisible="{Binding !IsSecretVisible}"
-                                 Watermark="Confirm"
+                                 PlaceholderText="Confirm"
                                  HorizontalAlignment="Stretch" />
                         <TextBox Text="{Binding ConfirmValue}"
                                  IsVisible="{Binding IsSecretVisible}"
-                                 Watermark="Confirm"
+                                 PlaceholderText="Confirm"
                                  HorizontalAlignment="Stretch" />
                     </StackPanel>
 
@@ -621,12 +621,12 @@
                                     <TextBox Grid.Column="0"
                                              Text="{Binding Key}"
                                              IsVisible="{Binding IsKeyValue}"
-                                             Watermark="Key"
+                                             PlaceholderText="Key"
                                              HorizontalAlignment="Stretch" />
                                     <TextBox Grid.Column="1"
                                              Text="{Binding ItemValue}"
                                              IsVisible="{Binding IsKeyValue}"
-                                             Watermark="Value"
+                                             PlaceholderText="Value"
                                              HorizontalAlignment="Stretch" />
                                     <Button Grid.Column="2"
                                             Command="{Binding RemoveCommand}"

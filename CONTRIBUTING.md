@@ -5,7 +5,7 @@ Thanks for your interest in contributing to Rclone Mount Manager.
 ## Development Setup
 
 1. Install prerequisites:
-   - .NET 10 SDK
+   - .NET 11 SDK
    - rclone
    - Git
 2. Clone and build:

@@ -12,7 +12,7 @@
 
         <Grid ColumnDefinitions="*,Auto">
             <TextBox Text="{Binding SearchText}"
-                     Watermark="Search all parameters by name or description..."
+                     PlaceholderText="Search all parameters by name or description..."
                      AutomationProperties.Name="Search mount parameters"
                      ToolTip.Tip="Search includes advanced options and opens matching groups." />
             <Button Grid.Column="1" Content="Clear" Margin="8,0,0,0"

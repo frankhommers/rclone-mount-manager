@@ -485,7 +485,7 @@
                                                Margin="0,0,8,0" />
                                     <TextBox Grid.Column="7"
                                              Text="{Binding DiagnosticsSearchText}"
-                                             Watermark="Filter log messages..."
+                                             PlaceholderText="Filter log messages..."
                                              HorizontalAlignment="Stretch" />
                                 </Grid>
                             </Border>
@@ -642,7 +642,7 @@
                                 <Grid ColumnDefinitions="200,*">
                                     <TextBlock Text="Remote name" VerticalAlignment="Center" />
                                     <TextBox Grid.Column="1" Text="{Binding NewRemoteName}"
-                                             Watermark="example: my-webdav" HorizontalAlignment="Stretch"
+                                             PlaceholderText="example: my-webdav" HorizontalAlignment="Stretch"
                                              Margin="8,0,0,0" />
                                 </Grid>
 
@@ -703,13 +703,13 @@
                                 <Grid ColumnDefinitions="200,*">
                                     <TextBlock Text="Remote name" VerticalAlignment="Center" />
                                     <TextBox Grid.Column="1" Text="{Binding NewRemoteName}"
-                                             Watermark="example: my-webdav" HorizontalAlignment="Stretch"
+                                             PlaceholderText="example: my-webdav" HorizontalAlignment="Stretch"
                                              Margin="8,0,0,0" />
                                 </Grid>
 
                                 <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasBackendOptions}">
                                     <TextBox Text="{Binding BackendOptionSearchText}"
-                                             Watermark="Search all options by name or description..."
+                                             PlaceholderText="Search all options by name or description..."
                                              AutomationProperties.Name="Search remote configuration options"
                                              ToolTip.Tip="Search includes advanced options. Try key_file, key-file or SSH." />
                                     <Button Grid.Column="1" Content="Clear" Margin="8,0,0,0"
@@ -819,7 +819,7 @@
                                     <!-- TextBox for free-form input -->
                                     <TextBox IsVisible="{Binding WizardStepIsTextBox}"
                                              Text="{Binding WizardAnswer}"
-                                             Watermark="{Binding CurrentWizardStep.DefaultValue}"
+                                             PlaceholderText="{Binding CurrentWizardStep.DefaultValue}"
                                              PasswordChar="{Binding WizardStepPasswordChar}"
                                              HorizontalAlignment="Stretch"
                                              MaxWidth="500" />
@@ -967,13 +967,13 @@
                                     <Grid ColumnDefinitions="200,*" IsVisible="{Binding HasSelectedMountRemote}">
                                         <TextBlock Text="{Binding SourceLabel}" VerticalAlignment="Center" />
                                         <TextBox Grid.Column="1" Text="{Binding MountRemotePath, Mode=TwoWay}"
-                                                 Watermark="{Binding SourceHint}" HorizontalAlignment="Stretch"
+                                                 PlaceholderText="{Binding SourceHint}" HorizontalAlignment="Stretch"
                                                  Margin="8,0,0,0" />
                                     </Grid>
                                     <Grid ColumnDefinitions="200,*" IsVisible="{Binding !HasSelectedMountRemote}">
                                         <TextBlock Text="{Binding SourceLabel}" VerticalAlignment="Center" />
                                         <TextBox Grid.Column="1" Text="{Binding SelectedProfile.Source}"
-                                                 Watermark="{Binding SourceHint}" HorizontalAlignment="Stretch"
+                                                 PlaceholderText="{Binding SourceHint}" HorizontalAlignment="Stretch"
                                                  Margin="8,0,0,0" />
                                     </Grid>
                                     <TextBlock Text="{Binding SourceFormatHelp}" TextWrapping="Wrap" FontSize="11"
@@ -982,14 +982,14 @@
                                     <Grid ColumnDefinitions="200,*">
                                         <TextBlock Text="Local mount path" VerticalAlignment="Center" />
                                         <TextBox Grid.Column="1" Text="{Binding SelectedProfile.MountPoint}"
-                                                 Watermark="{Binding MountPointHint}" HorizontalAlignment="Stretch"
+                                                 PlaceholderText="{Binding MountPointHint}" HorizontalAlignment="Stretch"
                                                  Margin="8,0,0,0" />
                                     </Grid>
 
                                     <Grid ColumnDefinitions="200,*">
                                         <TextBlock Text="Rclone binary override" VerticalAlignment="Center" />
                                         <TextBox Grid.Column="1" Text="{Binding SelectedProfile.RcloneBinaryPath}"
-                                                 Watermark="Leave empty to use global setting"
+                                                 PlaceholderText="Leave empty to use global setting"
                                                  HorizontalAlignment="Stretch"
                                                  Margin="8,0,0,0" />
                                     </Grid>
@@ -1078,7 +1078,7 @@
                                 <Grid ColumnDefinitions="200,*">
                                     <TextBlock Text="Rclone binary path" VerticalAlignment="Center" />
                                     <TextBox Grid.Column="1" Text="{Binding GlobalRcloneBinaryPath}"
-                                             Watermark="Default: rclone" HorizontalAlignment="Stretch"
+                                             PlaceholderText="Default: rclone" HorizontalAlignment="Stretch"
                                              Margin="8,0,0,0" />
                                 </Grid>
 
