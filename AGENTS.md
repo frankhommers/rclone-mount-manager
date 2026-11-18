@@ -1,9 +1,10 @@
 ---
 # AI Agent Instructor Metadata
-generated: 2026-02-23T22:42:35Z
+generated: 2026-09-15T11:16:30Z
 languages: ['csharp']
 directions: []
 general: ['general']
+project: []
 template_order: ['general.md', 'languages/csharp.md']
 deployed_files: ['CODEX.md', 'GEMINI.md', 'CLAUDE.md', '.github/copilot-instructions.md']
 tool_version: 1.0.0
@@ -23,10 +24,12 @@ onsider other possibilities to achieve the result, do not be limited by the prom
 - **Clarity and Simplicity:** Write code that is easy to read and understand. Avoid overly complex solutions. Readability is key.
 - **Comments:** Output code without descriptions, minimize prose, comments and empty lines. Unless it is important.
 - **Conciseness:** Generate only the necessary code. Avoid verbosity.
-- **No Hallucinations:** Do not invent APIs, methods, or properties that do not exist. If you are unsure about a specific API, state that you cannot provide a definitive answer. Do not generate code that is likely to be incorrect or based on outdated information.
+- **No Hallucinations:** Do not invent APIs, methods, or properties that do not exist. If you are unsure about a specific API, state that you cannot provide a definitive answer. Do not generate code that is likely to be incorrect or based on outdated information. Make sure to fetch docs when unsure.
 - **Performance:** Be mindful of performance. Use efficient algorithms and data structures. Avoid unnecessary allocations, especially in performance-critical code.
 - **Hardcoding:** Judge what you hardcode, that is usually a bad pattern, avoid it if possible.
-- **UI:** If the application is a UI application, you can not run it to test it, so ask the user to test for you.
+- **Secrets:** Keep them out of the code and out of source control at ALL times!
+- **Backward compatibility:** Don't assume that the code needs to be backward compatible, ask the user.
+- **Generated Code:** Never manually edit generated code or files (e.g., code from scaffolding tools, ORM migrations, API client generators, or build outputs). If generated code contains issues, fix them in the generation process, templates, or configuration — not in the output. If you are unsure whether a file is generated, check for auto-generation headers or ask the user.
 
 ## Development Best Practices
 - Follow the project's existing conventions and patterns
@@ -42,6 +45,11 @@ onsider other possibilities to achieve the result, do not be limited by the prom
 - Use meaningful file and directory names
 - Separate concerns appropriately
 - Group related functionality together
+
+## i18n
+- Use English by Default if it's not clear from the project
+- Maintain all languages if there are i18n functionalities
+- Use the ISO8601 format for displaying date/times everywhere
 
 # C# Development Guidelines
 
